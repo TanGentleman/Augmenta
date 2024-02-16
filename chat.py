@@ -1,5 +1,5 @@
 from langchain.schema import HumanMessage, SystemMessage
-from models import get_together_mix, get_together_quen, get_mistral
+from models import get_together_mix, get_together_quen, get_mistral, get_together_coder
 from helpers import save_response_to_markdown_file, read_sample
 from constants import DEFAULT_QUERY, DEFAULT_SYSTEM_MESSAGE, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES
 from config import PERSISTENCE_ENABLED, ENABLE_SYSTEM_MESSAGE, ACTIVE_MODEL_TYPE, TOGETHER_API_ENABLED, SAVE_ONESHOT_RESPONSE
@@ -12,11 +12,14 @@ FORMATTED_PROMPT = '''Explain the following text using comprehensive bulletpoint
 '''
 EXPLAIN_EXCERPT = False
 
+CODE_SYSTEM_MESSAGE = "You are an expert programmer that helps to review Python code and provide optimizations. Provide a few specific bulletpoint notes on how to improve the code segment."
+
 SYSTEM_MESSAGE = DEFAULT_SYSTEM_MESSAGE
+# SYSTEM_MESSAGE = CODE_SYSTEM_MESSAGE
 
 if TOGETHER_API_ENABLED:
     assert ACTIVE_MODEL_TYPE == "together", "Set ACTIVE_MODEL_TYPE to 'together' in config.py"
-    TOGETHER_MODEL = get_together_mix()
+    TOGETHER_MODEL = get_together_quen()
     LOCAL_MODEL = None
 else:
     assert ACTIVE_MODEL_TYPE == "local", "Set ACTIVE_MODEL_TYPE to 'local' in config.py"
@@ -42,7 +45,6 @@ def main(prompt=DEFAULT_QUERY, persistent=False):
     forced_prompt = ""
     if not persistent:
         max_exchanges = 1
-        persistent = True
         force_prompt = True
         forced_prompt = prompt
         if SAVE_ONESHOT_RESPONSE:
@@ -62,7 +64,11 @@ def main(prompt=DEFAULT_QUERY, persistent=False):
 
         if prompt == "paste":
             # paste from clipboard
-            from pyperclip import paste
+            try:
+                from pyperclip import paste
+            except:
+                print('pyperclip not installed, try pip install pyperclip')
+                continue
             prompt = paste()
         elif prompt == "read":
             # read from sample.txt
@@ -83,7 +89,7 @@ def main(prompt=DEFAULT_QUERY, persistent=False):
             messages.pop()
             print('Deleted last exchange')
             continue
-        elif prompt == "exit":
+        elif prompt in ["quit", "exit"]:
             print('Exiting.')
             return
         elif prompt == "save":
@@ -91,7 +97,7 @@ def main(prompt=DEFAULT_QUERY, persistent=False):
             print('Saved response to response.md')
             continue
 
-        # add input to messages
+        # add input to messages list and get response
         messages.append(HumanMessage(content=prompt))
         count += 1
         print(f'Fetching response #{count}!')
@@ -111,28 +117,19 @@ def main(prompt=DEFAULT_QUERY, persistent=False):
     print('Reached max exchanges, exiting.')
     return
 
-# if __name__ == "__main__":
-#     from sys import argv
-#     if len(argv) > 1:
-#         prompt = argv[1]
-#     else:
-#         if FORMAT_PROMPT:
-#             prompt = FORMATTED_PROMPT.format(excerpt=read_sample())
-#         else:
-#             # prompt = read_sample()
-#             prompt = "read"
-#     main(prompt, persistent=PERSISTENCE_ENABLED)
-
 # Argparse implementation
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description='Chat with an AI')
+    parser = argparse.ArgumentParser(description='Chat with an LLM')
     parser.add_argument('prompt', type=str, nargs='?', help='Prompt for the AI')
-    parser.add_argument('--persistent', action='store_true', help='Persistent chat mode')
+    parser.add_argument('-p', '--persistent', action='store_true', help='Persistent chat mode')
     args = parser.parse_args()
     if args.prompt is None:
         if EXPLAIN_EXCERPT:
             args.prompt = FORMATTED_PROMPT.format(excerpt=read_sample())
         else:
             args.prompt = "read"
+    if not args.persistent:
+        args.persistent = PERSISTENCE_ENABLED
+        
     main(args.prompt, persistent=args.persistent)

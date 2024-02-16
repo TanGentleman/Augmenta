@@ -1,7 +1,8 @@
-
 .DS_Store
 .env
 __pycache__/
 *.pdf
 vector-dbs/
-
+.venv/
+*.md
+*.txt

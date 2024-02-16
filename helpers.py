@@ -18,10 +18,9 @@ def get_pdf_pages(filepath):
     return pages
 
 def get_documents(doc_type, input):
-    assert doc_type in ["text", "url", "file"]
-    if doc_type == "text":
-        documents = [input]
-    elif doc_type == "url":
+    assert doc_type in ["url", "file"]
+    documents = None
+    if doc_type == "url":
         loader = WebBaseLoader()
         documents = loader.load_documents()
     elif doc_type == "file":
@@ -29,14 +28,14 @@ def get_documents(doc_type, input):
     return documents
 
 def set_text_splitter(chunk_size=None, chunk_overlap=None):
-    chunk_size = chunk_size or 2000
+    chunk_size = chunk_size or 4000
     chunk_overlap = chunk_overlap or 200
     return RecursiveCharacterTextSplitter(
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
     )
 
-def split_docs(docs, text_splitter):
+def split_docs(docs: list, text_splitter: RecursiveCharacterTextSplitter):
     documents = text_splitter.split_documents(docs)
     if not documents:
         print('No documents found')
@@ -44,13 +43,22 @@ def split_docs(docs, text_splitter):
     print(f'Found {len(documents)} documents')
     return documents
 
-def get_vectorstore(documents, embedder, local_vector_path=None):
+def documents_from_texts(texts: list[str], text_splitter):
+    documents = text_splitter.create_documents(texts)
+    return documents
+
+
+def get_vectorstore(embedder, documents=None, local_vector_path=None):
     assert not(documents and local_vector_path), "Must provide either documents or local_vector_path, not both"
     if local_vector_path:
         vector = FAISS.load_local(f"vector-dbs/{local_vector_path}", embedder)
     else:
         print('Loading documents')
         vector = FAISS.from_documents(documents, embedder)
+    return vector
+
+def get_vectorstore_from_text(text: str, embedder):
+    vector = FAISS.from_texts([text], embedder)
     return vector
 
 def save_vector(vector, name="latest_vector"):
@@ -78,7 +86,7 @@ def get_response(retrieval_chain, query, together = False):
     return response["answer"]
 
 ### CONSTANTS
-rag_prompt = ChatPromptTemplate.from_template("""Answer the following question based only on the provided context:
+rag_template = ChatPromptTemplate.from_template("""Answer the following question based only on the following context:
 
 <context>
 {context}
