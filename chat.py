@@ -1,9 +1,9 @@
 from langchain.schema import HumanMessage, SystemMessage
-from models import get_together_mix, get_together_quen, get_mistral, get_together_coder
+# from models import get_together_mix, get_together_quen, get_mistral, get_together_coder
 from helpers import save_response_to_markdown_file, read_sample
 from constants import DEFAULT_QUERY, DEFAULT_SYSTEM_MESSAGE, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES
 from config import PERSISTENCE_ENABLED, ENABLE_SYSTEM_MESSAGE, ACTIVE_MODEL_TYPE, TOGETHER_API_ENABLED, SAVE_ONESHOT_RESPONSE
-
+from config import CHOSEN_MODEL, BACKUP_MODEL
 
 FORMATTED_PROMPT = '''Explain the following text using comprehensive bulletpoints:
 """
@@ -19,24 +19,28 @@ SYSTEM_MESSAGE = DEFAULT_SYSTEM_MESSAGE
 
 if TOGETHER_API_ENABLED:
     assert ACTIVE_MODEL_TYPE == "together", "Set ACTIVE_MODEL_TYPE to 'together' in config.py"
-    TOGETHER_MODEL = get_together_quen()
+    TOGETHER_MODEL = CHOSEN_MODEL()
     LOCAL_MODEL = None
 else:
     assert ACTIVE_MODEL_TYPE == "local", "Set ACTIVE_MODEL_TYPE to 'local' in config.py"
     TOGETHER_MODEL = None
-    LOCAL_MODEL = get_mistral()
+    LOCAL_MODEL = CHOSEN_MODEL()
 
 assert TOGETHER_MODEL is None or LOCAL_MODEL is None, "TOGETHER_MODEL and LOCAL_MODEL cannot both be enabled"
 
 def main(prompt=DEFAULT_QUERY, persistent=False):
     # Note that by default, main function reads prompt from sample.txt
-    model = ACTIVE_MODEL_TYPE
-    assert model in ["local", "together"]
-    if model == "together":
+    model_type = ACTIVE_MODEL_TYPE
+    assert model_type in ["local", "together"]
+    chat_model = None
+    backup_model = None
+    if model_type == "together":
         assert TOGETHER_API_ENABLED, "Set TOGETHER_API_ENABLED in config.py"
         assert TOGETHER_MODEL is not None, "TOGETHER_MODEL is None"
-    elif model == "local":
+        chat_model = TOGETHER_MODEL
+    elif model_type == "local":
         assert LOCAL_MODEL is not None, "LOCAL_MODEL is None"
+        chat_model = LOCAL_MODEL
     
     save_response = False
     count = 0
@@ -96,20 +100,25 @@ def main(prompt=DEFAULT_QUERY, persistent=False):
             save_response_to_markdown_file(messages[-1].content)
             print('Saved response to response.md')
             continue
-
+        elif prompt == "switch":
+            if TOGETHER_API_ENABLED:
+                # Switch to backup LLM
+                if backup_model is None:
+                    backup_model = chat_model
+                    print('Switching to backup model')
+                    chat_model = BACKUP_MODEL()
+                else:
+                    print('Switching back to primary model')
+                    # Switch chat model and backup model
+                    chat_model, backup_model = backup_model, chat_model
+            continue
         # add input to messages list and get response
         messages.append(HumanMessage(content=prompt))
         count += 1
         print(f'Fetching response #{count}!')
-        if model == "local":
-            response = LOCAL_MODEL.invoke(messages)
-            messages.append(response)
-            print()
-
-        elif model == "together":
-            response = TOGETHER_MODEL.invoke(messages)
-            messages.append(response)
-            print()
+        response = chat_model.invoke(messages)
+        messages.append(response)
+        print()
 
     if save_response:
         save_response_to_markdown_file(messages[-1].content)

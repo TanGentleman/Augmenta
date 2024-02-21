@@ -1,11 +1,13 @@
 from dotenv import load_dotenv
 load_dotenv()
 from os import getenv
+TOGETHER_API_KEY = getenv("TOGETHER_API_KEY")
+assert TOGETHER_API_KEY is not None
+
 from langchain_openai import ChatOpenAI
 from langchain.callbacks.manager import CallbackManager
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
-TOGETHER_API_KEY = getenv("TOGETHER_API_KEY")
-assert TOGETHER_API_KEY is not None
+
 def get_together_quen():
     return ChatOpenAI(
         base_url = "https://api.together.xyz",
@@ -24,6 +26,26 @@ def get_together_mix():
         model = "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
         temperature=0.1,
         max_tokens=1000,
+        streaming=True,
+        callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+    )
+def get_together_fn_mix():
+    return ChatOpenAI(
+        base_url = "https://api.together.xyz",
+        api_key = TOGETHER_API_KEY,
+        model = "mistralai/Mixtral-8x7B-Instruct-v0.1",
+        temperature=0.1,
+        max_tokens=1000,
+        streaming=True,
+        callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+    )
+def get_together_coder():
+    return ChatOpenAI(
+        base_url = "https://api.together.xyz",
+        api_key = TOGETHER_API_KEY,
+        model = "deepseek-ai/deepseek-coder-33b-instruct",
+        temperature=0.1,
+        max_tokens=2000,
         streaming=True,
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
