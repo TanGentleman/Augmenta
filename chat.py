@@ -15,7 +15,6 @@ EXPLAIN_EXCERPT = False
 CODE_SYSTEM_MESSAGE = "You are an expert programmer that helps to review Python code and provide optimizations. Provide a few specific bulletpoint notes on how to improve the code segment."
 
 SYSTEM_MESSAGE = DEFAULT_SYSTEM_MESSAGE
-# SYSTEM_MESSAGE = CODE_SYSTEM_MESSAGE
 
 if TOGETHER_API_ENABLED:
     assert ACTIVE_MODEL_TYPE == "together", "Set ACTIVE_MODEL_TYPE to 'together' in config.py"
@@ -101,16 +100,15 @@ def main(prompt=DEFAULT_QUERY, persistent=False):
             print('Saved response to response.md')
             continue
         elif prompt == "switch":
-            if TOGETHER_API_ENABLED:
-                # Switch to backup LLM
-                if backup_model is None:
-                    backup_model = chat_model
-                    print('Switching to backup model')
-                    chat_model = BACKUP_MODEL()
-                else:
-                    print('Switching back to primary model')
-                    # Switch chat model and backup model
-                    chat_model, backup_model = backup_model, chat_model
+            # Switch to backup LLM
+            if backup_model is None:
+                backup_model = chat_model
+                print('Switching to backup model')
+                chat_model = BACKUP_MODEL()
+            else:
+                print('Switching back to primary model')
+                # Switch chat model and backup model
+                chat_model, backup_model = backup_model, chat_model
             continue
         # add input to messages list and get response
         messages.append(HumanMessage(content=prompt))
@@ -132,6 +130,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='Chat with an LLM')
     parser.add_argument('prompt', type=str, nargs='?', help='Prompt for the AI')
     parser.add_argument('-p', '--persistent', action='store_true', help='Persistent chat mode')
+    parser.add_argument('-np', '--not-persistent', action='store_true', help='Disable persistent chat mode')
     args = parser.parse_args()
     if args.prompt is None:
         if EXPLAIN_EXCERPT:
@@ -140,5 +139,7 @@ if __name__ == "__main__":
             args.prompt = "read"
     if not args.persistent:
         args.persistent = PERSISTENCE_ENABLED
+    if args.not_persistent:
+        args.persistent = False
         
     main(args.prompt, persistent=args.persistent)

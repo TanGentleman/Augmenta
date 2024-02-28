@@ -1,18 +1,19 @@
 from models import get_together_quen, get_together_mix
-# from models import get_mistral, get_together_coder
+from models import get_mistral, get_together_coder
 
 # Rag config
-EMBEDDINGS_STEP = False
-PDF_FILENAME = "unit6-4k.pdf"
+EMBEDDINGS_STEP = True
+PDF_FILENAME = "yang.pdf"
 EMBEDDING_CONTEXT_SIZE = '8k'
-CHUNK_SIZE = 4000
+CHUNK_SIZE = 3000
 CHUNK_OVERLAP = 200
 USE_ADVANCED = False # This should be False unless I troubleshoot the errors
-CHOSEN_MODEL = get_together_mix
-BACKUP_MODEL = get_together_quen
 RAG_SYSTEM_MESSAGE = "You are a helpful AI assistant. Respond being clear, concise, and comprehensive."
 
 # chat.py config
+CHOSEN_MODEL = get_together_quen
+BACKUP_MODEL = get_together_mix
+# BACKUP_MODEL = get_mistral
 PERSISTENCE_ENABLED = True
 ENABLE_SYSTEM_MESSAGE = True
 
