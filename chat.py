@@ -1,8 +1,8 @@
 from langchain.schema import HumanMessage, SystemMessage
-# from models import get_together_mix, get_together_quen, get_mistral, get_together_coder
+# from models import get_together_nous_mix, get_together_quen, get_local_model, get_together_coder
 from helpers import save_response_to_markdown_file, read_sample
-from constants import DEFAULT_QUERY, DEFAULT_SYSTEM_MESSAGE, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES
-from config import PERSISTENCE_ENABLED, ENABLE_SYSTEM_MESSAGE, ACTIVE_MODEL_TYPE, TOGETHER_API_ENABLED, SAVE_ONESHOT_RESPONSE
+from constants import DEFAULT_QUERY, DEFAULT_SYSTEM_MESSAGE, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, CODE_SYSTEM_MESSAGE
+from config import PERSISTENCE_ENABLED, ENABLE_SYSTEM_MESSAGE, ACTIVE_MODEL_TYPE, TOGETHER_API_ENABLED, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE
 from config import CHOSEN_MODEL, BACKUP_MODEL
 
 FORMATTED_PROMPT = '''Explain the following text using comprehensive bulletpoints:
@@ -10,11 +10,10 @@ FORMATTED_PROMPT = '''Explain the following text using comprehensive bulletpoint
 {excerpt}
 """
 '''
-EXPLAIN_EXCERPT = False
-
-CODE_SYSTEM_MESSAGE = "You are an expert programmer that helps to review Python code and provide optimizations. Provide a few specific bulletpoint notes on how to improve the code segment."
+EXPLAIN_EXCERPT = True # If set to true, -np on sample.txt will format prompt like above
 
 SYSTEM_MESSAGE = DEFAULT_SYSTEM_MESSAGE
+# SYSTEM_MESSAGE = CODE_SYSTEM_MESSAGE
 
 if TOGETHER_API_ENABLED:
     assert ACTIVE_MODEL_TYPE == "together", "Set ACTIVE_MODEL_TYPE to 'together' in config.py"
@@ -27,7 +26,7 @@ else:
 
 assert TOGETHER_MODEL is None or LOCAL_MODEL is None, "TOGETHER_MODEL and LOCAL_MODEL cannot both be enabled"
 
-def main(prompt=DEFAULT_QUERY, persistent=False):
+def main(prompt=None, persistent=False):
     # Note that by default, main function reads prompt from sample.txt
     model_type = ACTIVE_MODEL_TYPE
     assert model_type in ["local", "together"]
@@ -47,11 +46,17 @@ def main(prompt=DEFAULT_QUERY, persistent=False):
     force_prompt = False
     forced_prompt = ""
     if not persistent:
+        if prompt is None:
+            prompt = DEFAULT_QUERY
         max_exchanges = 1
         force_prompt = True
         forced_prompt = prompt
         if SAVE_ONESHOT_RESPONSE:
             save_response = True
+    elif prompt is not None:
+        # This is a temporary solution
+        force_prompt = True
+        forced_prompt = prompt
 
     messages = []
     if ENABLE_SYSTEM_MESSAGE:
@@ -127,19 +132,21 @@ def main(prompt=DEFAULT_QUERY, persistent=False):
 # Argparse implementation
 if __name__ == "__main__":
     import argparse
-    parser = argparse.ArgumentParser(description='Chat with an LLM')
-    parser.add_argument('prompt', type=str, nargs='?', help='Prompt for the AI')
-    parser.add_argument('-p', '--persistent', action='store_true', help='Persistent chat mode')
+    parser = argparse.ArgumentParser(description='Interactive chat')
+    parser.add_argument('prompt', type=str, nargs='?', help='Prompt for the LLM')
     parser.add_argument('-np', '--not-persistent', action='store_true', help='Disable persistent chat mode')
     args = parser.parse_args()
-    if args.prompt is None:
-        if EXPLAIN_EXCERPT:
-            args.prompt = FORMATTED_PROMPT.format(excerpt=read_sample())
-        else:
-            args.prompt = "read"
-    if not args.persistent:
-        args.persistent = PERSISTENCE_ENABLED
+    
+    chat_is_persistent = PERSISTENCE_ENABLED
     if args.not_persistent:
-        args.persistent = False
-        
-    main(args.prompt, persistent=args.persistent)
+        chat_is_persistent = False
+
+    if args.prompt is None and chat_is_persistent is False:
+        if DEFAULT_TO_SAMPLE:
+            sample_txt_prompt = read_sample()
+            if EXPLAIN_EXCERPT:
+                formatted_prompt = FORMATTED_PROMPT.format(excerpt=sample_txt_prompt)
+            args.prompt = formatted_prompt
+
+    
+    main(args.prompt, persistent=chat_is_persistent)
