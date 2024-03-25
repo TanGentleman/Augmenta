@@ -1,12 +1,8 @@
 # This file is for running a retrieval augmented generation on an existing vector db
-from langchain.memory import ConversationBufferMemory
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.messages import SystemMessage
-from langchain_core.runnables import RunnableLambda, RunnablePassthrough
+from langchain_core.runnables import RunnablePassthrough
 from langchain_core.documents import Document
-from operator import itemgetter
 from helpers import clean_docs
-
+from constants import RAG_TEMPLATE
 import embed
 
 # These are the urls that get ingested as documents. Should be a list of strings.
@@ -18,62 +14,17 @@ DEFAULT_COLLECTION_NAME = "langchain_faiss_collection"
 # This is the question you want to ask (retriever will choose chunks of the documents as context to answer the question)
 DEFAULT_QUESTION = """How can I add documents to an existing faiss vector db?"""
 
-def format_docs(docs: list[Document]) -> str:
+def format_docs(docs: list[Document], save_excerpts = True) -> str:
     """
     Formats the list of documents into a single string.
     Used to format the docs into a string for context that is passed to the LLM.
     """
-    return "\n\n".join(doc.page_content for doc in docs)
-
-def get_rag_template():
-    """
-    Fetches the RAG template for the prompt.
-    This template expects to be passed values for both context and question.
-    """
-    template = """Answer the question based only on the following context:
-    <context>
-    {context}
-    </context>
-
-    Question: {question}
-    """
-    rag_prompt_template = ChatPromptTemplate.from_template(template)
-    rag_prompt_template.messages.insert(0, 
-        SystemMessage(
-            content="You are a helpful AI. Use the document excerpts to respond to the best of your ability."
-        )
-    )
-    return rag_prompt_template
-
-# def get_rag_chain(retriever, llm, memory: ConversationBufferMemory | None = None):
-#     """
-#     Input: retriever (contains vectorstore with documents) and llm
-#     Returns a chain for the RAG pipeline.
-#     Can be invoked with a question, like `chain.invoke("How do I do x task using this framework?")` to get a response.
-#     """
-#     # Get prompt template
-#     rag_prompt_template = get_rag_template()
-#     # Set memory
-#     if memory is None:
-#         memory = ConversationBufferMemory(
-#         return_messages=True, input_key="question", output_key="answer"
-#     )
-#     # Load memory
-#     # This adds a "memory" key to the input object
-#     loaded_memory = RunnablePassthrough.assign(
-#         chat_history=RunnableLambda(memory.load_memory_variables) | itemgetter("history"),
-#     )
-#     chain = (
-#         {"context": retriever | format_docs, "question": RunnablePassthrough()}
-#         | loaded_memory
-#         | rag_prompt_template
-#         | llm
-#         # | StrOutputParser()
-#     )
-#     # Save memory
-#     # This saves the history of the conversation
-#     # Return memory along with the chain
-#     return chain
+    # save documents here to excerpts.md
+    context = "\n\n".join(doc.page_content for doc in docs)
+    if save_excerpts:
+        with open("excerpts.md", "w") as f:
+            f.write(f"Context:\n{context}")
+    return context
 
 def get_rag_chain(retriever, llm):
     """
@@ -82,7 +33,7 @@ def get_rag_chain(retriever, llm):
     Can be invoked with a question, like `chain.invoke("How do I do x task using this framework?")` to get a response.
     """
     # Get prompt template
-    rag_prompt_template = get_rag_template()
+    rag_prompt_template = RAG_TEMPLATE
     chain = (
         {"context": retriever | format_docs, "question": RunnablePassthrough()}
         | rag_prompt_template
@@ -113,7 +64,7 @@ def vectorstore_from_inputs(inputs: str | list[str], method: str, embedder, coll
     assert method in ["chroma", "faiss"], "Invalid method"
     """
     Args:
-    - inputs: list of strings (urls or filepaths to pdfs [will support text files soon])
+    - inputs: list of strings (urls or filepaths to .pdf or .txt files)
     - method: "chroma" or "faiss"
     - embedder: the embedder to use
     - collection_name: the name of the collection to create/load
