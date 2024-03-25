@@ -1,0 +1,20 @@
+{
+    "ragConfig": {
+        "collectionName": "construction_collection",
+        "embedding_model": "get_openai_embedder_large",
+        "method": "faiss",
+        "chunkSize": 3000,
+        "chunkOverlap": 200,
+        "rag_model": "get_claude_opus",
+        "inputs": [
+            "construction.txt"
+        ]
+    },
+    "chatConfig": {
+        "primary_model": "get_claude_opus",
+        "backup_model": "get_local_model",
+        "persistence_enabled": true,
+        "enable_system_message": true,
+        "system_message": "You are a helpful AI."
+    }
+}

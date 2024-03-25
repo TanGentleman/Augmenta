@@ -1,0 +1,13 @@
+{
+    "id": "unique-id",
+    "collectionName": "descriptive-name",
+    "metadata":
+        {
+            "embedding_model": "get_openai_embedder_large",
+            "method": "faiss",
+            "chunkSize": 3000,
+            "chunkOverlap": 200,
+            "inputs": ["pdfName.pdf", "transcript.txt"],
+            "timestamp": "2024-03-25"
+        }
+}
