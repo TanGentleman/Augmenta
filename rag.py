@@ -3,7 +3,6 @@ from langchain.memory import ConversationBufferMemory
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import SystemMessage
 from langchain_core.runnables import RunnableLambda, RunnablePassthrough
-from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
 from operator import itemgetter
 from helpers import clean_docs
@@ -41,12 +40,42 @@ def get_rag_template():
     rag_prompt_template = ChatPromptTemplate.from_template(template)
     rag_prompt_template.messages.insert(0, 
         SystemMessage(
-            content="You are an AI programming assistant. Use the document excerpts to respond to the best of your ability."
+            content="You are a helpful AI. Use the document excerpts to respond to the best of your ability."
         )
     )
     return rag_prompt_template
 
-def get_rag_chain(retriever, llm, memory: ConversationBufferMemory | None = None):
+# def get_rag_chain(retriever, llm, memory: ConversationBufferMemory | None = None):
+#     """
+#     Input: retriever (contains vectorstore with documents) and llm
+#     Returns a chain for the RAG pipeline.
+#     Can be invoked with a question, like `chain.invoke("How do I do x task using this framework?")` to get a response.
+#     """
+#     # Get prompt template
+#     rag_prompt_template = get_rag_template()
+#     # Set memory
+#     if memory is None:
+#         memory = ConversationBufferMemory(
+#         return_messages=True, input_key="question", output_key="answer"
+#     )
+#     # Load memory
+#     # This adds a "memory" key to the input object
+#     loaded_memory = RunnablePassthrough.assign(
+#         chat_history=RunnableLambda(memory.load_memory_variables) | itemgetter("history"),
+#     )
+#     chain = (
+#         {"context": retriever | format_docs, "question": RunnablePassthrough()}
+#         | loaded_memory
+#         | rag_prompt_template
+#         | llm
+#         # | StrOutputParser()
+#     )
+#     # Save memory
+#     # This saves the history of the conversation
+#     # Return memory along with the chain
+#     return chain
+
+def get_rag_chain(retriever, llm):
     """
     Input: retriever (contains vectorstore with documents) and llm
     Returns a chain for the RAG pipeline.
@@ -54,27 +83,13 @@ def get_rag_chain(retriever, llm, memory: ConversationBufferMemory | None = None
     """
     # Get prompt template
     rag_prompt_template = get_rag_template()
-    # Set memory
-    if memory is None:
-        memory = ConversationBufferMemory(
-        return_messages=True, input_key="question", output_key="answer"
-    )
-    # Load memory
-    # This adds a "memory" key to the input object
-    loaded_memory = RunnablePassthrough.assign(
-        chat_history=RunnableLambda(memory.load_memory_variables) | itemgetter("history"),
-    )
     chain = (
         {"context": retriever | format_docs, "question": RunnablePassthrough()}
-        | loaded_memory
         | rag_prompt_template
         | llm
-        | StrOutputParser()
     )
-    # Save memory
-    # This saves the history of the conversation
-    # Return memory along with the chain
     return chain
+
 
 def input_to_docs(input: str) -> list[Document]:
     """

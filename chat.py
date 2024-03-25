@@ -30,6 +30,17 @@ def get_rag_settings(config: Config):
     }
     return rag_settings
 
+def get_retriever_from_settings(rag_settings):
+    # TODO:
+    # Add error handling
+    vectorstore = vectorstore_from_inputs(rag_settings["inputs"], 
+                                          rag_settings["method"], 
+                                          rag_settings["embedding_model"](), 
+                                          rag_settings["collection_name"])
+    retriever = vectorstore.as_retriever()
+    return retriever
+
+
 FORMATTED_PROMPT = '''Explain the following text using comprehensive bulletpoints:
 """
 {excerpt}
@@ -38,41 +49,24 @@ FORMATTED_PROMPT = '''Explain the following text using comprehensive bulletpoint
 EXPLAIN_EXCERPT = False # If set to true, -np on sample.txt will format prompt like above
 
 SYSTEM_MESSAGE = DEFAULT_SYSTEM_MESSAGE
-# SYSTEM_MESSAGE = CODE_SYSTEM_MESSAGE
 
-if TOGETHER_API_ENABLED:
-    assert ACTIVE_MODEL_TYPE == "together", "Set ACTIVE_MODEL_TYPE to 'together' in config.py"
-    TOGETHER_MODEL = CHOSEN_MODEL()
-    LOCAL_MODEL = None
-else:
-    assert ACTIVE_MODEL_TYPE == "local", "Set ACTIVE_MODEL_TYPE to 'local' in config.py"
-    TOGETHER_MODEL = None
-    LOCAL_MODEL = CHOSEN_MODEL()
-
-assert TOGETHER_MODEL is None or LOCAL_MODEL is None, "TOGETHER_MODEL and LOCAL_MODEL cannot both be enabled"
 
 def main(prompt=None, config=Config):
-    # Note that by default, main function reads prompt from sample.txt
-    # model_type = ACTIVE_MODEL_TYPE
-    # assert model_type in ["local", "together"]
-    # chat_model = None
-    # backup_model = None
-    # if model_type == "together":
-    #     assert TOGETHER_API_ENABLED, "Set TOGETHER_API_ENABLED in config.py"
-    #     assert TOGETHER_MODEL is not None, "TOGETHER_MODEL is None"
-    #     chat_model = TOGETHER_MODEL
-    # elif model_type == "local":
-    #     assert LOCAL_MODEL is not None, "LOCAL_MODEL is None"
-    #     chat_model = LOCAL_MODEL
+    # Note that by default with -np flag, main function reads prompt from sample.txt
     settings = get_chat_settings(config)
     rag_settings = get_rag_settings(config)
     chat_model = settings["primary_model"]
     backup_model = None
-    
-    rag_mode = settings["rag_mode"]
-    assert rag_mode is False, "RAG mode must initialize ingestion first"
     rag_chain = None
     retriever = None
+    rag_mode = settings["rag_mode"]
+    # assert rag_mode is False, "RAG mode must initialize ingestion first"
+    if rag_mode:
+        # pass
+        print("RAG mode activated, using vectorstore and solo responses")
+        retriever = get_retriever_from_settings(rag_settings)
+        # Save to manifest.json
+        rag_chain = get_rag_chain(retriever, rag_settings["rag_llm"]())
 
     save_response = False
     count = 0
@@ -94,7 +88,6 @@ def main(prompt=None, config=Config):
         forced_prompt = prompt
 
     messages = []
-    # if ENABLE_SYSTEM_MESSAGE:
     if settings["enable_system_message"]:
         messages.append(SystemMessage(content=settings["system_message"]))
     else:
@@ -168,13 +161,16 @@ def main(prompt=None, config=Config):
             chat_model = settings["primary_model"]()
             backup_model = None
             # Other changes go here...reload if needed?
+            messages = []
+            if settings["enable_system_message"]:
+                messages.append(SystemMessage(content=settings["system_message"]))
             rag_settings = get_rag_settings(new_config)
             continue
         # TODO:
         elif prompt == "saveall":
             # Save full chat history
             # Iterate through messages array and add to history.md
-            save_history_to_markdown_file([msg.type + ": " + msg.content for msg in messages])
+            save_history_to_markdown_file([msg.type.upper() + ": " + msg.content for msg in messages])
             continue
         # TODO:
         elif prompt == "info":
@@ -183,16 +179,12 @@ def main(prompt=None, config=Config):
         elif prompt == "ingest":
             # Ingest documents to vectorstore
             if retriever is not None:
-                print('Vectorstore already exists, use "reg" to clear and reset')
+                print('Retriever already exists, use "reg" to clear and reset first')
                 continue
             rag_mode = True
             # get rag settings
             print('Now using vectorstore and solo responses')
-            vectorstore = vectorstore_from_inputs(rag_settings["inputs"], 
-                                                  rag_settings["method"], 
-                                                  rag_settings["embedding_model"](), 
-                                                  rag_settings["collection_name"])
-            retriever = vectorstore.as_retriever()
+            retriever = get_retriever_from_settings(rag_settings)
             # Save to manifest.json
             rag_chain = get_rag_chain(retriever, rag_settings["rag_llm"]())
             continue
