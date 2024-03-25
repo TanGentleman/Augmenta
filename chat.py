@@ -1,13 +1,14 @@
 from langchain.schema import HumanMessage, SystemMessage
-from helpers import save_response_to_markdown_file, save_history_to_markdown_file, read_sample, read_settings
-from constants import DEFAULT_QUERY, DEFAULT_SYSTEM_MESSAGE, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, CODE_SYSTEM_MESSAGE
-from config import PERSISTENCE_ENABLED, ENABLE_SYSTEM_MESSAGE, ACTIVE_MODEL_TYPE, TOGETHER_API_ENABLED, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE
-from config import CHOSEN_MODEL, BACKUP_MODEL
+from helpers import save_response_to_markdown_file, save_history_to_markdown_file, read_sample
+from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES
+from config import SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, LOCAL_MODEL_ONLY
 from classes import Config
 from models import MODEL_DICT
 from rag import vectorstore_from_inputs, get_rag_chain
 
 def get_chat_settings(config: Config):
+    if LOCAL_MODEL_ONLY:
+        assert config.chat_config["primary_model"] == "get_local_model", "LOCAL_MODEL_ONLY is set to True"
     chat_settings = {
         "primary_model": MODEL_DICT[config.chat_config["primary_model"]],
         "backup_model": MODEL_DICT[config.chat_config["backup_model"]],
@@ -48,11 +49,10 @@ FORMATTED_PROMPT = '''Explain the following text using comprehensive bulletpoint
 '''
 EXPLAIN_EXCERPT = False # If set to true, -np on sample.txt will format prompt like above
 
-SYSTEM_MESSAGE = DEFAULT_SYSTEM_MESSAGE
-
-
 def main(prompt=None, config=Config):
     # Note that by default with -np flag, main function reads prompt from sample.txt
+    # TODO:
+    # Add comments to explain the flow of the main function
     settings = get_chat_settings(config)
     rag_settings = get_rag_settings(config)
     chat_model = settings["primary_model"]
@@ -108,7 +108,7 @@ def main(prompt=None, config=Config):
             except:
                 print('pyperclip not installed, try pip install pyperclip')
                 continue
-            prompt = paste()
+            prompt = paste().strip()
         elif prompt == "read":
             # read from sample.txt
             prompt = read_sample()
@@ -228,36 +228,24 @@ if __name__ == "__main__":
     parser.add_argument('-rag', '--rag-mode', action='store_true', help='Enable RAG mode')
     args = parser.parse_args()
     config = Config()
-    # print all the attributes of the config object
-    # print(config.__dict__)
-    chat_is_persistent = PERSISTENCE_ENABLED
+    prompt = args.prompt
+    chat_is_persistent = config.chat_config["persistence_enabled"]
     if args.not_persistent:
         chat_is_persistent = False
         config.chat_config["persistence_enabled"] = chat_is_persistent
 
-    if args.prompt is None and chat_is_persistent is False:
+    if prompt is None and chat_is_persistent is False:
         if DEFAULT_TO_SAMPLE:
             excerpt_as_prompt = read_sample()
             if EXPLAIN_EXCERPT:
                 excerpt_as_prompt = FORMATTED_PROMPT.format(excerpt=excerpt_as_prompt)
-            args.prompt = excerpt_as_prompt
+            prompt = excerpt_as_prompt
     
     if args.rag_mode:
         config.chat_config["rag_mode"] = True
     try:
         # main(args.prompt, persistent=chat_is_persistent)
-        main(args.prompt, config=config)
+        main(prompt, config=config)
     except KeyboardInterrupt:
         print('Keyboard interrupt, exiting.')
         raise SystemExit
-
-# New architecture:
-    # Rag commands: ingest, rag, reset
-    # Regular chat
-    # Type "ingest" as command
-    # If no vectorstore, create one
-    # Print "Now using vectorstore and solo responses"
-    # Only command accepted is "rag or reset"
-    # Rag command reformats the clipboard and responds to it
-    # Reset returns to regular chat and clears vectorstore
-    # Add restore as failsafe to retrieve last saved vectorstore
