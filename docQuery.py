@@ -1,5 +1,5 @@
-# Load document
-from models import get_together_mix, get_together_quen
+# This file is officially deprecated. The improved functions have been moved to embed.py and rag.py
+from models import get_together_nous_mix, get_together_quen
 from helpers import get_pdf_pages, save_response_to_markdown_file, set_text_splitter, split_docs
 from helpers import get_vectorstore, save_vector, get_document_chain, get_retrieval_chain, get_response
 from helpers import rag_template
@@ -13,7 +13,7 @@ from langchain_core.prompts import ChatPromptTemplate
 # EMBEDDING_CONTEXT_SIZE = '8k'
 # CHUNK_SIZE = 7500
 # CHUNK_OVERLAP = 200
-# ACTIVE_LLM = get_together_mix()
+# ACTIVE_LLM = get_together_nous_mix()
 
 ACTIVE_LLM = CHOSEN_MODEL()
 

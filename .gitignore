@@ -6,3 +6,6 @@ vector-dbs/
 .venv/
 *.md
 *.txt
+!TODO.md
+faiss-vector-dbs/
+chroma-vector-dbs/
