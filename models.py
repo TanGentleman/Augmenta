@@ -117,3 +117,14 @@ def get_local_model():
         streaming=True,
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
+
+MODEL_DICT = {
+    "get_openai_gpt4": get_openai_gpt4,
+    "get_together_quen": get_together_quen,
+    "get_together_nous_mix": get_together_nous_mix,
+    "get_together_fn_mix": get_together_fn_mix,
+    "get_together_coder": get_together_coder,
+    "get_claude_opus": get_claude_opus,
+    "get_local_model": get_local_model,
+    "get_openai_embedder_large": get_openai_embedder_large
+}
