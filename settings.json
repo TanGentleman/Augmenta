@@ -1,20 +1,21 @@
 {
-    "ragConfig": {
-        "collectionName": "construction_collection",
+    "rag_config": {
+        "collection_name": "test_paper_collection",
         "embedding_model": "get_openai_embedder_large",
         "method": "faiss",
-        "chunkSize": 3000,
-        "chunkOverlap": 200,
-        "rag_model": "get_claude_opus",
+        "chunk_size": 3000,
+        "chunk_overlap": 200,
+        "rag_llm": "get_together_quen",
         "inputs": [
-            "construction.txt"
+            "paper.txt"
         ]
     },
-    "chatConfig": {
+    "chat_config": {
         "primary_model": "get_claude_opus",
         "backup_model": "get_local_model",
         "persistence_enabled": true,
         "enable_system_message": true,
-        "system_message": "You are a helpful AI."
+        "system_message": "You are a helpful AI.",
+        "rag_mode": false
     }
 }

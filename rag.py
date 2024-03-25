@@ -32,7 +32,9 @@ def get_rag_template():
     This template expects to be passed values for both context and question.
     """
     template = """Answer the question based only on the following context:
+    <context>
     {context}
+    </context>
 
     Question: {question}
     """
@@ -44,7 +46,7 @@ def get_rag_template():
     )
     return rag_prompt_template
 
-def get_chain(retriever, llm, memory: ConversationBufferMemory | None = None):
+def get_rag_chain(retriever, llm, memory: ConversationBufferMemory | None = None):
     """
     Input: retriever (contains vectorstore with documents) and llm
     Returns a chain for the RAG pipeline.
@@ -128,7 +130,7 @@ def vectorstore_from_inputs(inputs: str | list[str], method: str, embedder, coll
 #     vectorstore = vectorstore_from_inputs(inputs, "chroma", embedder, collection_name)
 #     retriever = vectorstore.as_retriever()
 #     # Can add optional arguments like search_kwargs={"score_threshold": 0.5}
-#     chain = get_chain(retriever, llm)
+#     chain = get_rag_chain(retriever, llm)
 #     output = chain.invoke(question)
 #     return output
 
