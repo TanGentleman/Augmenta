@@ -1,7 +1,7 @@
 from langchain.schema import HumanMessage, SystemMessage
 from helpers import save_response_to_markdown_file, save_history_to_markdown_file, read_sample
-from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES
-from config import SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, LOCAL_MODEL_ONLY
+from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, EXPLANATION_TEMPLATE
+from config import SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, LOCAL_MODEL_ONLY, EXPLAIN_EXCERPT
 from classes import Config
 from models import MODEL_DICT
 from rag import vectorstore_from_inputs, get_rag_chain
@@ -31,9 +31,10 @@ def get_rag_settings(config: Config):
     }
     return rag_settings
 
-def get_retriever_from_settings(rag_settings):
+def get_retriever_from_settings(rag_settings, retriever_settings = None):
     # TODO:
     # Add error handling
+    # Implement retriever_settings (like k value or score_threshold)
     vectorstore = vectorstore_from_inputs(rag_settings["inputs"], 
                                           rag_settings["method"], 
                                           rag_settings["embedding_model"](), 
@@ -41,13 +42,9 @@ def get_retriever_from_settings(rag_settings):
     retriever = vectorstore.as_retriever()
     return retriever
 
-
-FORMATTED_PROMPT = '''Explain the following text using comprehensive bulletpoints:
-"""
-{excerpt}
-"""
-'''
-EXPLAIN_EXCERPT = False # If set to true, -np on sample.txt will format prompt like above
+def messages_to_strings(messages):
+    messages = [msg.type.upper() + ": " + msg.content for msg in messages]
+    return messages
 
 def main(prompt=None, config=Config):
     # Note that by default with -np flag, main function reads prompt from sample.txt
@@ -55,7 +52,7 @@ def main(prompt=None, config=Config):
     # Add comments to explain the flow of the main function
     settings = get_chat_settings(config)
     rag_settings = get_rag_settings(config)
-    chat_model = settings["primary_model"]
+    chat_model = settings["primary_model"]()
     backup_model = None
     rag_chain = None
     retriever = None
@@ -67,7 +64,11 @@ def main(prompt=None, config=Config):
         retriever = get_retriever_from_settings(rag_settings)
         # Save to manifest.json
         rag_chain = get_rag_chain(retriever, rag_settings["rag_llm"]())
-
+    messages = []
+    if settings["enable_system_message"]:
+        messages.append(SystemMessage(content=settings["system_message"]))
+    else:
+        print('System message is disabled')
     save_response = False
     count = 0
     max_exchanges = MAX_CHAT_EXCHANGES
@@ -87,11 +88,6 @@ def main(prompt=None, config=Config):
         force_prompt = True
         forced_prompt = prompt
 
-    messages = []
-    if settings["enable_system_message"]:
-        messages.append(SystemMessage(content=settings["system_message"]))
-    else:
-        print('System message is disabled')
     while count < max_exchanges:
         # get input
         if force_prompt:
@@ -112,6 +108,7 @@ def main(prompt=None, config=Config):
         elif prompt == "read":
             # read from sample.txt
             prompt = read_sample()
+            # No continue here
         
         if len(prompt) > MAX_CHARS_IN_PROMPT:
             print(f'Input too long, max characters is {MAX_CHARS_IN_PROMPT}')
@@ -127,14 +124,11 @@ def main(prompt=None, config=Config):
             messages.pop()
             messages.pop()
             print('Deleted last exchange')
+            count -= 1
             continue
         elif prompt in ["quit", "exit"]:
             print('Exiting.')
             return
-        elif prompt == "save":
-            save_response_to_markdown_file(messages[-1].content)
-            print('Saved response to response.md')
-            continue
         
         elif prompt == "switch":
             # Switch to backup LLM
@@ -149,32 +143,38 @@ def main(prompt=None, config=Config):
                 chat_model, backup_model = backup_model, chat_model
             continue
         elif prompt == "refresh":
-            # Refresh chat model
-            # NOTE:
-            # This currently only adjusts LLM choices
+            # Refresh chat model, system message, and RAG settings
             try:
-                new_config = Config()
+                config = Config()
             except:
                 print('Error reading settings.json')
                 raise SystemExit
-            settings = get_chat_settings(new_config)
+            settings = get_chat_settings(config)
+            rag_settings = get_rag_settings(config)
             chat_model = settings["primary_model"]()
             backup_model = None
-            # Other changes go here...reload if needed?
-            messages = []
-            if settings["enable_system_message"]:
-                messages.append(SystemMessage(content=settings["system_message"]))
-            rag_settings = get_rag_settings(new_config)
             continue
-        # TODO:
+        elif prompt == "save":
+            save_response_to_markdown_file(messages[-1].content)
+            print('Saved response to response.md')
+            continue
         elif prompt == "saveall":
             # Save full chat history
             # Iterate through messages array and add to history.md
-            save_history_to_markdown_file([msg.type.upper() + ": " + msg.content for msg in messages])
+            message_strings = messages_to_strings(messages)
+            save_history_to_markdown_file(message_strings)
+            print(f'Saved {count} exchanges to history.md')
             continue
         # TODO:
         elif prompt == "info":
             # Print info about the model, # of exchanges, system message, etc.
+            # Get name of the function
+            print(f'Chat model name: {chat_model.model_name}')
+            print(f'RAG mode: {rag_mode}')
+            if rag_mode is False:
+                print(f'Exchanges: {count}')
+                if settings["enable_system_message"]:
+                    print(f'System message: {settings["system_message"]}')
             continue
         elif prompt == "ingest":
             # Ingest documents to vectorstore
@@ -197,20 +197,24 @@ def main(prompt=None, config=Config):
             messages = messages[:1]
             continue
         # add input to messages list and get response
-        messages.append(HumanMessage(content=prompt))
-        count += 1
-        print(f'Fetching response #{count}!')
+        
         if rag_mode:
             # RAG mode
             assert rag_chain is not None, "Set rag_chain after ingest command"
             response = rag_chain.invoke(prompt)
         else:
+            messages.append(HumanMessage(content=prompt))
+            count += 1
+            print(f'Fetching response #{count}!')
             try:
                 response = chat_model.invoke(messages)
+                messages.append(response)
             except KeyboardInterrupt:
                 print('Keyboard interrupt, aborting generation.')
                 continue
-        messages.append(response)
+            except Exception as e:
+                print(f'Error!: {e}')
+                continue
         print()
 
     if save_response:
@@ -238,13 +242,12 @@ if __name__ == "__main__":
         if DEFAULT_TO_SAMPLE:
             excerpt_as_prompt = read_sample()
             if EXPLAIN_EXCERPT:
-                excerpt_as_prompt = FORMATTED_PROMPT.format(excerpt=excerpt_as_prompt)
+                excerpt_as_prompt = EXPLANATION_TEMPLATE.format(excerpt=excerpt_as_prompt)
             prompt = excerpt_as_prompt
     
     if args.rag_mode:
         config.chat_config["rag_mode"] = True
     try:
-        # main(args.prompt, persistent=chat_is_persistent)
         main(prompt, config=config)
     except KeyboardInterrupt:
         print('Keyboard interrupt, exiting.')
