@@ -127,14 +127,14 @@ def create_faiss_vectorstore(embedder, collection_name = "test_collection", docs
         print("Note: Collection seems to already exist! Not adding documents to the collection.")
         is_local = True
     if is_local:
-        vector = FAISS.load_local(filename, embedder, allow_dangerous_deserialization=True)
+        vectorstore = FAISS.load_local(filename, embedder, allow_dangerous_deserialization=True)
     else:
         if docs is None:
             raise ValueError("Collection not found. Provide documents to create a new collection")
         print('Indexing documents...')
-        vector = FAISS.from_documents(docs, embedder)
-        vector.save_local(filename)
-    return vector
+        vectorstore = FAISS.from_documents(docs, embedder)
+        vectorstore.save_local(filename)
+    return vectorstore
 
 def main(url = TEST_URL, collection_name = TEST_COLLECTION_NAME, question = TEST_QUESTION):
     from models import get_openai_embedder_large

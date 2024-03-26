@@ -35,10 +35,15 @@ def get_retriever_from_settings(rag_settings, retriever_settings = None):
     # TODO:
     # Add error handling
     # Implement retriever_settings (like k value or score_threshold)
-    vectorstore = vectorstore_from_inputs(rag_settings["inputs"], 
-                                          rag_settings["method"], 
-                                          rag_settings["embedding_model"](), 
-                                          rag_settings["collection_name"])
+    try:
+        vectorstore = vectorstore_from_inputs(rag_settings["inputs"], 
+                                            rag_settings["method"], 
+                                            rag_settings["embedding_model"](), 
+                                            rag_settings["collection_name"])
+    except Exception as e:
+        print(f'Error: {e}\n')
+        print(f'Error creating vectorstore, check RAG settings in settings.json!')
+        raise SystemExit
     retriever = vectorstore.as_retriever()
     return retriever
 
