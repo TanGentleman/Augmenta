@@ -5,10 +5,19 @@ from config import SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, LOCAL_MODEL_ONLY, E
 from classes import Config
 from models import MODEL_DICT
 from rag import vectorstore_from_inputs, get_rag_chain
+from json import dump as json_dump
+from json import load as json_load
+from uuid import uuid4
+# Get current time from datatime
+from datetime import datetime
+
+def get_current_time() -> str:
+    return str(datetime.now().strftime("%Y-%m-%d"))
 
 def get_chat_settings(config: Config):
     if LOCAL_MODEL_ONLY:
         assert config.chat_config["primary_model"] == "get_local_model", "LOCAL_MODEL_ONLY is set to True"
+    # Note these models are uncalled get llm functions
     chat_settings = {
         "primary_model": MODEL_DICT[config.chat_config["primary_model"]],
         "backup_model": MODEL_DICT[config.chat_config["backup_model"]],
@@ -20,13 +29,14 @@ def get_chat_settings(config: Config):
     return chat_settings
 
 def get_rag_settings(config: Config):
+    # Note that these models are called and initialized here
     rag_settings = {
         "collection_name": config.rag_config["collection_name"],
-        "embedding_model": MODEL_DICT[config.rag_config["embedding_model"]],
+        "embedding_model": MODEL_DICT[config.rag_config["embedding_model"]](),
         "method": config.rag_config["method"],
         "chunk_size": config.rag_config["chunk_size"],
         "chunk_overlap": config.rag_config["chunk_overlap"],
-        "rag_llm": MODEL_DICT[config.rag_config["rag_llm"]],
+        "rag_llm": MODEL_DICT[config.rag_config["rag_llm"]](),
         "inputs": config.rag_config["inputs"]
     }
     return rag_settings
@@ -38,7 +48,7 @@ def get_retriever_from_settings(rag_settings, retriever_settings = None):
     try:
         vectorstore = vectorstore_from_inputs(rag_settings["inputs"], 
                                             rag_settings["method"], 
-                                            rag_settings["embedding_model"](), 
+                                            rag_settings["embedding_model"], 
                                             rag_settings["collection_name"])
     except Exception as e:
         print(f'Error: {e}\n')
@@ -46,6 +56,41 @@ def get_retriever_from_settings(rag_settings, retriever_settings = None):
         raise SystemExit
     retriever = vectorstore.as_retriever()
     return retriever
+
+def update_manifest(rag_settings):
+    data = {}
+    with open('manifest.json', 'r') as f:
+        data = json_load(f) 
+    assert isinstance(data, list), "manifest.json is not a list"
+    # assert that the id is unique
+    for item in data:
+        if item["collection_name"] == rag_settings["collection_name"]:
+            print("No need to update manifest.json")
+            return
+    # get unique id
+    unique_id = str(uuid4())
+    print()
+    try:
+        model_name = str(rag_settings["embedding_model"].model)
+    except:
+        print("Could not get model name from embedding model")
+        model_name = "Unknown model"
+    manifest = {
+        "id": unique_id,
+        "collection_name": rag_settings["collection_name"],
+        "metadata": {
+            "embedding_model": model_name,
+            "method": rag_settings["method"],
+            "chunk_size": str(rag_settings["chunk_size"]),
+            "chunk_overlap": str(rag_settings["chunk_overlap"]),
+            "inputs": rag_settings["inputs"],
+            "timestamp": get_current_time()
+        }
+    }
+    data.append(manifest)
+    with open('manifest.json', 'w') as f:
+        json_dump(data, f, indent=4)
+    print("Updated manifest.json")
 
 def messages_to_strings(messages):
     messages = [msg.type.upper() + ": " + msg.content for msg in messages]
@@ -68,7 +113,8 @@ def main(prompt=None, config=Config):
         print("RAG mode activated, using vectorstore and solo responses")
         retriever = get_retriever_from_settings(rag_settings)
         # Save to manifest.json
-        rag_chain = get_rag_chain(retriever, rag_settings["rag_llm"]())
+        rag_chain = get_rag_chain(retriever, rag_settings["rag_llm"])
+        update_manifest(rag_settings)
     messages = []
     if settings["enable_system_message"]:
         messages.append(SystemMessage(content=settings["system_message"]))
@@ -191,7 +237,8 @@ def main(prompt=None, config=Config):
             print('Now using vectorstore and solo responses')
             retriever = get_retriever_from_settings(rag_settings)
             # Save to manifest.json
-            rag_chain = get_rag_chain(retriever, rag_settings["rag_llm"]())
+            rag_chain = get_rag_chain(retriever, rag_settings["rag_llm"])
+            update_manifest(rag_settings)
             continue
         elif prompt == "reg":
             # Return to regular chat

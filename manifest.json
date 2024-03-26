@@ -1,13 +1,17 @@
-{
-    "id": "unique-id",
-    "collectionName": "descriptive-name",
-    "metadata":
-        {
-            "embedding_model": "get_openai_embedder_large",
+[
+    {
+        "id": "c2a75dbe-0843-4f39-9a1b-e05ddd34dd40",
+        "collection_name": "rag_medium_and_txt_collection",
+        "metadata": {
+            "embedding_model": "text-embedding-3-large",
             "method": "faiss",
-            "chunkSize": 3000,
-            "chunkOverlap": 200,
-            "inputs": ["pdfName.pdf", "transcript.txt"],
+            "chunk_size": "3000",
+            "chunk_overlap": "200",
+            "inputs": [
+                "ragMedium.pdf",
+                "paper.txt"
+            ],
             "timestamp": "2024-03-25"
         }
-}
+    }
+]
