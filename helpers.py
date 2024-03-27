@@ -1,7 +1,13 @@
 from json import load as json_load
+from json import dump as json_dump
 from re import sub as re_sub
+from uuid import uuid4
 from langchain_core.documents import Document
 from os.path import exists, join
+from datetime import datetime
+
+#TODO:
+# Add a ROOT_FILEPATH constant and use os.join to create the filepaths
 
 def save_response_to_markdown_file(response_string, filename="response.md"):
     with open(filename, "w") as file:
@@ -50,7 +56,8 @@ def format_docs(docs: list[Document], save_excerpts = True) -> str:
     context_string = ""
     for doc in docs:
         # check if "Summary" is a key in the dict
-        print(doc.metadata.keys())
+        # print(doc.metadata.keys())
+        # This block is the default for arxiv papers, but I can add these to other docs
         if "Summary" in doc.metadata and "Title" in doc.metadata:
             summary = doc.metadata["Summary"]
             summary_string = f"Summary for {doc.metadata['Title']}:\n{summary}"
@@ -69,3 +76,52 @@ def collection_exists(collection_name: str, method: str) -> bool:
     """
     filepath = join(f"{method}-vector-dbs", collection_name)
     return exists(filepath)
+
+def get_current_time() -> str:
+    return str(datetime.now().strftime("%Y-%m-%d"))
+
+def update_manifest(rag_settings):
+    """
+    Update the manifest.json file with the new collection
+
+    Records:
+    - unique id, collection name, metadata
+    - metadata includes embedding model, method, chunk size, chunk overlap, inputs, timestamp
+    """
+    # assert rag_settings is appropriately formed
+    data = {}
+    with open('manifest.json', 'r') as f:
+        data = json_load(f) 
+    assert isinstance(data, list), "manifest.json is not a list"
+    # assert that the id is unique
+    for item in data:
+        if item["collection_name"] == rag_settings["collection_name"]:
+            # Make sure the embedding model is the same
+            if item["metadata"]["embedding_model"] != rag_settings["embedding_model"].model:
+                raise ValueError("Embedding model must match manifest")
+            # print("No need to update manifest.json")
+            return
+    # get unique id
+    unique_id = str(uuid4())
+    print()
+    try:
+        model_name = str(rag_settings["embedding_model"].model)
+    except:
+        print("Could not get model name from embedding model")
+        model_name = "Unknown model"
+    manifest = {
+        "id": unique_id,
+        "collection_name": rag_settings["collection_name"],
+        "metadata": {
+            "embedding_model": model_name,
+            "method": rag_settings["method"],
+            "chunk_size": str(rag_settings["chunk_size"]),
+            "chunk_overlap": str(rag_settings["chunk_overlap"]),
+            "inputs": rag_settings["inputs"],
+            "timestamp": get_current_time()
+        }
+    }
+    data.append(manifest)
+    with open('manifest.json', 'w') as f:
+        json_dump(data, f, indent=4)
+    print("Updated manifest.json")

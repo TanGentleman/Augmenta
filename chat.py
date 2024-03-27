@@ -1,18 +1,10 @@
 from langchain.schema import HumanMessage, SystemMessage
-from helpers import save_response_to_markdown_file, save_history_to_markdown_file, read_sample
+from helpers import save_response_to_markdown_file, save_history_to_markdown_file, read_sample, update_manifest
 from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, EXPLANATION_TEMPLATE
 from config import SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, LOCAL_MODEL_ONLY, EXPLAIN_EXCERPT
 from classes import Config
 from models import MODEL_DICT
 from rag import vectorstore_from_inputs, get_rag_chain
-from json import dump as json_dump
-from json import load as json_load
-from uuid import uuid4
-# Get current time from datatime
-from datetime import datetime
-
-def get_current_time() -> str:
-    return str(datetime.now().strftime("%Y-%m-%d"))
 
 def get_chat_settings(config: Config):
     if LOCAL_MODEL_ONLY:
@@ -67,41 +59,6 @@ def get_retriever_from_settings(rag_settings, retriever_settings = None):
         search_kwargs["k"] = 4
     retriever = vectorstore.as_retriever(search_kwargs=search_kwargs)
     return retriever
-
-def update_manifest(rag_settings):
-    data = {}
-    with open('manifest.json', 'r') as f:
-        data = json_load(f) 
-    assert isinstance(data, list), "manifest.json is not a list"
-    # assert that the id is unique
-    for item in data:
-        if item["collection_name"] == rag_settings["collection_name"]:
-            print("No need to update manifest.json")
-            return
-    # get unique id
-    unique_id = str(uuid4())
-    print()
-    try:
-        model_name = str(rag_settings["embedding_model"].model)
-    except:
-        print("Could not get model name from embedding model")
-        model_name = "Unknown model"
-    manifest = {
-        "id": unique_id,
-        "collection_name": rag_settings["collection_name"],
-        "metadata": {
-            "embedding_model": model_name,
-            "method": rag_settings["method"],
-            "chunk_size": str(rag_settings["chunk_size"]),
-            "chunk_overlap": str(rag_settings["chunk_overlap"]),
-            "inputs": rag_settings["inputs"],
-            "timestamp": get_current_time()
-        }
-    }
-    data.append(manifest)
-    with open('manifest.json', 'w') as f:
-        json_dump(data, f, indent=4)
-    print("Updated manifest.json")
 
 def messages_to_strings(messages):
     messages = [msg.type.upper() + ": " + msg.content for msg in messages]
@@ -234,19 +191,24 @@ def main(prompt=None, config=Config):
             # Print info about the model, # of exchanges, system message, etc.
             # Get name of the function
             model_name = "Unknown model"
-            
-            print(f'Chat model name: {chat_model_name}')
             print(f'RAG mode: {rag_mode}')
             if rag_mode is False:
                 print(f'Exchanges: {count}')
                 if settings["enable_system_message"]:
                     print(f'System message: {settings["system_message"]}')
                 try:
-                    chat_model_name = chat_model.model_name if hasattr(chat_model, 'model_name') else chat_model.model
+                    model_name = chat_model.model_name if hasattr(chat_model, 'model_name') else chat_model.model
+                    print(f'LLM: {model_name}')
                 except AttributeError:
                     print('Could not get model name from chat model')
                 continue
             else:
+                try:
+                    rag_model = rag_settings["rag_llm"]
+                    model_name = rag_model.model_name if hasattr(rag_model, 'model_name') else rag_model.model
+                    print(f'LLM: {model_name}')
+                except AttributeError:
+                    print('Could not get model name from chat model')
                 # RAG mode
                 print(f'Using vectorstore: {rag_settings["collection_name"]}')
                 print(f'Inputs: {rag_settings["inputs"]}')
