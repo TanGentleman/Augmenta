@@ -13,8 +13,7 @@ CODE_SYSTEM_MESSAGE = "You are an expert programmer that helps to review Python 
 EXPLANATION_TEMPLATE = '''Explain the following text using comprehensive bulletpoints:
 """
 {excerpt}
-"""
-'''
+"""'''
 
 def get_rag_template():
     """
@@ -26,8 +25,7 @@ def get_rag_template():
     {context}
     </context>
 
-    Question: {question}
-    """
+    Question: {question}"""
     rag_prompt_template = ChatPromptTemplate.from_template(template)
     rag_prompt_template.messages.insert(0, 
         SystemMessage(
@@ -36,4 +34,21 @@ def get_rag_template():
     )
     return rag_prompt_template
 
+def get_summary_template():
+    """
+    Fetches the template for summarization.
+    """
+    template = """Summarize the following text:
+    <excerpt>
+    {excerpt}
+    </excerpt>"""
+    summary_template = ChatPromptTemplate.from_template(template)
+    summary_template.messages.insert(0, 
+        SystemMessage(
+            content="You are a helpful AI."
+        )
+    )
+    return summary_template
+
 RAG_TEMPLATE = get_rag_template()
+SUMMARY_TEMPLATE = get_summary_template()
