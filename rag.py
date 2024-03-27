@@ -1,8 +1,9 @@
 # This file is for running a retrieval augmented generation on an existing vector db
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.documents import Document
-from helpers import clean_docs
-from constants import RAG_TEMPLATE
+from langchain_core.output_parsers import StrOutputParser
+from helpers import clean_docs, format_docs
+from constants import RAG_TEMPLATE, SUMMARY_TEMPLATE
 import embed
 
 # These are the urls that get ingested as documents. Should be a list of strings.
@@ -14,17 +15,18 @@ DEFAULT_COLLECTION_NAME = "langchain_faiss_collection"
 # This is the question you want to ask (retriever will choose chunks of the documents as context to answer the question)
 DEFAULT_QUESTION = """How can I add documents to an existing faiss vector db?"""
 
-def format_docs(docs: list[Document], save_excerpts = True) -> str:
+def get_summary_chain(llm):
     """
-    Formats the list of documents into a single string.
-    Used to format the docs into a string for context that is passed to the LLM.
+    Returns a chain for summarization only.
+    Can be invoked, like `chain.invoke("Excerpt of long reading:...")` to get a response.
     """
-    # save documents here to excerpts.md
-    context = "\n\n".join(doc.page_content for doc in docs)
-    if save_excerpts:
-        with open("excerpts.md", "w") as f:
-            f.write(f"Context:\n{context}")
-    return context
+    chain = (
+        {"excerpt": lambda x: x}
+        | SUMMARY_TEMPLATE
+        | llm
+        | StrOutputParser()
+    )
+    return chain
 
 def get_rag_chain(retriever, llm):
     """
@@ -59,7 +61,8 @@ def input_to_docs(input: str) -> list[Document]:
     docs = clean_docs(docs)
     return docs
 
-def vectorstore_from_inputs(inputs: str | list[str], method: str, embedder, collection_name: str):
+def vectorstore_from_inputs(inputs: str | list[str], method: str, embedder, collection_name: str,
+                            chunk_size: int, chunk_overlap: int = 200):
     method = method.lower()
     assert method in ["chroma", "faiss"], "Invalid method"
     """
@@ -68,6 +71,8 @@ def vectorstore_from_inputs(inputs: str | list[str], method: str, embedder, coll
     - method: "chroma" or "faiss"
     - embedder: the embedder to use
     - collection_name: the name of the collection to create/load
+    - chunk_size: the size in characters of the chunks to split the documents into
+    - chunk_overlap: the overlap between chunks
     Returns:
     - vectorstore: the vectorstore created from the inputs (FAISS or Chroma)
     """
@@ -76,7 +81,7 @@ def vectorstore_from_inputs(inputs: str | list[str], method: str, embedder, coll
         inputs = [inputs]
     for i in range(len(inputs)):
         docs = input_to_docs(inputs[i])
-        docs = embed.split_documents(docs)
+        docs = embed.split_documents(docs, chunk_size, chunk_overlap)
         if i == 0:
             if method == "chroma":
                 vectorstore = embed.create_chroma_vectorstore(embedder, collection_name, docs)
