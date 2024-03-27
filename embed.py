@@ -153,7 +153,7 @@ def faiss_vectorstore_from_docs(collection_name: str, embedder, docs: list[Docum
 def load_faiss_vectorstore(collection_name: str, embedder):
     assert collection_exists(collection_name, "faiss"), "Collection does not exist"
     filename = f"faiss-vector-dbs/{collection_name}"
-    vectorstore = FAISS.load_local(filename, embedder)
+    vectorstore = FAISS.load_local(filename, embedder, allow_dangerous_deserialization=True)
     return vectorstore
 
 def main(url = TEST_URL, collection_name = TEST_COLLECTION_NAME, question = TEST_QUESTION):
