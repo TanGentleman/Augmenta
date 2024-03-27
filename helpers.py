@@ -38,3 +38,15 @@ def clean_docs(docs: list[Document]) -> list[Document]:
         doc.page_content = clean_text(doc.page_content)
     # Replace emojis, weird unicode characters, etc.
     return docs
+
+def format_docs(docs: list[Document], save_excerpts = True) -> str:
+    """
+    Formats the list of documents into a single string.
+    Used to format the docs into a string for context that is passed to the LLM.
+    """
+    # save documents here to excerpts.md
+    context = "\n\n".join(doc.page_content for doc in docs)
+    if save_excerpts:
+        with open("excerpts.md", "w") as f:
+            f.write(f"Context:\n{context}")
+    return context
