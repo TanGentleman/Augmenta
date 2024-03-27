@@ -2,7 +2,7 @@
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
-from helpers import clean_docs, format_docs
+from helpers import clean_docs, collection_exists, format_docs
 from constants import RAG_TEMPLATE, SUMMARY_TEMPLATE
 import embed
 
@@ -61,7 +61,7 @@ def input_to_docs(input: str) -> list[Document]:
     docs = clean_docs(docs)
     return docs
 
-def vectorstore_from_inputs(inputs: str | list[str], method: str, embedder, collection_name: str,
+def vectorstore_from_inputs(inputs: list[str], method: str, embedder, collection_name: str,
                             chunk_size: int, chunk_overlap: int = 200):
     method = method.lower()
     assert method in ["chroma", "faiss"], "Invalid method"
@@ -77,16 +77,22 @@ def vectorstore_from_inputs(inputs: str | list[str], method: str, embedder, coll
     - vectorstore: the vectorstore created from the inputs (FAISS or Chroma)
     """
     vectorstore = None
-    if isinstance(inputs, str):
-        inputs = [inputs]
+    if collection_exists(collection_name, method):
+        print(f"Collection {collection_name} exists, now loading")
+        if method == "chroma":
+            vectorstore = embed.load_chroma_vectorstore(collection_name, embedder)
+        elif method == "faiss":
+            vectorstore = embed.load_faiss_vectorstore(collection_name, embedder)
+        assert vectorstore is not None, "Collection exists but not loaded properly"
+        return vectorstore
     for i in range(len(inputs)):
         docs = input_to_docs(inputs[i])
         docs = embed.split_documents(docs, chunk_size, chunk_overlap)
         if i == 0:
             if method == "chroma":
-                vectorstore = embed.create_chroma_vectorstore(embedder, collection_name, docs)
+                vectorstore = embed.chroma_vectorstore_from_docs(collection_name, embedder, docs)
             elif method == "faiss":
-                vectorstore = embed.create_faiss_vectorstore(embedder, collection_name, docs)
+                vectorstore = embed.faiss_vectorstore_from_docs(collection_name, embedder, docs)
         else:
             assert vectorstore is not None, "Vectorstore not initialized"
             # This method should work for both Chroma and FAISS

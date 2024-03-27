@@ -1,6 +1,7 @@
 from json import load as json_load
 from re import sub as re_sub
 from langchain_core.documents import Document
+from os.path import exists, join
 
 def save_response_to_markdown_file(response_string, filename="response.md"):
     with open(filename, "w") as file:
@@ -44,9 +45,27 @@ def format_docs(docs: list[Document], save_excerpts = True) -> str:
     Formats the list of documents into a single string.
     Used to format the docs into a string for context that is passed to the LLM.
     """
+    summaries = []
     # save documents here to excerpts.md
-    context = "\n\n".join(doc.page_content for doc in docs)
+    context_string = ""
+    for doc in docs:
+        # check if "Summary" is a key in the dict
+        print(doc.metadata.keys())
+        if "Summary" in doc.metadata and "Title" in doc.metadata:
+            summary = doc.metadata["Summary"]
+            summary_string = f"Summary for {doc.metadata['Title']}:\n{summary}"
+            if summary not in summaries:
+                summaries.append(summary)
+                context_string += summary_string + "\n\n"
+        context_string += doc.page_content + "\n\n"
     if save_excerpts:
         with open("excerpts.md", "w") as f:
-            f.write(f"Context:\n{context}")
-    return context
+            f.write(f"Context:\n{context_string}")
+    return context_string
+
+def collection_exists(collection_name: str, method: str) -> bool:
+    """
+    Check if a collection exists
+    """
+    filepath = join(f"{method}-vector-dbs", collection_name)
+    return exists(filepath)

@@ -6,14 +6,24 @@ from langchain_core.documents import Document
 from langchain_community.vectorstores import Chroma
 from chromadb.config import Settings
 from os.path import exists, join
-from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import PyPDFLoader, ArxivLoader
 from langchain_community.vectorstores import FAISS
+from helpers import collection_exists
 
 TEST_URL = "https://python.langchain.com/docs/integrations/vectorstores/faiss"
 TEST_COLLECTION_NAME = "langchain_faiss_collection" # This is just a descriptive name for the vector db folder
 TEST_QUESTION = "How can I initialize a faiss vector db?"
 
-
+def loader_from_arxiv_url(url: str) -> list[Document]:
+    """
+    Load documents from an arXiv URL, return List[Document]
+    """
+    # Get the number from links like "https://arxiv.org/pdf/2310.02170.pdf"
+    valid_starts = ["https://arxiv.org/abs/", "https://arxiv.org/pdf/"]
+    assert url.startswith(tuple(valid_starts)), "Make sure the link is a valid arXiv URL"
+    doc_id = url.split("/")[-1].replace(".pdf", "")
+    loader = ArxivLoader(query=doc_id)
+    return loader
 
 def loader_from_notebook_url(url: str):
     """
@@ -54,8 +64,11 @@ def documents_from_url(url: str) -> list[Document]:
         return url.startswith("http")
     assert is_link_valid(url), "Make sure the link is valid"
     print("Indexing url:", url)
+    loader = None
     if url[-6:] == ".ipynb":
         loader = loader_from_notebook_url(url)
+    elif url.startswith("https://arxiv.org/"):
+        loader = loader_from_arxiv_url(url)
     else:
         loader = WebBaseLoader(url)
     docs = loader.load()
@@ -72,6 +85,7 @@ def documents_from_local_pdf(filepath)-> list[Document]:
     assert exists(filepath), "Local PDF file not found"
     loader = PyPDFLoader(filepath)
     docs = loader.load()
+    # TODO: Add page number to each document as metadata
     if not docs:
         raise ValueError(f"Failed to read PDF and return documents.")
     return docs
@@ -98,42 +112,48 @@ def split_documents(docs: list[Document], chunk_size=4000, chunk_overlap=200) ->
     ).split_documents(docs)
     return chunked_docs
 
-def create_chroma_vectorstore(embedder, collection_name = "test_collection", docs: list[Document] = None):
+def get_chroma_vectorstore(collection_name: str, embedder):
     """
-    Create a vectorstore from documents
+    Get a Chroma vectorstore from a collection name, folder is created if it doesn't exist
     """
     filename = f"chroma-vector-dbs/{collection_name}"
-    is_local = False
-    if exists(filename):
-        print("Note: Collection seems to already exist! Not adding documents to the collection.")
-        is_local = True
-    else:
-        if docs is None:
-            raise ValueError("Collection not found. Provide documents to create a new collection")
     vectorstore = Chroma(
         collection_name=collection_name, 
         embedding_function=embedder,
         persist_directory=filename,
         client_settings= Settings(anonymized_telemetry=False, is_persistent=True),
     )
-    if is_local is False:
-        vectorstore.add_documents(docs)
     return vectorstore
 
-def create_faiss_vectorstore(embedder, collection_name = "test_collection", docs: list[Document] = None):
+def chroma_vectorstore_from_docs(collection_name: str, embedder, docs: list[Document]):
+    assert not collection_exists(collection_name, "chroma"), "Collection already exists"
+    if docs is None:
+        raise ValueError("Collection not found. Provide documents to create a new collection")
+    print('Indexing documents...')
+    vectorstore = get_chroma_vectorstore(collection_name, embedder)
+    vectorstore.add_documents(docs)
+    return vectorstore
+
+def load_chroma_vectorstore(collection_name, embedder):
+    assert collection_exists(collection_name, "chroma"), "Collection does not exist"
+    vectorstore = get_chroma_vectorstore(collection_name, embedder)
+    # assert there are documents present
+    return vectorstore
+
+def faiss_vectorstore_from_docs(collection_name: str, embedder, docs: list[Document]):
+    assert not collection_exists(collection_name, "faiss"), "Collection already exists"
     filename = f"faiss-vector-dbs/{collection_name}"
-    is_local = False
-    if exists(filename):
-        print("Note: Collection seems to already exist! Not adding documents to the collection.")
-        is_local = True
-    if is_local:
-        vectorstore = FAISS.load_local(filename, embedder, allow_dangerous_deserialization=True)
-    else:
-        if docs is None:
-            raise ValueError("Collection not found. Provide documents to create a new collection")
-        print('Indexing documents...')
-        vectorstore = FAISS.from_documents(docs, embedder)
-        vectorstore.save_local(filename)
+    if docs is None:
+        raise ValueError("Collection not found. Provide documents to create a new collection")
+    print('Indexing documents...')
+    vectorstore = FAISS.from_documents(docs, embedder)
+    vectorstore.save_local(filename)
+    return vectorstore
+
+def load_faiss_vectorstore(collection_name: str, embedder):
+    assert collection_exists(collection_name, "faiss"), "Collection does not exist"
+    filename = f"faiss-vector-dbs/{collection_name}"
+    vectorstore = FAISS.load_local(filename, embedder)
     return vectorstore
 
 def main(url = TEST_URL, collection_name = TEST_COLLECTION_NAME, question = TEST_QUESTION):
@@ -141,7 +161,7 @@ def main(url = TEST_URL, collection_name = TEST_COLLECTION_NAME, question = TEST
     embedder = get_openai_embedder_large()
     docs = documents_from_url(url)
     chunked_docs = split_documents(docs)
-    vectorstore = create_chroma_vectorstore(embedder, collection_name=collection_name, docs=chunked_docs)
+    vectorstore = chroma_vectorstore_from_docs(collection_name, embedder, chunked_docs)
     output = vectorstore.similarity_search(question, k=1)
     print(output)
     print('\nThe above document was found to be most relevant!')
