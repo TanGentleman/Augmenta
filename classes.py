@@ -10,9 +10,12 @@ LLM = Literal[
         "get_together_fn_mix",
         "get_together_coder",
         "get_claude_opus",
+        "get_claude_sonnet",
         "get_local_model",
         ]
-Embedder = Literal["get_openai_embedder_large"]
+Embedder = Literal["get_openai_embedder_large",
+                   "get_together_embedder_large",
+                   "get_nomic_local_embedder"]
 
 class RagSchema(BaseModel):
     """

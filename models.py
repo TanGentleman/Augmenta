@@ -2,6 +2,8 @@
 
 from os.path import join, dirname
 from dotenv import load_dotenv
+from langchain_together import TogetherEmbeddings
+from langchain_community.embeddings import OllamaEmbeddings
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
 
@@ -90,6 +92,15 @@ def get_together_coder():
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
+def get_claude_sonnet():
+    return ChatAnthropic(
+        model_name="claude-3-sonnet-20240229",
+        anthropic_api_key=ANTHROPIC_API_KEY, 
+        temperature=0, 
+        streaming=True,
+        callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+    )
+
 def get_claude_opus():
     assert ANTHROPIC_API_KEY, "Please set ANTHROPIC_API_KEY in .env file"
     return ChatAnthropic(
@@ -107,15 +118,28 @@ def get_openai_embedder_large():
         api_key=OPENAI_API_KEY
     )
 
+def get_together_embedder_large():
+    # assert False, "This model is not available yet. Please use get_openai_embedder_large() instead."
+    assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
+    return TogetherEmbeddings(
+        model="BAAI/bge-large-en-v1.5",
+        together_api_key=TOGETHER_API_KEY
+    )
+
 def get_local_model():
     return ChatOpenAI(
         base_url = "http://localhost:1234/v1",
-        api_key='None',
+        api_key='lm-studio',
         model = "local-model",
         temperature=0.1,
         max_tokens=1000,
         streaming=True,
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+    )
+
+def get_nomic_local_embedder():
+    return OllamaEmbeddings(
+        model = "nomic-embed-text"
     )
 
 MODEL_DICT = {
@@ -124,7 +148,10 @@ MODEL_DICT = {
     "get_together_nous_mix": get_together_nous_mix,
     "get_together_fn_mix": get_together_fn_mix,
     "get_together_coder": get_together_coder,
+    "get_claude_sonnet": get_claude_sonnet,
     "get_claude_opus": get_claude_opus,
     "get_local_model": get_local_model,
-    "get_openai_embedder_large": get_openai_embedder_large
+    "get_openai_embedder_large": get_openai_embedder_large,
+    "get_together_embedder_large": get_together_embedder_large,
+    "get_nomic_local_embedder": get_nomic_local_embedder
 }
