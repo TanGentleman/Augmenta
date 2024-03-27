@@ -49,12 +49,23 @@ def get_retriever_from_settings(rag_settings, retriever_settings = None):
         vectorstore = vectorstore_from_inputs(rag_settings["inputs"], 
                                             rag_settings["method"], 
                                             rag_settings["embedding_model"], 
-                                            rag_settings["collection_name"])
+                                            rag_settings["collection_name"],
+                                            rag_settings["chunk_size"],
+                                            rag_settings["chunk_overlap"])
     except Exception as e:
         print(f'Error: {e}\n')
         print(f'Error creating vectorstore, check RAG settings in settings.json!')
         raise SystemExit
-    retriever = vectorstore.as_retriever()
+    # retrieval settings
+    search_kwargs = {}
+    if retriever_settings is not None:
+        search_kwargs["k"] = retriever_settings["document_count"]
+        if retriever_settings["filter"] is not None:
+            search_kwargs["filter"] = retriever_settings["filter_metadata"]
+            # 'filter': {'paper_title':'GPT-4 Technical Report'}
+    else:
+        search_kwargs["k"] = 4
+    retriever = vectorstore.as_retriever(search_kwargs=search_kwargs)
     return retriever
 
 def update_manifest(rag_settings):
@@ -206,6 +217,9 @@ def main(prompt=None, config=Config):
             backup_model = None
             continue
         elif prompt == "save":
+            if len(messages) < 2:
+                print('No responses to save')
+                continue
             save_response_to_markdown_file(messages[-1].content)
             print('Saved response to response.md')
             continue
@@ -216,17 +230,31 @@ def main(prompt=None, config=Config):
             save_history_to_markdown_file(message_strings)
             print(f'Saved {count} exchanges to history.md')
             continue
-        # TODO:
         elif prompt == "info":
             # Print info about the model, # of exchanges, system message, etc.
             # Get name of the function
-            print(f'Chat model name: {chat_model.model_name}')
+            model_name = "Unknown model"
+            
+            print(f'Chat model name: {chat_model_name}')
             print(f'RAG mode: {rag_mode}')
             if rag_mode is False:
                 print(f'Exchanges: {count}')
                 if settings["enable_system_message"]:
                     print(f'System message: {settings["system_message"]}')
-            continue
+                try:
+                    chat_model_name = chat_model.model_name if hasattr(chat_model, 'model_name') else chat_model.model
+                except AttributeError:
+                    print('Could not get model name from chat model')
+                continue
+            else:
+                # RAG mode
+                print(f'Using vectorstore: {rag_settings["collection_name"]}')
+                print(f'Inputs: {rag_settings["inputs"]}')
+                print(f'Embedding model: {rag_settings["embedding_model"].model}')
+                print(f'Method: {rag_settings["method"]}')
+                print(f'Chunk size: {rag_settings["chunk_size"]}')
+                print(f'Chunk overlap: {rag_settings["chunk_overlap"]}')
+                continue
         elif prompt == "ingest":
             # Ingest documents to vectorstore
             if retriever is not None:
