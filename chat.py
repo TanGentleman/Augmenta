@@ -7,6 +7,7 @@ from classes import Config
 from models import MODEL_DICT, LLM, Embedder
 from rag import vectorstore_from_inputs, get_rag_chain
 
+
 def get_chat_settings(config: Config):
     if LOCAL_MODEL_ONLY:
         assert config.chat_config["primary_model"] == "get_local_model", "LOCAL_MODEL_ONLY is set to True"
@@ -21,6 +22,7 @@ def get_chat_settings(config: Config):
     }
     return chat_settings
 
+
 def get_rag_settings(config: Config) -> dict[str, Any]:
     # Note that these models are called and initialized here
     rag_settings = {
@@ -34,17 +36,19 @@ def get_rag_settings(config: Config) -> dict[str, Any]:
     }
     return rag_settings
 
-def get_retriever_from_settings(rag_settings: dict[str, Any], retriever_settings = None):
+
+def get_retriever_from_settings(
+        rag_settings: dict[str, Any], retriever_settings=None):
     # TODO:
     # Add error handling
     # Implement retriever_settings (like k value or score_threshold)
     try:
-        vectorstore = vectorstore_from_inputs(rag_settings["inputs"], 
-                                            rag_settings["method"], 
-                                            rag_settings["embedding_model"], 
-                                            rag_settings["collection_name"],
-                                            rag_settings["chunk_size"],
-                                            rag_settings["chunk_overlap"])
+        vectorstore = vectorstore_from_inputs(rag_settings["inputs"],
+                                              rag_settings["method"],
+                                              rag_settings["embedding_model"],
+                                              rag_settings["collection_name"],
+                                              rag_settings["chunk_size"],
+                                              rag_settings["chunk_overlap"])
     except Exception as e:
         print(f'Error: {e}\n')
         print(f'Error creating vectorstore, check RAG settings in settings.json!')
@@ -61,9 +65,11 @@ def get_retriever_from_settings(rag_settings: dict[str, Any], retriever_settings
     retriever = vectorstore.as_retriever(search_kwargs=search_kwargs)
     return retriever
 
+
 def messages_to_strings(messages):
     messages = [msg.type.upper() + ": " + msg.content for msg in messages]
     return messages
+
 
 def main(prompt=None, config=Config):
     # Note that by default with -np flag, main function reads prompt from sample.txt
@@ -121,7 +127,7 @@ def main(prompt=None, config=Config):
             # paste from clipboard
             try:
                 from pyperclip import paste
-            except:
+            except BaseException:
                 print('pyperclip not installed, try pip install pyperclip')
                 continue
             prompt = paste().strip()
@@ -129,7 +135,7 @@ def main(prompt=None, config=Config):
             # read from sample.txt
             prompt = read_sample()
             # No continue here
-        
+
         if len(prompt) > MAX_CHARS_IN_PROMPT:
             print(f'Input too long, max characters is {MAX_CHARS_IN_PROMPT}')
             continue
@@ -149,7 +155,7 @@ def main(prompt=None, config=Config):
         elif prompt in ["quit", "exit"]:
             print('Exiting.')
             return
-        
+
         elif prompt == "switch":
             # Switch to backup LLM
             if backup_model is None:
@@ -166,7 +172,7 @@ def main(prompt=None, config=Config):
             # Refresh chat model, system message, and RAG settings
             try:
                 config = Config()
-            except:
+            except BaseException:
                 print('Error reading settings.json')
                 raise SystemExit
             settings = get_chat_settings(config)
@@ -201,7 +207,8 @@ def main(prompt=None, config=Config):
                 if settings["enable_system_message"]:
                     print(f'System message: {settings["system_message"]}')
                 try:
-                    model_name = chat_model.model_name if hasattr(chat_model, 'model_name') else chat_model.model
+                    model_name = chat_model.model_name if hasattr(
+                        chat_model, 'model_name') else chat_model.model
                     print(f'LLM: {model_name}')
                 except AttributeError:
                     print('Could not get model name from chat model')
@@ -209,14 +216,16 @@ def main(prompt=None, config=Config):
             else:
                 try:
                     rag_model = rag_settings["rag_llm"]
-                    model_name = rag_model.model_name if hasattr(rag_model, 'model_name') else rag_model.model
+                    model_name = rag_model.model_name if hasattr(
+                        rag_model, 'model_name') else rag_model.model
                     print(f'LLM: {model_name}')
                 except AttributeError:
                     print('Could not get model name from chat model')
                 # RAG mode
                 print(f'Using vectorstore: {rag_settings["collection_name"]}')
                 print(f'Inputs: {rag_settings["inputs"]}')
-                print(f'Embedding model: {rag_settings["embedding_model"].model}')
+                print(
+                    f'Embedding model: {rag_settings["embedding_model"].model}')
                 print(f'Method: {rag_settings["method"]}')
                 print(f'Chunk size: {rag_settings["chunk_size"]}')
                 print(f'Chunk overlap: {rag_settings["chunk_overlap"]}')
@@ -243,7 +252,7 @@ def main(prompt=None, config=Config):
             messages = messages[:1]
             continue
         # add input to messages list and get response
-        
+
         if rag_mode:
             # RAG mode
             assert rag_chain is not None, "Set rag_chain after ingest command"
@@ -276,13 +285,26 @@ def main(prompt=None, config=Config):
     print('Reached max exchanges, exiting.')
     return
 
+
 # Argparse implementation
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Interactive chat')
-    parser.add_argument('prompt', type=str, nargs='?', help='Prompt for the LLM')
-    parser.add_argument('-np', '--not-persistent', action='store_true', help='Disable persistent chat mode')
-    parser.add_argument('-rag', '--rag-mode', action='store_true', help='Enable RAG mode')
+    parser.add_argument(
+        'prompt',
+        type=str,
+        nargs='?',
+        help='Prompt for the LLM')
+    parser.add_argument(
+        '-np',
+        '--not-persistent',
+        action='store_true',
+        help='Disable persistent chat mode')
+    parser.add_argument(
+        '-rag',
+        '--rag-mode',
+        action='store_true',
+        help='Enable RAG mode')
     args = parser.parse_args()
     config = Config()
     prompt = args.prompt
@@ -295,9 +317,10 @@ if __name__ == "__main__":
         if DEFAULT_TO_SAMPLE:
             excerpt_as_prompt = read_sample()
             if EXPLAIN_EXCERPT:
-                excerpt_as_prompt = EXPLANATION_TEMPLATE.format(excerpt=excerpt_as_prompt)
+                excerpt_as_prompt = EXPLANATION_TEMPLATE.format(
+                    excerpt=excerpt_as_prompt)
             prompt = excerpt_as_prompt
-    
+
     if args.rag_mode:
         config.chat_config["rag_mode"] = True
     try:

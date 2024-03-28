@@ -1,5 +1,6 @@
 from pyperclip import copy, paste
 
+
 def reformat(content: str) -> str:
     # Split the content into lines
     lines = content.split('\n')
@@ -15,6 +16,7 @@ def reformat(content: str) -> str:
     # Join the lines into a single string
     return '\n'.join(new_lines)
 
+
 def main():
     # Get the clipboard's content
     content = paste().strip()
@@ -24,5 +26,6 @@ def main():
 
     # Copy the reformatted content to the clipboard
     copy(reformatted_content)
+
 
 main()

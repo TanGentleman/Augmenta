@@ -15,6 +15,7 @@ EXPLANATION_TEMPLATE = '''Explain the following text using comprehensive bulletp
 {excerpt}
 """'''
 
+
 def get_rag_template():
     """
     Fetches the RAG template for the prompt.
@@ -27,12 +28,10 @@ def get_rag_template():
 
     Question: {question}"""
     rag_prompt_template = ChatPromptTemplate.from_template(template)
-    rag_prompt_template.messages.insert(0, 
-        SystemMessage(
-            content="You are a helpful AI. Use the document excerpts to respond to the best of your ability."
-        )
-    )
+    rag_prompt_template.messages.insert(0, SystemMessage(
+        content="You are a helpful AI. Use the document excerpts to respond to the best of your ability."))
     return rag_prompt_template
+
 
 def get_summary_template():
     """
@@ -43,12 +42,13 @@ def get_summary_template():
     {excerpt}
     </excerpt>"""
     summary_template = ChatPromptTemplate.from_template(template)
-    summary_template.messages.insert(0, 
-        SystemMessage(
-            content="You are a helpful AI."
-        )
-    )
+    summary_template.messages.insert(0,
+                                     SystemMessage(
+                                         content="You are a helpful AI."
+                                     )
+                                     )
     return summary_template
+
 
 RAG_TEMPLATE = get_rag_template()
 SUMMARY_TEMPLATE = get_summary_template()

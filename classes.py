@@ -4,18 +4,19 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 LLM_FN = Literal[
-        "get_openai_gpt4",
-        "get_together_quen",
-        "get_together_nous_mix",
-        "get_together_fn_mix",
-        "get_together_coder",
-        "get_claude_opus",
-        "get_claude_sonnet",
-        "get_local_model",
-        ]
+    "get_openai_gpt4",
+    "get_together_quen",
+    "get_together_nous_mix",
+    "get_together_fn_mix",
+    "get_together_coder",
+    "get_claude_opus",
+    "get_claude_sonnet",
+    "get_local_model",
+]
 EMBEDDER_FN = Literal["get_openai_embedder_large",
-                   "get_together_embedder_large",
-                   "get_nomic_local_embedder"]
+                      "get_together_embedder_large",
+                      "get_nomic_local_embedder"]
+
 
 class RagSchema(BaseModel):
     """
@@ -30,6 +31,7 @@ class RagSchema(BaseModel):
     inputs: list[str]
     pass
 
+
 class ChatSchema(BaseModel):
     """
     Configuration for Chat
@@ -41,11 +43,13 @@ class ChatSchema(BaseModel):
     system_message: str
     rag_mode: bool
 
+
 class Config():
     """
     Configuration class
     """
-    def __init__(self, config_file = "settings.json"):
+
+    def __init__(self, config_file="settings.json"):
         config = read_settings(config_file)
         self.rag_config = config["rag_config"]
         self.chat_config = config["chat_config"]

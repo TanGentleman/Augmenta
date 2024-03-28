@@ -1,4 +1,5 @@
-# This file is for running a retrieval augmented generation on an existing vector db
+# This file is for running a retrieval augmented generation on an existing
+# vector db
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
@@ -6,14 +7,18 @@ from helpers import clean_docs, collection_exists, format_docs
 from constants import RAG_TEMPLATE, SUMMARY_TEMPLATE
 import embed
 
-# These are the urls that get ingested as documents. Should be a list of strings.
+# These are the urls that get ingested as documents. Should be a list of
+# strings.
 DEFAULT_URLS = [
     "https://python.langchain.com/docs/integrations/vectorstores/faiss",
 ]
-# This the folder name within chroma-vector-dbs or faiss-dbs where the vector db is stored
+# This the folder name within chroma-vector-dbs or faiss-dbs where the
+# vector db is stored
 DEFAULT_COLLECTION_NAME = "langchain_faiss_collection"
-# This is the question you want to ask (retriever will choose chunks of the documents as context to answer the question)
+# This is the question you want to ask (retriever will choose chunks of
+# the documents as context to answer the question)
 DEFAULT_QUESTION = """How can I add documents to an existing faiss vector db?"""
+
 
 def get_summary_chain(llm):
     """
@@ -27,6 +32,7 @@ def get_summary_chain(llm):
         | StrOutputParser()
     )
     return chain
+
 
 def get_rag_chain(retriever, llm):
     """
@@ -61,8 +67,14 @@ def input_to_docs(input: str) -> list[Document]:
     docs = clean_docs(docs)
     return docs
 
-def vectorstore_from_inputs(inputs: list[str], method: str, embedder, collection_name: str,
-                            chunk_size: int, chunk_overlap: int = 200):
+
+def vectorstore_from_inputs(
+        inputs: list[str],
+        method: str,
+        embedder,
+        collection_name: str,
+        chunk_size: int,
+        chunk_overlap: int = 200):
     """
     Args:
     - inputs: list of strings (urls or filepaths to .pdf or .txt files)
@@ -81,9 +93,11 @@ def vectorstore_from_inputs(inputs: list[str], method: str, embedder, collection
     if collection_exists(collection_name, method):
         print(f"Collection {collection_name} exists, now loading")
         if method == "chroma":
-            vectorstore = embed.load_chroma_vectorstore(collection_name, embedder)
+            vectorstore = embed.load_chroma_vectorstore(
+                collection_name, embedder)
         elif method == "faiss":
-            vectorstore = embed.load_faiss_vectorstore(collection_name, embedder)
+            vectorstore = embed.load_faiss_vectorstore(
+                collection_name, embedder)
         assert vectorstore is not None, "Collection exists but not loaded properly"
         return vectorstore
     for i in range(len(inputs)):
@@ -91,9 +105,11 @@ def vectorstore_from_inputs(inputs: list[str], method: str, embedder, collection
         docs = embed.split_documents(docs, chunk_size, chunk_overlap)
         if i == 0:
             if method == "chroma":
-                vectorstore = embed.chroma_vectorstore_from_docs(collection_name, embedder, docs)
+                vectorstore = embed.chroma_vectorstore_from_docs(
+                    collection_name, embedder, docs)
             elif method == "faiss":
-                vectorstore = embed.faiss_vectorstore_from_docs(collection_name, embedder, docs)
+                vectorstore = embed.faiss_vectorstore_from_docs(
+                    collection_name, embedder, docs)
         else:
             assert vectorstore is not None, "Vectorstore not initialized"
             # This method should work for both Chroma and FAISS

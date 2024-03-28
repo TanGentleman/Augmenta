@@ -8,17 +8,20 @@ from datetime import datetime
 
 from config import VECTOR_DB_SUFFIX
 
-#TODO:
+# TODO:
 # Add a ROOT_FILEPATH constant and use os.join to create the filepaths
+
 
 def save_response_to_markdown_file(response_string, filename="response.md"):
     with open(filename, "w") as file:
         file.write(response_string)
 
+
 def save_history_to_markdown_file(messages, filename="history.md"):
     with open(filename, "w") as file:
         for message in messages:
             file.write(f"{message}\n\n")
+
 
 def read_sample():
     excerpt = ''
@@ -27,17 +30,20 @@ def read_sample():
         assert len(excerpt) > 0, "File is empty"
     return excerpt
 
-def read_settings(config_file = "settings.json") -> dict:
+
+def read_settings(config_file="settings.json") -> dict:
     settings = {}
     with open(config_file, 'r') as file:
         settings = json_load(file)
         assert isinstance(settings, dict), "Settings file is not a dictionary"
     return settings
 
+
 def clean_text(text):
     cleaned_text = re_sub(r'\s+', ' ', text)
     cleaned_text = re_sub(r'[^\w\s]', '', cleaned_text)
     return cleaned_text
+
 
 def clean_docs(docs: list[Document]) -> list[Document]:
     """
@@ -48,7 +54,8 @@ def clean_docs(docs: list[Document]) -> list[Document]:
     # Replace emojis, weird unicode characters, etc.
     return docs
 
-def format_docs(docs: list[Document], save_excerpts = True) -> str:
+
+def format_docs(docs: list[Document], save_excerpts=True) -> str:
     """
     Formats the list of documents into a single string.
     Used to format the docs into a string for context that is passed to the LLM.
@@ -59,7 +66,8 @@ def format_docs(docs: list[Document], save_excerpts = True) -> str:
     for doc in docs:
         # check if "Summary" is a key in the dict
         # print(doc.metadata.keys())
-        # This block is the default for arxiv papers, but I can add these to other docs
+        # This block is the default for arxiv papers, but I can add these to
+        # other docs
         if "Summary" in doc.metadata and "Title" in doc.metadata:
             summary = doc.metadata["Summary"]
             summary_string = f"Summary for {doc.metadata['Title']}:\n{summary}"
@@ -75,6 +83,7 @@ def format_docs(docs: list[Document], save_excerpts = True) -> str:
             f.write(f"Context:\n{context_string}")
     return context_string
 
+
 def collection_exists(collection_name: str, method: str) -> bool:
     """
     Check if a collection exists
@@ -82,8 +91,10 @@ def collection_exists(collection_name: str, method: str) -> bool:
     filepath = join(f"{method}{VECTOR_DB_SUFFIX}", collection_name)
     return exists(filepath)
 
+
 def get_current_time() -> str:
     return str(datetime.now().strftime("%Y-%m-%d"))
+
 
 def update_manifest(rag_settings):
     """
@@ -96,7 +107,7 @@ def update_manifest(rag_settings):
     # assert rag_settings is appropriately formed
     data = {}
     with open('manifest.json', 'r') as f:
-        data = json_load(f) 
+        data = json_load(f)
     assert isinstance(data, list), "manifest.json is not a list"
     # assert that the id is unique
     for item in data:
@@ -111,7 +122,7 @@ def update_manifest(rag_settings):
     print()
     try:
         model_name = str(rag_settings["embedding_model"].model)
-    except:
+    except BaseException:
         print("Could not get model name from embedding model")
         model_name = "Unknown model"
     manifest = {
