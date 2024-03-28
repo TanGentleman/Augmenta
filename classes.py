@@ -49,12 +49,14 @@ class Config():
         config = read_settings(config_file)
         self.rag_config = config["rag_config"]
         self.chat_config = config["chat_config"]
-        self.validate_configs()
+        self.__validate_configs()
 
-    def validate_configs(self):
+    def __validate_configs(self):
         """
         Validate the configuration
         """
         RagSchema(**self.rag_config)
         ChatSchema(**self.chat_config)
+        # TODO:
+        # Enforce chunk size check against the embedder here
         pass
