@@ -1,4 +1,6 @@
 # This file defines functions for API calls to different models
+# TODO: Allow model hyperparameters to be passed as arguments to the functions
+# TODO: Implement embedding model context size checks, potentially issues during vectorstore steps?
 
 from os.path import join, dirname
 from dotenv import load_dotenv
@@ -22,7 +24,7 @@ from langchain_openai import OpenAIEmbeddings
 # This model is the flagship for improved instruction following,
 # JSON mode, reproducible outputs, parallel function calling (training data up to Dec 2023)
 # 128K model context size
-def get_openai_gpt4():
+def get_openai_gpt4() -> ChatOpenAI:
     assert OPENAI_API_KEY, "Please set OPENAI_API_KEY in .env file"
     return ChatOpenAI(
         model="gpt-4-0125-preview",
@@ -33,7 +35,7 @@ def get_openai_gpt4():
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
-def get_together_quen():
+def get_together_quen() -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
         base_url = "https://api.together.xyz",
@@ -45,7 +47,7 @@ def get_together_quen():
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
-def get_together_nous_mix():
+def get_together_nous_mix() -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
         base_url = "https://api.together.xyz",
@@ -56,7 +58,7 @@ def get_together_nous_mix():
         streaming=True,
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
-def get_together_fn_mix():
+def get_together_fn_mix() -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
         base_url = "https://api.together.xyz",
@@ -68,7 +70,7 @@ def get_together_fn_mix():
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
-def get_together_fn_mistral():
+def get_together_fn_mistral() -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
         base_url = "https://api.together.xyz",
@@ -80,7 +82,7 @@ def get_together_fn_mistral():
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
-def get_together_coder():
+def get_together_coder() -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
         base_url = "https://api.together.xyz",
@@ -92,7 +94,7 @@ def get_together_coder():
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
-def get_claude_sonnet():
+def get_claude_sonnet() -> ChatAnthropic:
     return ChatAnthropic(
         model_name="claude-3-sonnet-20240229",
         anthropic_api_key=ANTHROPIC_API_KEY, 
@@ -101,7 +103,7 @@ def get_claude_sonnet():
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
-def get_claude_opus():
+def get_claude_opus() -> ChatAnthropic:
     assert ANTHROPIC_API_KEY, "Please set ANTHROPIC_API_KEY in .env file"
     return ChatAnthropic(
         temperature=0, 
@@ -111,14 +113,14 @@ def get_claude_opus():
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
-def get_openai_embedder_large():
+def get_openai_embedder_large() -> OpenAIEmbeddings:
     assert OPENAI_API_KEY, "Please set OPENAI_API_KEY in .env file"
     return OpenAIEmbeddings(
         model="text-embedding-3-large",
         api_key=OPENAI_API_KEY
     )
 
-def get_together_embedder_large():
+def get_together_embedder_large() -> TogetherEmbeddings:
     # assert False, "This model is not available yet. Please use get_openai_embedder_large() instead."
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return TogetherEmbeddings(
@@ -126,7 +128,7 @@ def get_together_embedder_large():
         together_api_key=TOGETHER_API_KEY
     )
 
-def get_local_model():
+def get_local_model() -> ChatOpenAI:
     return ChatOpenAI(
         base_url = "http://localhost:1234/v1",
         api_key='lm-studio',
@@ -137,10 +139,16 @@ def get_local_model():
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
-def get_nomic_local_embedder():
+def get_nomic_local_embedder() -> OllamaEmbeddings:
     return OllamaEmbeddings(
         model = "nomic-embed-text"
     )
+
+class LLM(ChatOpenAI, ChatAnthropic): 
+    pass
+
+class Embedder(OpenAIEmbeddings, TogetherEmbeddings, OllamaEmbeddings):
+    pass
 
 MODEL_DICT = {
     "get_openai_gpt4": get_openai_gpt4,
@@ -154,4 +162,10 @@ MODEL_DICT = {
     "get_openai_embedder_large": get_openai_embedder_large,
     "get_together_embedder_large": get_together_embedder_large,
     "get_nomic_local_embedder": get_nomic_local_embedder
+}
+
+EMBEDDING_CONTEXT_SIZE_DICT = {
+    "get_openai_embedder_large": 128000,
+    "get_together_embedder_large": 8192,
+    "get_nomic_local_embedder": 8192
 }

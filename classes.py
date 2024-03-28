@@ -3,7 +3,7 @@ from helpers import read_settings
 from typing import Literal
 from pydantic import BaseModel, Field
 
-LLM = Literal[
+LLM_FN = Literal[
         "get_openai_gpt4",
         "get_together_quen",
         "get_together_nous_mix",
@@ -13,7 +13,7 @@ LLM = Literal[
         "get_claude_sonnet",
         "get_local_model",
         ]
-Embedder = Literal["get_openai_embedder_large",
+EMBEDDER_FN = Literal["get_openai_embedder_large",
                    "get_together_embedder_large",
                    "get_nomic_local_embedder"]
 
@@ -22,7 +22,7 @@ class RagSchema(BaseModel):
     Configuration for RAG
     """
     collection_name: str
-    embedding_model: Embedder
+    embedding_model: EMBEDDER_FN
     method: Literal["faiss", "chroma"]
     chunk_size: int = Field(ge=0)
     chunk_overlap: int = Field(ge=0)
@@ -34,8 +34,8 @@ class ChatSchema(BaseModel):
     """
     Configuration for Chat
     """
-    primary_model: LLM
-    backup_model: LLM
+    primary_model: LLM_FN
+    backup_model: LLM_FN
     persistence_enabled: bool
     enable_system_message: bool
     system_message: str

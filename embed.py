@@ -10,6 +10,7 @@ from langchain_community.document_loaders import PyPDFLoader, ArxivLoader
 from langchain_community.vectorstores import FAISS
 from config import CHROMA_FOLDER, FAISS_FOLDER
 from helpers import collection_exists
+from models import Embedder
 
 TEST_URL = "https://python.langchain.com/docs/integrations/vectorstores/faiss"
 TEST_COLLECTION_NAME = "langchain_faiss_collection" # This is just a descriptive name for the vector db folder
@@ -113,7 +114,7 @@ def split_documents(docs: list[Document], chunk_size=4000, chunk_overlap=200) ->
     ).split_documents(docs)
     return chunked_docs
 
-def get_chroma_vectorstore(collection_name: str, embedder):
+def get_chroma_vectorstore(collection_name: str, embedder: Embedder):
     """
     Get a Chroma vectorstore from a collection name, folder is created if it doesn't exist
     """
@@ -126,7 +127,7 @@ def get_chroma_vectorstore(collection_name: str, embedder):
     )
     return vectorstore
 
-def chroma_vectorstore_from_docs(collection_name: str, embedder, docs: list[Document]):
+def chroma_vectorstore_from_docs(collection_name: str, embedder: Embedder, docs: list[Document]):
     assert not collection_exists(collection_name, "chroma"), "Collection already exists"
     if docs is None:
         raise ValueError("Collection not found. Provide documents to create a new collection")
@@ -141,7 +142,7 @@ def load_chroma_vectorstore(collection_name, embedder):
     # assert there are documents present
     return vectorstore
 
-def faiss_vectorstore_from_docs(collection_name: str, embedder, docs: list[Document]):
+def faiss_vectorstore_from_docs(collection_name: str, embedder: Embedder, docs: list[Document]):
     assert not collection_exists(collection_name, "faiss"), "Collection already exists"
     filename = join(FAISS_FOLDER, collection_name)
     if docs is None:
@@ -151,7 +152,7 @@ def faiss_vectorstore_from_docs(collection_name: str, embedder, docs: list[Docum
     vectorstore.save_local(filename)
     return vectorstore
 
-def load_faiss_vectorstore(collection_name: str, embedder):
+def load_faiss_vectorstore(collection_name: str, embedder: Embedder):
     assert collection_exists(collection_name, "faiss"), "Collection does not exist"
     filename = join(FAISS_FOLDER, collection_name)
     vectorstore = FAISS.load_local(filename, embedder, allow_dangerous_deserialization=True)

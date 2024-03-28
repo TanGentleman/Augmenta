@@ -1,9 +1,10 @@
+from typing import Any
 from langchain.schema import HumanMessage, SystemMessage
 from helpers import save_response_to_markdown_file, save_history_to_markdown_file, read_sample, update_manifest
 from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, EXPLANATION_TEMPLATE
 from config import SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, LOCAL_MODEL_ONLY, EXPLAIN_EXCERPT
 from classes import Config
-from models import MODEL_DICT
+from models import MODEL_DICT, LLM, Embedder
 from rag import vectorstore_from_inputs, get_rag_chain
 
 def get_chat_settings(config: Config):
@@ -20,7 +21,7 @@ def get_chat_settings(config: Config):
     }
     return chat_settings
 
-def get_rag_settings(config: Config):
+def get_rag_settings(config: Config) -> dict[str, Any]:
     # Note that these models are called and initialized here
     rag_settings = {
         "collection_name": config.rag_config["collection_name"],
@@ -33,7 +34,7 @@ def get_rag_settings(config: Config):
     }
     return rag_settings
 
-def get_retriever_from_settings(rag_settings, retriever_settings = None):
+def get_retriever_from_settings(rag_settings: dict[str, Any], retriever_settings = None):
     # TODO:
     # Add error handling
     # Implement retriever_settings (like k value or score_threshold)
@@ -70,7 +71,7 @@ def main(prompt=None, config=Config):
     # Add comments to explain the flow of the main function
     settings = get_chat_settings(config)
     rag_settings = get_rag_settings(config)
-    chat_model = settings["primary_model"]()
+    chat_model: LLM = settings["primary_model"]()
     backup_model = None
     rag_chain = None
     retriever = None
