@@ -108,9 +108,12 @@ def update_manifest(rag_settings):
     data = {}
     with open('manifest.json', 'r') as f:
         data = json_load(f)
-    assert isinstance(data, list), "manifest.json is not a list"
+    assert isinstance(data, dict), "manifest.json is not a dict"
+    if "databases" not in data:
+        data["databases"] = []
+    databases = data["databases"]
     # assert that the id is unique
-    for item in data:
+    for item in databases:
         if item["collection_name"] == rag_settings["collection_name"]:
             # Make sure the embedding model is the same
             if item["metadata"]["embedding_model"] != rag_settings["embedding_model"].model:
@@ -137,7 +140,7 @@ def update_manifest(rag_settings):
             "timestamp": get_current_time()
         }
     }
-    data.append(manifest)
+    databases.append(manifest)
     with open('manifest.json', 'w') as f:
         json_dump(data, f, indent=4)
     print("Updated manifest.json")
