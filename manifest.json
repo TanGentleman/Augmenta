@@ -1,118 +1,19 @@
-[
-    {
-        "id": "c2a75dbe-0843-4f39-9a1b-e05ddd34dd40",
-        "collection_name": "rag_medium_and_txt_collection",
-        "metadata": {
-            "embedding_model": "text-embedding-3-large",
-            "method": "faiss",
-            "chunk_size": "3000",
-            "chunk_overlap": "200",
-            "inputs": [
-                "ragMedium.pdf",
-                "paper.txt"
-            ],
-            "timestamp": "2024-03-25"
+{
+    "databases": [
+        {
+            "id": "c2a75dbe-0843-4f39-9a1b-e05ddd34dd40",
+            "collection_name": "rag_medium_and_txt_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "3000",
+                "chunk_overlap": "200",
+                "inputs": [
+                    "ragMedium.pdf",
+                    "paper.txt"
+                ],
+                "timestamp": "2024-03-25"
+            }
         }
-    },
-    {
-        "id": "8aaed296-9dc3-43cd-806a-aa69c4c8247d",
-        "collection_name": "anderson_collection",
-        "metadata": {
-            "embedding_model": "text-embedding-3-large",
-            "method": "faiss",
-            "chunk_size": "3000",
-            "chunk_overlap": "200",
-            "inputs": [
-                "ACTR_Anderson.pdf"
-            ],
-            "timestamp": "2024-03-26"
-        }
-    },
-    {
-        "id": "549e318b-1c5b-4766-85e3-5e29811180ba",
-        "collection_name": "sleek_collection",
-        "metadata": {
-            "embedding_model": "text-embedding-3-large",
-            "method": "faiss",
-            "chunk_size": "3000",
-            "chunk_overlap": "200",
-            "inputs": [
-                "Sleek_IAT_20_years.pdf"
-            ],
-            "timestamp": "2024-03-26"
-        }
-    },
-    {
-        "id": "693cda66-6477-42c4-8840-dc059931afc2",
-        "collection_name": "wegner_collection",
-        "metadata": {
-            "embedding_model": "text-embedding-3-large",
-            "method": "faiss",
-            "chunk_size": "3000",
-            "chunk_overlap": "200",
-            "inputs": [
-                "Wegner.pdf"
-            ],
-            "timestamp": "2024-03-26"
-        }
-    },
-    {
-        "id": "b284a7bc-331a-49d3-82cf-f33ec4639d34",
-        "collection_name": "together_rag_medium_collection",
-        "metadata": {
-            "embedding_model": "BAAI/bge-large-en-v1.5",
-            "method": "faiss",
-            "chunk_size": "512",
-            "chunk_overlap": "100",
-            "inputs": [
-                "ragMedium.pdf"
-            ],
-            "timestamp": "2024-03-26"
-        }
-    },
-    {
-        "id": "448fa596-7959-4502-8637-7c5dd8f6cae9",
-        "collection_name": "scrum_collection",
-        "metadata": {
-            "embedding_model": "BAAI/bge-large-en-v1.5",
-            "method": "faiss",
-            "chunk_size": "512",
-            "chunk_overlap": "100",
-            "inputs": [
-                "RPO.pdf"
-            ],
-            "timestamp": "2024-03-26"
-        }
-    },
-    {
-        "id": "de4f802f-f041-4143-a21c-47765a7660ff",
-        "collection_name": "pagerank_collection",
-        "metadata": {
-            "embedding_model": "BAAI/bge-large-en-v1.5",
-            "method": "faiss",
-            "chunk_size": "512",
-            "chunk_overlap": "100",
-            "inputs": [
-                "pagerank.pdf"
-            ],
-            "timestamp": "2024-03-26"
-        }
-    },
-    {
-        "id": "77d2b47c-6051-4bb0-b97c-06720ef5d2e6",
-        "collection_name": "gradio_collection",
-        "metadata": {
-            "embedding_model": "text-embedding-3-large",
-            "method": "faiss",
-            "chunk_size": "1500",
-            "chunk_overlap": "200",
-            "inputs": [
-                "https://www.gradio.app/guides/creating-a-custom-chatbot-with-blocks",
-                "https://www.gradio.app/guides/key-component-concepts",
-                "https://www.gradio.app/guides/pdf-component-example",
-                "https://www.gradio.app/guides/multimodal-chatbot-part1"
-            ],
-            "timestamp": "2024-03-26"
-        }
-    }
-]
+    ]
+}
