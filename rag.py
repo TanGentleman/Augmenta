@@ -63,8 +63,6 @@ def input_to_docs(input: str) -> list[Document]:
 
 def vectorstore_from_inputs(inputs: list[str], method: str, embedder, collection_name: str,
                             chunk_size: int, chunk_overlap: int = 200):
-    method = method.lower()
-    assert method in ["chroma", "faiss"], "Invalid method"
     """
     Args:
     - inputs: list of strings (urls or filepaths to .pdf or .txt files)
@@ -76,6 +74,9 @@ def vectorstore_from_inputs(inputs: list[str], method: str, embedder, collection
     Returns:
     - vectorstore: the vectorstore created from the inputs (FAISS or Chroma)
     """
+    method = method.lower()
+    assert method in ["chroma", "faiss"], "Invalid method"
+    assert inputs, "No inputs provided"
     vectorstore = None
     if collection_exists(collection_name, method):
         print(f"Collection {collection_name} exists, now loading")

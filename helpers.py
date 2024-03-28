@@ -64,7 +64,10 @@ def format_docs(docs: list[Document], save_excerpts = True) -> str:
             if summary not in summaries:
                 summaries.append(summary)
                 context_string += summary_string + "\n\n"
-        context_string += doc.page_content + "\n\n"
+        context_string += doc.page_content + "\n"
+        # add source
+        source_string = doc.metadata["source"] if "source" in doc.metadata else "Unknown source"
+        context_string += f"Source: {source_string}\n\n"
     if save_excerpts:
         with open("excerpts.md", "w") as f:
             f.write(f"Context:\n{context_string}")
