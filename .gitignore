@@ -9,3 +9,4 @@ vector-dbs/
 !TODO.md
 faiss-vector-dbs/
 chroma-vector-dbs/
+!requirements.txt
