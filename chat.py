@@ -243,7 +243,14 @@ def main(prompt=None, config=Config):
         if rag_mode:
             # RAG mode
             assert rag_chain is not None, "Set rag_chain after ingest command"
-            response = rag_chain.invoke(prompt)
+            try:
+                response = rag_chain.invoke(prompt)
+            except KeyboardInterrupt:
+                print('Keyboard interrupt, aborting generation.')
+                continue
+            except Exception as e:
+                print(f'Error!: {e}')
+                continue
         else:
             messages.append(HumanMessage(content=prompt))
             count += 1
