@@ -172,6 +172,9 @@ def main(prompt=None, config=Config):
             rag_settings = get_rag_settings(config)
             chat_model = settings["primary_model"]()
             backup_model = None
+            if rag_mode:
+                assert retriever is not None, "Retriever must be initialized"
+                rag_chain = get_rag_chain(retriever, rag_settings["rag_llm"])
             continue
         elif prompt == "save":
             if len(messages) < 2:
