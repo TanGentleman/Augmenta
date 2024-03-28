@@ -8,6 +8,7 @@ from chromadb.config import Settings
 from os.path import exists, join
 from langchain_community.document_loaders import PyPDFLoader, ArxivLoader
 from langchain_community.vectorstores import FAISS
+from config import CHROMA_FOLDER, FAISS_FOLDER
 from helpers import collection_exists
 
 TEST_URL = "https://python.langchain.com/docs/integrations/vectorstores/faiss"
@@ -116,7 +117,7 @@ def get_chroma_vectorstore(collection_name: str, embedder):
     """
     Get a Chroma vectorstore from a collection name, folder is created if it doesn't exist
     """
-    filename = f"chroma-vector-dbs/{collection_name}"
+    filename = join(CHROMA_FOLDER, collection_name)
     vectorstore = Chroma(
         collection_name=collection_name, 
         embedding_function=embedder,
@@ -142,7 +143,7 @@ def load_chroma_vectorstore(collection_name, embedder):
 
 def faiss_vectorstore_from_docs(collection_name: str, embedder, docs: list[Document]):
     assert not collection_exists(collection_name, "faiss"), "Collection already exists"
-    filename = f"faiss-vector-dbs/{collection_name}"
+    filename = join(FAISS_FOLDER, collection_name)
     if docs is None:
         raise ValueError("Collection not found. Provide documents to create a new collection")
     print('Indexing documents...')
@@ -152,7 +153,7 @@ def faiss_vectorstore_from_docs(collection_name: str, embedder, docs: list[Docum
 
 def load_faiss_vectorstore(collection_name: str, embedder):
     assert collection_exists(collection_name, "faiss"), "Collection does not exist"
-    filename = f"faiss-vector-dbs/{collection_name}"
+    filename = join(FAISS_FOLDER, collection_name)
     vectorstore = FAISS.load_local(filename, embedder, allow_dangerous_deserialization=True)
     return vectorstore
 

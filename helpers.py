@@ -6,6 +6,8 @@ from langchain_core.documents import Document
 from os.path import exists, join
 from datetime import datetime
 
+from config import VECTOR_DB_SUFFIX
+
 #TODO:
 # Add a ROOT_FILEPATH constant and use os.join to create the filepaths
 
@@ -77,7 +79,7 @@ def collection_exists(collection_name: str, method: str) -> bool:
     """
     Check if a collection exists
     """
-    filepath = join(f"{method}-vector-dbs", collection_name)
+    filepath = join(f"{method}{VECTOR_DB_SUFFIX}", collection_name)
     return exists(filepath)
 
 def get_current_time() -> str:
