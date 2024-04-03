@@ -77,6 +77,9 @@ def format_docs(docs: list[Document], save_excerpts=True) -> str:
         context_string += doc.page_content + "\n"
         # add source
         source_string = doc.metadata["source"] if "source" in doc.metadata else "Unknown source"
+        # add page string if available
+        if "page" in doc.metadata:
+            source_string += f" (Page {doc.metadata['page']})"
         context_string += f"Source: {source_string}\n\n"
     if save_excerpts:
         with open("excerpts.md", "w") as f:
