@@ -1,12 +1,11 @@
 from pyperclip import copy, paste
 
 
-def reformat(content: str) -> str:
+def reformat_to_mc(content: str) -> str:
     # Split the content into lines
     lines = content.split('\n')
     letter = "A"
     new_lines = []
-    #
     for line in lines:
         if "•" in line:
             line = line.replace("•", f"{letter}.")
@@ -17,15 +16,16 @@ def reformat(content: str) -> str:
     return '\n'.join(new_lines)
 
 
-def main():
+def reformat_clipboard():
     # Get the clipboard's content
     content = paste().strip()
 
     # Reformat the content
-    reformatted_content = reformat(content)
+    reformatted_content = reformat_to_mc(content)
 
     # Copy the reformatted content to the clipboard
     copy(reformatted_content)
 
 
-main()
+if __name__ == "__main__":
+    reformat_clipboard()

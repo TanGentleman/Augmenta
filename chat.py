@@ -156,10 +156,7 @@ def main(prompt=None, config=Config, persistence_enabled=True):
             except ImportError:
                 print('pyperclip not installed, try pip install pyperclip')
                 continue
-            from reformatter import reformat
             prompt = paste().strip()
-            prompt = reformat(prompt)
-            # NOTE: Now reformatting the prompt from the clipboard
 
         elif prompt == "read":
             # read from sample.txt

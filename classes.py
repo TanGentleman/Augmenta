@@ -38,7 +38,6 @@ class ChatSchema(BaseModel):
     """
     primary_model: LLM_FN
     backup_model: LLM_FN
-    # persistence_enabled: bool # Removing persistence_enabled from settings.json
     enable_system_message: bool
     system_message: str
     rag_mode: bool

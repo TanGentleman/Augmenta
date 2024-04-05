@@ -1,5 +1,4 @@
-# This file is for testing the use of the embedding and creates a local
-# vectorstore
+# This file is for loading documents and indexing them to a vectorstore
 
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import WebBaseLoader, TextLoader, NotebookLoader
