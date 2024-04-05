@@ -8,7 +8,8 @@ from models import MODEL_DICT, LLM, Embedder
 from rag import vectorstore_from_inputs, get_rag_chain
 
 DEFAULT_DOCS_USED = 6 # This will be moved to a value in settings.json
-COMMAND_LIST = ["paste", "read", "del", "quit", "exit", "switch", "refresh", "save", "saveall", "info", "rag", "reg"]
+REFORMATTING_PROMPTS = ["paste", "read"]
+COMMAND_LIST = ["del", "quit", "exit", "switch", "refresh", "save", "saveall", "info", "rag", "reg"]
 # Current implemented commands
 
 def get_chat_settings(config: Config):
@@ -301,6 +302,252 @@ def main(prompt=None, config=Config, persistence_enabled=True):
     print('Reached max exchanges, exiting.')
     return
 
+class Chatbot:
+    def __init__(self, config):
+        self.config = config
+        self.settings = self.get_chat_settings()
+        self.rag_settings = self.get_rag_settings()
+        self.chat_model = self.settings["primary_model"]()
+        self.backup_model = None
+        self.rag_chain = None
+        self.retriever = None
+        self.messages = []
+        self.save_response = False
+        self.count = 0
+        self.rag_mode = self.settings["rag_mode"]
+        self.exit = False
+
+    def refresh_config(self, config: Config = None):
+        if config is None:
+            config = self.config
+        self.config = config
+        self.settings = self.get_chat_settings()
+        self.rag_settings = self.get_rag_settings()
+        self.chat_model = self.settings["primary_model"]()
+        self.backup_model = None
+        if self.rag_mode:
+            # TODO: Implement re-ingesting documents here, for now use same docs
+            # Maybe just get a new retriever at this step
+            assert self.retriever is not None, "Retriever must be initialized"
+            self.rag_chain = get_rag_chain(self.retriever, self.rag_settings["rag_llm"])
+    
+    def get_chat_settings(self):
+        assert "primary_model" in self.config.chat_config and self.config.chat_config["primary_model"] in MODEL_DICT, "set valid primary_model in settings.json"
+        assert "backup_model" in self.config.chat_config and self.config.chat_config["backup_model"] in MODEL_DICT, "set valid backup_model in settings.json"
+        assert "enable_system_message" in self.config.chat_config and isinstance(self.config.chat_config["enable_system_message"], bool), "set valid enable_system_message in settings.json"
+        assert "system_message" in self.config.chat_config, "system_message key not found in chat_config"
+        assert "rag_mode" in self.config.chat_config, "rag_mode key not found in chat_config"
+        if LOCAL_MODEL_ONLY:
+            assert self.config.chat_config["primary_model"] == "get_local_model", "LOCAL_MODEL_ONLY is set to True"
+        chat_settings = {
+            "primary_model": MODEL_DICT[self.config.chat_config["primary_model"]],
+            "backup_model": MODEL_DICT[self.config.chat_config["backup_model"]],
+            "enable_system_message": self.config.chat_config["enable_system_message"],
+            "system_message": self.config.chat_config["system_message"],
+            "rag_mode": self.config.chat_config["rag_mode"]
+        }
+        return chat_settings
+
+    def get_rag_settings(self):
+        rag_settings = {
+            "collection_name": self.config.rag_config["collection_name"],
+            "embedding_model": MODEL_DICT[self.config.rag_config["embedding_model"]](),
+            "method": self.config.rag_config["method"],
+            "chunk_size": self.config.rag_config["chunk_size"],
+            "chunk_overlap": self.config.rag_config["chunk_overlap"],
+            "rag_llm": MODEL_DICT[self.config.rag_config["rag_llm"]](),
+            "inputs": self.config.rag_config["inputs"]
+        }
+        return rag_settings
+    
+    def get_retriever_from_settings(self, retriever_settings=None):
+        try:
+            vectorstore = vectorstore_from_inputs(self.rag_settings["inputs"],
+                                                self.rag_settings["method"],
+                                                self.rag_settings["embedding_model"],
+                                                self.rag_settings["collection_name"],
+                                                self.rag_settings["chunk_size"],
+                                                self.rag_settings["chunk_overlap"])
+        except Exception as e:
+            print(f'Error: {e}\n')
+            print(f'Error creating vectorstore, check RAG settings in settings.json!')
+            raise SystemExit
+        search_kwargs = {}
+        if retriever_settings is not None:
+            search_kwargs["k"] = retriever_settings["document_count"]
+            if retriever_settings["filter"] is not None:
+                search_kwargs["filter"] = retriever_settings["filter_metadata"]
+        else:
+            search_kwargs["k"] = DEFAULT_DOCS_USED
+        retriever = vectorstore.as_retriever(search_kwargs=search_kwargs)
+        return retriever
+    
+    def messages_to_strings(self, messages):
+        messages = [msg.type.upper() + ": " + msg.content for msg in messages]
+        return messages
+    
+    def prompt_from_clipboard(self):
+        try:
+            from pyperclip import paste
+        except ImportError:
+            print('pyperclip not installed, try pip install pyperclip')
+            return None
+        prompt = paste().strip()
+        return prompt
+
+    def command_handler(self, prompt):
+        assert prompt in COMMAND_LIST, "Invalid command"
+        if prompt == "del":
+            if len(self.messages) < 2:
+                print('No messages to delete')
+                return
+            self.messages.pop()
+            self.messages.pop()
+            print('Deleted last exchange')
+            self.count -= 1
+            return
+        elif prompt == "quit" or prompt == "exit":
+            print('Exiting.')
+            self.exit = True
+            return
+        elif prompt == "switch":
+            # TODO: Create a method for switching models
+            if self.backup_model is None:
+                self.backup_model = self.chat_model
+                print('Switching to backup model')
+                try:
+                    self.chat_model = self.settings["backup_model"]()
+                except BaseException:
+                    print('Error switching to backup model')
+                    raise SystemExit
+        elif prompt == "refresh":
+            self.refresh_config()
+            return
+        elif prompt == "save":
+            if len(self.messages) < 2:
+                print('No responses to save')
+                return
+            save_response_to_markdown_file(self.messages[-1].content)
+            # TODO: Modify this to work with RAG mode
+            print('Saved response to response.md')
+            return
+        elif prompt == "saveall":
+            message_strings = self.messages_to_strings(self.messages)
+            save_history_to_markdown_file(message_strings)
+            print(f'Saved {self.count} exchanges to history.md')
+            return
+        elif prompt == "info":
+            model_name = "Unknown model"
+            print(f'RAG mode: {self.rag_mode}')
+            if self.rag_mode is False:
+                print(f'Exchanges: {self.count}')
+                if self.settings["enable_system_message"]:
+                    print(f'System message: {self.settings["system_message"]}')
+                try:
+                    # TODO: Implement better model name retrieval logic
+                    # I suggest storing all important attributes in an LLM object
+                    model_name = self.chat_model.model_name if hasattr(
+                        self.chat_model, 'model_name') else self.chat_model.model
+                    print(f'LLM: {model_name}')
+                except AttributeError:
+                    print('Could not get model name from chat model')
+                return
+            else:
+                try:
+                    rag_model = self.rag_settings["rag_llm"]
+                    model_name = rag_model.model_name if hasattr(
+                        rag_model, 'model_name') else rag_model.model
+                    print(f'LLM: {model_name}')
+                except AttributeError:
+                    print('Could not get model name from chat model')
+                print(f'Using vectorstore: {self.rag_settings["collection_name"]}')
+                print(f'Inputs: {self.rag_settings["inputs"]}')
+                print(f'Embedding model: {self.rag_settings["embedding_model"].model}')
+                print(f'Method: {self.rag_settings["method"]}')
+                print(f'Chunk size: {self.rag_settings["chunk_size"]}')
+                print(f'Chunk overlap: {self.rag_settings["chunk_overlap"]}')
+                return
+        elif prompt == "rag":
+            if self.retriever is not None:
+                print('Retriever already exists, use "reg" to clear and reset first')
+                return
+            self.rag_mode = True
+            self.retriever = self.get_retriever_from_settings()
+            self.rag_chain = get_rag_chain(self.retriever, self.rag_settings["rag_llm"])
+            update_manifest(self.rag_settings)
+            return
+        elif prompt == "reg":
+            self.rag_mode = False
+            self.retriever = None
+            self.rag_chain = None
+            print('Returning to regular chat, resetting message history')
+            self.messages = self.messages[:1]
+            return
+        else:
+            print('Invalid command: ', prompt)
+            return
+        
+        
+    def chat(self, prompt=None):
+        force_prompt = False
+        forced_prompt = ""
+        if prompt:
+            force_prompt = True
+            forced_prompt = prompt
+        while self.exit is False:
+            if force_prompt:
+                prompt = forced_prompt
+                force_prompt = False
+                forced_prompt = ""
+            else:
+                prompt = input("Enter your query: ")
+            if prompt in REFORMATTING_PROMPTS:
+                if prompt == "paste":
+                    prompt = self.prompt_from_clipboard()
+                    if not prompt:
+                        print('No text in clipboard! Try again.')
+                        continue
+                elif prompt == "read":
+                    prompt = read_sample()
+                    # Do not continue here
+            if not prompt.strip():
+                print('No input given, try again')
+                continue
+            if len(prompt) > MAX_CHARS_IN_PROMPT:
+                print(f'Input too long, max characters is {MAX_CHARS_IN_PROMPT}')
+                continue
+            
+            if prompt in COMMAND_LIST:
+                self.command_handler(prompt)
+                continue
+            # Generate response
+            # TODO: Move this to a separate method
+            if self.rag_mode:
+                try:
+                    response = self.rag_chain.invoke(prompt)
+                    print()
+                    # TODO: Adjust messages array to work seamlessly with RAG mode
+                except KeyboardInterrupt:
+                    print('Keyboard interrupt, aborting generation.')
+                    continue
+                except Exception as e:
+                    print(f'Error!: {e}')
+                    continue
+            else:
+                self.messages.append(HumanMessage(content=prompt))
+                self.count += 1
+                print(f'Fetching response #{self.count}!')
+                try:
+                    response = self.chat_model.invoke(self.messages)
+                    print()
+                    self.messages.append(response)
+                except KeyboardInterrupt:
+                    print('Keyboard interrupt, aborting generation.')
+                    continue
+                except Exception as e:
+                    print(f'Error!: {e}')
+                    continue
+
 # Argparse implementation
 if __name__ == "__main__":
     import argparse
@@ -339,7 +586,9 @@ if __name__ == "__main__":
     if args.rag_mode:
         config.chat_config["rag_mode"] = True
     try:
-        main(prompt, config=config)
+        # main(prompt, config=config)
+        chatbot = Chatbot(config)
+        chatbot.chat(prompt)
     except KeyboardInterrupt:
         print('Keyboard interrupt, exiting.')
         raise SystemExit
