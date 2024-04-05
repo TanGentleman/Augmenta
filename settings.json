@@ -13,7 +13,6 @@
     "chat_config": {
         "primary_model": "get_claude_opus",
         "backup_model": "get_local_model",
-        "persistence_enabled": true,
         "enable_system_message": true,
         "system_message": "You are a helpful AI.",
         "rag_mode": false

@@ -7,21 +7,32 @@ from classes import Config
 from models import MODEL_DICT, LLM, Embedder
 from rag import vectorstore_from_inputs, get_rag_chain
 
+DEFAULT_DOCS_USED = 6 # This will be moved to a value in settings.json
+COMMAND_LIST = ["paste", "read", "del", "quit", "exit", "switch", "refresh", "save", "saveall", "info", "rag", "reg"]
+# Current implemented commands
 
 def get_chat_settings(config: Config):
+    # Assert that all the keys are present in the chat_config
+    assert "primary_model" in config.chat_config and config.chat_config["primary_model"] in MODEL_DICT, "set valid primary_model in settings.json"
+    assert "backup_model" in config.chat_config and config.chat_config["backup_model"] in MODEL_DICT, "set valid backup_model in settings.json"
+    # assert "persistence_enabled" in config.chat_config and isinstance(config.chat_config["persistence_enabled"], bool), "set valid persistence_enabled in settings.json"
+
+    assert "enable_system_message" in config.chat_config and isinstance(config.chat_config["enable_system_message"], bool), "set valid enable_system_message in settings.json"
+    assert "system_message" in config.chat_config, "system_message key not found in chat_config"
+    assert "rag_mode" in config.chat_config, "rag_mode key not found in chat_config"
+
     if LOCAL_MODEL_ONLY:
         assert config.chat_config["primary_model"] == "get_local_model", "LOCAL_MODEL_ONLY is set to True"
     # Note these models are uncalled get llm functions
     chat_settings = {
         "primary_model": MODEL_DICT[config.chat_config["primary_model"]],
         "backup_model": MODEL_DICT[config.chat_config["backup_model"]],
-        "persistence_enabled": config.chat_config["persistence_enabled"],
+        # "persistence_enabled": config.chat_config["persistence_enabled"],
         "enable_system_message": config.chat_config["enable_system_message"],
         "system_message": config.chat_config["system_message"],
         "rag_mode": config.chat_config["rag_mode"]
     }
     return chat_settings
-
 
 def get_rag_settings(config: Config) -> dict[str, Any]:
     # Note that these models are called and initialized here
@@ -49,6 +60,7 @@ def get_retriever_from_settings(
                                               rag_settings["collection_name"],
                                               rag_settings["chunk_size"],
                                               rag_settings["chunk_overlap"])
+        # TODO: Add excerpt_count to settings.json
     except Exception as e:
         print(f'Error: {e}\n')
         print(f'Error creating vectorstore, check RAG settings in settings.json!')
@@ -61,7 +73,7 @@ def get_retriever_from_settings(
             search_kwargs["filter"] = retriever_settings["filter_metadata"]
             # 'filter': {'paper_title':'GPT-4 Technical Report'}
     else:
-        search_kwargs["k"] = 4
+        search_kwargs["k"] = DEFAULT_DOCS_USED
     retriever = vectorstore.as_retriever(search_kwargs=search_kwargs)
     return retriever
 
@@ -71,7 +83,7 @@ def messages_to_strings(messages):
     return messages
 
 
-def main(prompt=None, config=Config):
+def main(prompt=None, config=Config, persistence_enabled=True):
     # Note that by default with -np flag, main function reads prompt from sample.txt
     # TODO:
     # Add comments to explain the flow of the main function
@@ -101,7 +113,7 @@ def main(prompt=None, config=Config):
     force_prompt = False
     forced_prompt = ""
     # if not persistent:
-    if not settings["persistence_enabled"]:
+    if not persistence_enabled:
         if prompt is None:
             prompt = DEFAULT_QUERY
         max_exchanges = 1
@@ -127,10 +139,14 @@ def main(prompt=None, config=Config):
             # paste from clipboard
             try:
                 from pyperclip import paste
-            except BaseException:
+            except ImportError:
                 print('pyperclip not installed, try pip install pyperclip')
                 continue
+            from reformatter import reformat
             prompt = paste().strip()
+            prompt = reformat(prompt)
+            # NOTE: Now reformatting the prompt from the clipboard
+
         elif prompt == "read":
             # read from sample.txt
             prompt = read_sample()
@@ -230,7 +246,7 @@ def main(prompt=None, config=Config):
                 print(f'Chunk size: {rag_settings["chunk_size"]}')
                 print(f'Chunk overlap: {rag_settings["chunk_overlap"]}')
                 continue
-        elif prompt == "ingest":
+        elif prompt == "rag":
             # Ingest documents to vectorstore
             if retriever is not None:
                 print('Retriever already exists, use "reg" to clear and reset first')
@@ -255,7 +271,7 @@ def main(prompt=None, config=Config):
 
         if rag_mode:
             # RAG mode
-            assert rag_chain is not None, "Set rag_chain after ingest command"
+            assert rag_chain is not None, "Set rag_chain after rag command"
             try:
                 response = rag_chain.invoke(prompt)
             except KeyboardInterrupt:
@@ -285,7 +301,6 @@ def main(prompt=None, config=Config):
     print('Reached max exchanges, exiting.')
     return
 
-
 # Argparse implementation
 if __name__ == "__main__":
     import argparse
@@ -308,12 +323,12 @@ if __name__ == "__main__":
     args = parser.parse_args()
     config = Config()
     prompt = args.prompt
-    chat_is_persistent = config.chat_config["persistence_enabled"]
-    if args.not_persistent:
-        chat_is_persistent = False
-        config.chat_config["persistence_enabled"] = chat_is_persistent
+    # chat_is_persistent = config.chat_config["persistence_enabled"]
+    # if args.not_persistent:
+        # chat_is_persistent = False
+        # config.chat_config["persistence_enabled"] = chat_is_persistent # Removing persistence_enabled from settings.json
 
-    if prompt is None and chat_is_persistent is False:
+    if prompt is None and args.not_persistent:
         if DEFAULT_TO_SAMPLE:
             excerpt_as_prompt = read_sample()
             if EXPLAIN_EXCERPT:
