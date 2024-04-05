@@ -330,6 +330,30 @@ class Chatbot:
         self.count = 0
         self.rag_mode = self.settings["rag_mode"]
         self.exit = False
+        if self.rag_mode:
+            # Ingest documents
+            print("RAG mode activated, using vectorstore and solo responses")
+            retriever = get_retriever_from_settings(self.rag_settings)
+            # Save to manifest.json
+            self.rag_chain = get_rag_chain(
+                retriever, self.rag_settings["rag_llm"])
+            update_manifest(self.rag_settings)
+        if self.settings["enable_system_message"]:
+            self.messages.append(
+                SystemMessage(
+                    content=self.settings["system_message"]))
+        else:
+            print('System message is disabled')
+
+    def ingest_documents(self):
+        if self.retriever is not None:
+            print('Retriever already exists. Use "reg" to clear it first')
+            return
+        self.rag_mode = True
+        self.retriever = self.get_retriever_from_settings()
+        self.rag_chain = get_rag_chain(
+            self.retriever, self.rag_settings["rag_llm"])
+        update_manifest(self.rag_settings)
 
     def refresh_config(self, config: Config = None):
         if config is None:
@@ -340,11 +364,7 @@ class Chatbot:
         self.chat_model = self.settings["primary_model"]()
         self.backup_model = None
         if self.rag_mode:
-            # TODO: Implement re-ingesting documents here, for now use same docs
-            # Maybe just get a new retriever at this step
-            assert self.retriever is not None, "Retriever must be initialized"
-            self.rag_chain = get_rag_chain(
-                self.retriever, self.rag_settings["rag_llm"])
+            self.ingest_documents()
 
     def get_chat_settings(self):
         assert "primary_model" in self.config.chat_config and self.config.chat_config[
@@ -489,14 +509,7 @@ class Chatbot:
                 print(f'Chunk overlap: {self.rag_settings["chunk_overlap"]}')
                 return
         elif prompt == "rag":
-            if self.retriever is not None:
-                print('Retriever already exists, use "reg" to clear and reset first')
-                return
-            self.rag_mode = True
-            self.retriever = self.get_retriever_from_settings()
-            self.rag_chain = get_rag_chain(
-                self.retriever, self.rag_settings["rag_llm"])
-            update_manifest(self.rag_settings)
+            self.ingest_documents()
             return
         elif prompt == "reg":
             self.rag_mode = False
