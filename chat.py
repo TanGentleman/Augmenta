@@ -7,18 +7,31 @@ from classes import Config
 from models import MODEL_DICT, LLM, Embedder
 from rag import vectorstore_from_inputs, get_rag_chain
 
-DEFAULT_DOCS_USED = 6 # This will be moved to a value in settings.json
+DEFAULT_DOCS_USED = 6  # This will be moved to a value in settings.json
 REFORMATTING_PROMPTS = ["paste", "read"]
-COMMAND_LIST = ["del", "quit", "exit", "switch", "refresh", "save", "saveall", "info", "rag", "reg"]
+COMMAND_LIST = [
+    "del",
+    "quit",
+    "exit",
+    "switch",
+    "refresh",
+    "save",
+    "saveall",
+    "info",
+    "rag",
+    "reg"]
 # Current implemented commands
+
 
 def get_chat_settings(config: Config):
     # Assert that all the keys are present in the chat_config
-    assert "primary_model" in config.chat_config and config.chat_config["primary_model"] in MODEL_DICT, "set valid primary_model in settings.json"
-    assert "backup_model" in config.chat_config and config.chat_config["backup_model"] in MODEL_DICT, "set valid backup_model in settings.json"
-    # assert "persistence_enabled" in config.chat_config and isinstance(config.chat_config["persistence_enabled"], bool), "set valid persistence_enabled in settings.json"
+    assert "primary_model" in config.chat_config and config.chat_config[
+        "primary_model"] in MODEL_DICT, "set valid primary_model in settings.json"
+    assert "backup_model" in config.chat_config and config.chat_config[
+        "backup_model"] in MODEL_DICT, "set valid backup_model in settings.json"
 
-    assert "enable_system_message" in config.chat_config and isinstance(config.chat_config["enable_system_message"], bool), "set valid enable_system_message in settings.json"
+    assert "enable_system_message" in config.chat_config and isinstance(
+        config.chat_config["enable_system_message"], bool), "set valid enable_system_message in settings.json"
     assert "system_message" in config.chat_config, "system_message key not found in chat_config"
     assert "rag_mode" in config.chat_config, "rag_mode key not found in chat_config"
 
@@ -28,12 +41,12 @@ def get_chat_settings(config: Config):
     chat_settings = {
         "primary_model": MODEL_DICT[config.chat_config["primary_model"]],
         "backup_model": MODEL_DICT[config.chat_config["backup_model"]],
-        # "persistence_enabled": config.chat_config["persistence_enabled"],
         "enable_system_message": config.chat_config["enable_system_message"],
         "system_message": config.chat_config["system_message"],
         "rag_mode": config.chat_config["rag_mode"]
     }
     return chat_settings
+
 
 def get_rag_settings(config: Config) -> dict[str, Any]:
     # Note that these models are called and initialized here
@@ -302,6 +315,7 @@ def main(prompt=None, config=Config, persistence_enabled=True):
     print('Reached max exchanges, exiting.')
     return
 
+
 class Chatbot:
     def __init__(self, config):
         self.config = config
@@ -329,12 +343,16 @@ class Chatbot:
             # TODO: Implement re-ingesting documents here, for now use same docs
             # Maybe just get a new retriever at this step
             assert self.retriever is not None, "Retriever must be initialized"
-            self.rag_chain = get_rag_chain(self.retriever, self.rag_settings["rag_llm"])
-    
+            self.rag_chain = get_rag_chain(
+                self.retriever, self.rag_settings["rag_llm"])
+
     def get_chat_settings(self):
-        assert "primary_model" in self.config.chat_config and self.config.chat_config["primary_model"] in MODEL_DICT, "set valid primary_model in settings.json"
-        assert "backup_model" in self.config.chat_config and self.config.chat_config["backup_model"] in MODEL_DICT, "set valid backup_model in settings.json"
-        assert "enable_system_message" in self.config.chat_config and isinstance(self.config.chat_config["enable_system_message"], bool), "set valid enable_system_message in settings.json"
+        assert "primary_model" in self.config.chat_config and self.config.chat_config[
+            "primary_model"] in MODEL_DICT, "set valid primary_model in settings.json"
+        assert "backup_model" in self.config.chat_config and self.config.chat_config[
+            "backup_model"] in MODEL_DICT, "set valid backup_model in settings.json"
+        assert "enable_system_message" in self.config.chat_config and isinstance(
+            self.config.chat_config["enable_system_message"], bool), "set valid enable_system_message in settings.json"
         assert "system_message" in self.config.chat_config, "system_message key not found in chat_config"
         assert "rag_mode" in self.config.chat_config, "rag_mode key not found in chat_config"
         if LOCAL_MODEL_ONLY:
@@ -359,15 +377,16 @@ class Chatbot:
             "inputs": self.config.rag_config["inputs"]
         }
         return rag_settings
-    
+
     def get_retriever_from_settings(self, retriever_settings=None):
         try:
-            vectorstore = vectorstore_from_inputs(self.rag_settings["inputs"],
-                                                self.rag_settings["method"],
-                                                self.rag_settings["embedding_model"],
-                                                self.rag_settings["collection_name"],
-                                                self.rag_settings["chunk_size"],
-                                                self.rag_settings["chunk_overlap"])
+            vectorstore = vectorstore_from_inputs(
+                self.rag_settings["inputs"],
+                self.rag_settings["method"],
+                self.rag_settings["embedding_model"],
+                self.rag_settings["collection_name"],
+                self.rag_settings["chunk_size"],
+                self.rag_settings["chunk_overlap"])
         except Exception as e:
             print(f'Error: {e}\n')
             print(f'Error creating vectorstore, check RAG settings in settings.json!')
@@ -381,11 +400,11 @@ class Chatbot:
             search_kwargs["k"] = DEFAULT_DOCS_USED
         retriever = vectorstore.as_retriever(search_kwargs=search_kwargs)
         return retriever
-    
+
     def messages_to_strings(self, messages):
         messages = [msg.type.upper() + ": " + msg.content for msg in messages]
         return messages
-    
+
     def prompt_from_clipboard(self):
         try:
             from pyperclip import paste
@@ -445,7 +464,7 @@ class Chatbot:
                     print(f'System message: {self.settings["system_message"]}')
                 try:
                     # TODO: Implement better model name retrieval logic
-                    # I suggest storing all important attributes in an LLM object
+                    # Such attributes should be consistent in LLM interface
                     model_name = self.chat_model.model_name if hasattr(
                         self.chat_model, 'model_name') else self.chat_model.model
                     print(f'LLM: {model_name}')
@@ -460,9 +479,11 @@ class Chatbot:
                     print(f'LLM: {model_name}')
                 except AttributeError:
                     print('Could not get model name from chat model')
-                print(f'Using vectorstore: {self.rag_settings["collection_name"]}')
+                print(
+                    f'Using vectorstore: {self.rag_settings["collection_name"]}')
                 print(f'Inputs: {self.rag_settings["inputs"]}')
-                print(f'Embedding model: {self.rag_settings["embedding_model"].model}')
+                print(
+                    f'Embedding model: {self.rag_settings["embedding_model"].model}')
                 print(f'Method: {self.rag_settings["method"]}')
                 print(f'Chunk size: {self.rag_settings["chunk_size"]}')
                 print(f'Chunk overlap: {self.rag_settings["chunk_overlap"]}')
@@ -473,7 +494,8 @@ class Chatbot:
                 return
             self.rag_mode = True
             self.retriever = self.get_retriever_from_settings()
-            self.rag_chain = get_rag_chain(self.retriever, self.rag_settings["rag_llm"])
+            self.rag_chain = get_rag_chain(
+                self.retriever, self.rag_settings["rag_llm"])
             update_manifest(self.rag_settings)
             return
         elif prompt == "reg":
@@ -486,15 +508,54 @@ class Chatbot:
         else:
             print('Invalid command: ', prompt)
             return
-        
-        
-    def chat(self, prompt=None):
+
+    def get_chat_response(self, prompt: str):
+        self.messages.append(HumanMessage(content=prompt))
+        print(f'Fetching response #{self.count + 1}!')
+        try:
+            response = self.chat_model.invoke(self.messages)
+            self.messages.append(response)
+        except KeyboardInterrupt:
+            print('Keyboard interrupt, aborting generation.')
+            self.messages.pop()
+            return
+        except Exception as e:
+            print(f'Error!: {e}')
+            self.messages.pop()
+            return
+        self.count += 1
+        return response
+
+    def get_rag_response(self, prompt: str):
+        try:
+            response = self.rag_chain.invoke(prompt)
+        except KeyboardInterrupt:
+            print('Keyboard interrupt, aborting generation.')
+            return
+        except Exception as e:
+            print(f'Error!: {e}')
+            return
+        return response
+
+    def chat(self, prompt=None, persistence_enabled=True):
         force_prompt = False
         forced_prompt = ""
-        if prompt:
+        save_response = False
+        max_exchanges = MAX_CHAT_EXCHANGES
+        if prompt is not None:
             force_prompt = True
             forced_prompt = prompt
+        if persistence_enabled is False:
+            if prompt is None:
+                prompt = DEFAULT_QUERY
+            max_exchanges = 1
+            if SAVE_ONESHOT_RESPONSE:
+                save_response = True
         while self.exit is False:
+            if self.count >= max_exchanges:
+                print(f'Max exchanges reached: {self.count}')
+                self.exit = True
+                continue
             if force_prompt:
                 prompt = forced_prompt
                 force_prompt = False
@@ -508,45 +569,31 @@ class Chatbot:
                         print('No text in clipboard! Try again.')
                         continue
                 elif prompt == "read":
+                    # TODO: Add some checks for string content of sample.txt
                     prompt = read_sample()
-                    # Do not continue here
+                # Do not continue here
             if not prompt.strip():
                 print('No input given, try again')
                 continue
             if len(prompt) > MAX_CHARS_IN_PROMPT:
-                print(f'Input too long, max characters is {MAX_CHARS_IN_PROMPT}')
+                print(
+                    f'Input too long, max characters is {MAX_CHARS_IN_PROMPT}')
                 continue
-            
+
             if prompt in COMMAND_LIST:
                 self.command_handler(prompt)
                 continue
             # Generate response
             # TODO: Move this to a separate method
             if self.rag_mode:
-                try:
-                    response = self.rag_chain.invoke(prompt)
-                    print()
-                    # TODO: Adjust messages array to work seamlessly with RAG mode
-                except KeyboardInterrupt:
-                    print('Keyboard interrupt, aborting generation.')
-                    continue
-                except Exception as e:
-                    print(f'Error!: {e}')
-                    continue
+                response = self.get_rag_response(prompt)
             else:
-                self.messages.append(HumanMessage(content=prompt))
-                self.count += 1
-                print(f'Fetching response #{self.count}!')
-                try:
-                    response = self.chat_model.invoke(self.messages)
-                    print()
-                    self.messages.append(response)
-                except KeyboardInterrupt:
-                    print('Keyboard interrupt, aborting generation.')
-                    continue
-                except Exception as e:
-                    print(f'Error!: {e}')
-                    continue
+                response = self.get_chat_response(prompt)
+            print()
+        if save_response:
+            save_response_to_markdown_file(self.messages[-1].content)
+            print('Saved response to response.md')
+
 
 # Argparse implementation
 if __name__ == "__main__":
@@ -570,12 +617,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
     config = Config()
     prompt = args.prompt
-    # chat_is_persistent = config.chat_config["persistence_enabled"]
-    # if args.not_persistent:
-        # chat_is_persistent = False
-        # config.chat_config["persistence_enabled"] = chat_is_persistent # Removing persistence_enabled from settings.json
 
-    if prompt is None and args.not_persistent:
+    persistence_enabled = not args.not_persistent
+    if prompt is None and persistence_enabled is False:
         if DEFAULT_TO_SAMPLE:
             excerpt_as_prompt = read_sample()
             if EXPLAIN_EXCERPT:
@@ -585,10 +629,11 @@ if __name__ == "__main__":
 
     if args.rag_mode:
         config.chat_config["rag_mode"] = True
+
     try:
-        # main(prompt, config=config)
+        # main(prompt, config=config, persistence_enabled=persistence_enabled)
         chatbot = Chatbot(config)
-        chatbot.chat(prompt)
+        chatbot.chat(prompt, persistence_enabled=persistence_enabled)
     except KeyboardInterrupt:
         print('Keyboard interrupt, exiting.')
         raise SystemExit
