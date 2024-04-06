@@ -378,6 +378,7 @@ class Chatbot:
             self.ingest_documents()
         else:
             self.initialize_messages()
+            self.count = 0
 
     def get_chat_settings(self):
         assert "primary_model" in self.config.chat_config and self.config.chat_config[
