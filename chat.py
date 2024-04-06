@@ -23,7 +23,7 @@ COMMAND_LIST = [
 # Current implemented commands
 # TODO: Add a dictionary with command: description
 
-
+### DEPRECATED FUNCTIONS ###
 # def get_chat_settings(config: Config):
 #     # Assert that all the keys are present in the chat_config
 #     assert "primary_model" in config.chat_config and config.chat_config[
@@ -313,6 +313,7 @@ COMMAND_LIST = [
 #     print('Reached max exchanges, exiting.')
 #     return
 
+###
 
 class Chatbot:
     def __init__(self, config):
@@ -323,27 +324,34 @@ class Chatbot:
         self.backup_model = None
         self.rag_chain = None
         self.retriever = None
-        self.messages = []
-        self.save_response = False
         self.count = 0
         self.rag_mode = self.settings["rag_mode"]
         self.exit = False
+        self.messages = []
+
         if self.rag_mode:
-            # Ingest documents
-            print("RAG mode activated, using vectorstore and solo responses")
-            retriever = self.get_retriever_from_settings()
-            # Save to manifest.json
-            self.rag_chain = get_rag_chain(
-                retriever, self.rag_settings["rag_llm"])
-            update_manifest(self.rag_settings)
-        if self.settings["enable_system_message"]:
-            self.messages.append(
-                SystemMessage(
-                    content=self.settings["system_message"]))
+            self.ingest_documents()
         else:
-            print('System message is disabled')
+            self.initialize_messages()
+
+    def initialize_messages(self):
+        messages = []
+        if self.rag_mode:
+            messages = []
+        else:
+            if self.settings["enable_system_message"]:
+                messages.append(
+                    SystemMessage(
+                        content=self.settings["system_message"]))
+            else:
+                print('System message is disabled')
+        self.messages = messages
+
 
     def ingest_documents(self):
+        """
+        This function performs the initial RAG steps
+        """
         if self.retriever is not None:
             print('Retriever already exists. Use "reg" to clear it first')
             return
@@ -351,6 +359,9 @@ class Chatbot:
         self.retriever = self.get_retriever_from_settings()
         self.rag_chain = get_rag_chain(
             self.retriever, self.rag_settings["rag_llm"])
+        self.count = 0
+        
+        self.initialize_messages()
         update_manifest(self.rag_settings)
 
     def refresh_config(self, config: Config = None):
@@ -362,8 +373,11 @@ class Chatbot:
         self.rag_settings = self.get_rag_settings()
         self.chat_model = self.settings["primary_model"]()
         self.backup_model = None
+
         if self.rag_mode:
             self.ingest_documents()
+        else:
+            self.initialize_messages()
 
     def get_chat_settings(self):
         assert "primary_model" in self.config.chat_config and self.config.chat_config[
@@ -514,8 +528,7 @@ class Chatbot:
             self.rag_mode = False
             self.retriever = None
             self.rag_chain = None
-            print('Returning to regular chat, resetting message history')
-            self.messages = self.messages[:1]
+            self.initialize_messages()
             return
         else:
             print('Invalid command: ', prompt)
@@ -526,7 +539,6 @@ class Chatbot:
         print(f'Fetching response #{self.count + 1}!')
         try:
             response = self.chat_model.invoke(self.messages)
-            self.messages.append(response)
         except KeyboardInterrupt:
             print('Keyboard interrupt, aborting generation.')
             self.messages.pop()
@@ -535,10 +547,13 @@ class Chatbot:
             print(f'Error!: {e}')
             self.messages.pop()
             return
+        self.messages.append(response)
         self.count += 1
         return response
 
     def get_rag_response(self, prompt: str):
+        self.messages.append(HumanMessage(content=prompt))
+        print(f'RAG engine response #{self.count + 1}!')
         try:
             response = self.rag_chain.invoke(prompt)
         except KeyboardInterrupt:
@@ -547,6 +562,8 @@ class Chatbot:
         except Exception as e:
             print(f'Error!: {e}')
             return
+        self.messages.append(response)
+        self.count += 1
         return response
 
     def chat(self, prompt=None, persistence_enabled=True):
@@ -596,11 +613,10 @@ class Chatbot:
                 self.command_handler(prompt)
                 continue
             # Generate response
-            # TODO: Move this to a separate method
             if self.rag_mode:
-                response = self.get_rag_response(prompt)
+                self.get_rag_response(prompt)
             else:
-                response = self.get_chat_response(prompt)
+                self.get_chat_response(prompt)
             print()
         if save_response:
             save_response_to_markdown_file(self.messages[-1].content)
