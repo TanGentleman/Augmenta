@@ -80,6 +80,8 @@ def documents_from_url(url: str) -> list[Document]:
     else:
         loader = WebBaseLoader(url)
     docs = loader.load()
+    for doc in docs:
+        doc.metadata["source"] = url
     if not docs:
         raise ValueError(f"No documents found at url {url}")
     return docs
