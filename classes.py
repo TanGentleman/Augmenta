@@ -5,6 +5,7 @@ from pydantic import BaseModel, Field
 
 LLM_FN = Literal[
     "get_openai_gpt4",
+    "get_together_dolphin",
     "get_together_quen",
     "get_together_nous_mix",
     "get_together_fn_mix",

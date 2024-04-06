@@ -37,6 +37,17 @@ def get_openai_gpt4() -> ChatOpenAI:
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
+def get_together_dolphin() -> ChatOpenAI:
+    assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
+    return ChatOpenAI(
+        base_url="https://api.together.xyz",
+        api_key=TOGETHER_API_KEY,
+        model="cognitivecomputations/dolphin-2.5-mixtral-8x7b",
+        temperature=0,
+        max_tokens=1000,
+        streaming=True,
+        callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+    )
 
 def get_together_quen() -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
@@ -119,6 +130,7 @@ def get_claude_opus() -> ChatAnthropic:
         temperature=0,
         anthropic_api_key=ANTHROPIC_API_KEY,
         model_name="claude-3-opus-20240229",
+        max_tokens_to_sample=4000,
         streaming=True,
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
@@ -169,6 +181,7 @@ class Embedder(OpenAIEmbeddings, TogetherEmbeddings, OllamaEmbeddings):
 
 MODEL_DICT = {
     "get_openai_gpt4": get_openai_gpt4,
+    "get_together_dolphin": get_together_dolphin,
     "get_together_quen": get_together_quen,
     "get_together_nous_mix": get_together_nous_mix,
     "get_together_fn_mix": get_together_fn_mix,
