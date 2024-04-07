@@ -3,7 +3,7 @@ from json import dump as json_dump
 from re import sub as re_sub
 from uuid import uuid4
 from langchain_core.documents import Document
-from os.path import exists, join
+from os.path import exists as path_exists, join as path_join
 from datetime import datetime
 
 from config import VECTOR_DB_SUFFIX
@@ -12,18 +12,35 @@ from config import VECTOR_DB_SUFFIX
 # Add a ROOT_FILEPATH constant and use os.join to create the filepaths
 
 
-def save_response_to_markdown_file(response_string, filename="response.md"):
-    with open(filename, "w") as file:
+def save_response_to_markdown_file(response_string: str, filename="response.md"):
+    """
+    Save a response string to a markdown file.
+
+    Parameters:
+    - response_string (str): The response string to be saved.
+    - filename (str, optional): The name of the file. Defaults to "response.md".
+    """
+    with open(filename, "w", encoding="utf-8") as file:
         file.write(response_string)
 
 
-def save_history_to_markdown_file(messages, filename="history.md"):
-    with open(filename, "w") as file:
+def save_history_to_markdown_file(messages: list[str], filename="history.md"):
+    """
+    Save a list of messages to a markdown file.
+
+    Parameters:
+    - messages (list[str]): The list of messages to be saved.
+    - filename (str, optional): The name of the file. Defaults to "history.md".
+    """
+    with open(filename, "w", encoding="utf-8") as file:
         for message in messages:
             file.write(f"{message}\n\n")
 
-
+ 
 def read_sample():
+    """
+    Read the sample.txt file and return the excerpt.
+    """
     excerpt = ''
     with open('sample.txt', 'r') as file:
         excerpt = file.read()
@@ -32,6 +49,9 @@ def read_sample():
 
 
 def read_settings(config_file="settings.json") -> dict:
+    """
+    Read the settings file and return the settings as a dictionary.
+    """
     settings = {}
     with open(config_file, 'r') as file:
         settings = json_load(file)
@@ -40,6 +60,9 @@ def read_settings(config_file="settings.json") -> dict:
 
 
 def clean_text(text):
+    """
+    Clean text, return str
+    """
     cleaned_text = re_sub(r'\s+', ' ', text)
     cleaned_text = re_sub(r'[^\w\s]', '', cleaned_text)
     return cleaned_text
@@ -57,8 +80,12 @@ def clean_docs(docs: list[Document]) -> list[Document]:
 
 def format_docs(docs: list[Document], save_excerpts=True) -> str:
     """
-    Formats the list of documents into a single string.
-    Used to format the docs into a string for context that is passed to the LLM.
+    Formats the list of documents into a single string as context to be passed to LLM.
+    
+    Parameters:
+    - docs (list[Document]): A list of Document objects.
+    - save_excerpts (bool, optional): Whether to save the excerpts to a markdown file. Defaults to True.
+
     """
     summaries = []
     # save documents here to excerpts.md
@@ -91,17 +118,23 @@ def collection_exists(collection_name: str, method: str) -> bool:
     """
     Check if a collection exists
     """
-    filepath = join(f"{method}{VECTOR_DB_SUFFIX}", collection_name)
-    return exists(filepath)
+    filepath = path_join(f"{method}{VECTOR_DB_SUFFIX}", collection_name)
+    return path_exists(filepath)
 
 
 def get_current_time() -> str:
+    """
+    Get the current time in the format "YYYY-MM-DD"
+    """
     return str(datetime.now().strftime("%Y-%m-%d"))
 
 
 def update_manifest(rag_settings):
     """
     Update the manifest.json file with the new collection
+
+    Parameters:
+    - rag_settings (dict): A dictionary containing the RAG settings.
 
     Records:
     - unique id, collection name, metadata
