@@ -10,4 +10,4 @@ vector-dbs/
 faiss-vector-dbs/
 chroma-vector-dbs/
 !requirements.txt
-.idea
+download_agent_files.py
