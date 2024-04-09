@@ -1,14 +1,17 @@
 {
     "rag_config": {
-        "collection_name": "test_paper_collection",
+        "collection_name": "more_agents_paper_collection",
         "embedding_model": "get_openai_embedder_large",
         "method": "faiss",
-        "chunk_size": 3000,
-        "chunk_overlap": 200,
-        "rag_llm": "get_together_quen",
+        "chunk_size": 1024,
+        "chunk_overlap": 150,
+        "k_excerpts": 2,
+        "rag_llm": "get_together_dolphin",
         "inputs": [
-            "paper.txt"
-        ]
+            "more_agents.pdf"
+        ],
+        "multivector_enabled": false,
+        "multivector_method": "summary"
     },
     "chat_config": {
         "primary_model": "get_claude_opus",
@@ -16,5 +19,9 @@
         "enable_system_message": true,
         "system_message": "You are a helpful AI.",
         "rag_mode": false
+    },
+    "hyperparameters": {
+        "max_tokens": 1000,
+        "temperature": 0.1
     }
 }
