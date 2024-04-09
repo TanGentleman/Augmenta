@@ -47,6 +47,9 @@ class Chatbot:
             uninitialized_llm = self.settings["primary_model"]
         return LLM(LLM_FN(uninitialized_llm))
     
+    def get_rag_model(self) -> LLM:
+        return LLM(LLM_FN(self.rag_settings["rag_llm"]))
+    
     def initialize_messages(self):
         messages = []
         if self.rag_mode:
@@ -68,10 +71,13 @@ class Chatbot:
         if self.retriever is not None:
             print('Retriever already exists. Use "reg" to clear it first')
             return
+        # From this point forward, the rag_llm is of type LLM
+        self.rag_settings["rag_llm"] = self.get_rag_model()
+        assert self.rag_settings["rag_llm"].llm is not None, "LLM not initialized"
         self.rag_mode = True
         self.retriever = self.get_retriever_from_settings()
         self.rag_chain = get_rag_chain(
-            self.retriever, self.rag_settings["rag_llm"])
+            self.retriever, self.rag_settings["rag_llm"].llm)
         self.count = 0
         
         self.initialize_messages()
@@ -120,7 +126,7 @@ class Chatbot:
             "method": self.config.rag_config["method"],
             "chunk_size": self.config.rag_config["chunk_size"],
             "chunk_overlap": self.config.rag_config["chunk_overlap"],
-            "rag_llm": MODEL_DICT[self.config.rag_config["rag_llm"]](),
+            "rag_llm": MODEL_DICT[self.config.rag_config["rag_llm"]],
             "inputs": self.config.rag_config["inputs"]
         }
         return rag_settings
@@ -209,16 +215,13 @@ class Chatbot:
                 print(f'Exchanges: {self.count}')
                 if self.settings["enable_system_message"]:
                     print(f'System message: {self.settings["system_message"]}')
-                print(f'LLM: {self.chat_model.model_name}')
+                model_name = self.chat_model.model_name
+                print(f'LLM: {model_name}')
                 return
             else:
-                try:
-                    rag_model = self.rag_settings["rag_llm"]
-                    model_name = rag_model.model_name if hasattr(
-                        rag_model, 'model_name') else rag_model.model
-                    print(f'LLM: {model_name}')
-                except AttributeError:
-                    print('Could not get model name from chat model')
+                assert isinstance(self.rag_settings["rag_llm"], LLM), "RAG LLM not initialized"
+                model_name = self.rag_settings["rag_llm"].model_name
+                print(f'LLM: {model_name}')
                 print(
                     f'Using vectorstore: {self.rag_settings["collection_name"]}')
                 print(f'Inputs: {self.rag_settings["inputs"]}')
@@ -366,7 +369,6 @@ if __name__ == "__main__":
         config.chat_config["rag_mode"] = True
 
     try:
-        # main(prompt, config=config, persistence_enabled=persistence_enabled)
         chatbot = Chatbot(config)
         chatbot.chat(prompt, persistence_enabled=persistence_enabled)
     except KeyboardInterrupt:
