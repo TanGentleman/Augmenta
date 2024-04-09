@@ -7,7 +7,6 @@ from classes import Config
 from models import MODEL_DICT, LLM_FN, LLM
 from rag import vectorstore_from_inputs, get_rag_chain
 
-DEFAULT_DOCS_USED = 6  # This will be moved to a value in settings.json
 REFORMATTING_PROMPTS = ["paste", "read"]
 COMMAND_LIST = [
     "del",
@@ -128,12 +127,13 @@ class Chatbot:
             "method": self.config.rag_config["method"],
             "chunk_size": self.config.rag_config["chunk_size"],
             "chunk_overlap": self.config.rag_config["chunk_overlap"],
+            "k_excerpts": self.config.rag_config["k_excerpts"],
             "rag_llm": MODEL_DICT[self.config.rag_config["rag_llm"]],
             "inputs": self.config.rag_config["inputs"]
         }
         return rag_settings
 
-    def get_retriever_from_settings(self, retriever_settings=None):
+    def get_retriever_from_settings(self):
         try:
             vectorstore = vectorstore_from_inputs(
                 self.rag_settings["inputs"],
@@ -147,12 +147,8 @@ class Chatbot:
             print(f'Error creating vectorstore, check RAG settings in settings.json!')
             raise SystemExit
         search_kwargs = {}
-        if retriever_settings is not None:
-            search_kwargs["k"] = retriever_settings["document_count"]
-            if retriever_settings["filter"] is not None:
-                search_kwargs["filter"] = retriever_settings["filter_metadata"]
-        else:
-            search_kwargs["k"] = DEFAULT_DOCS_USED
+        search_kwargs["k"] = self.rag_settings["k_excerpts"]
+        # search_kwargs["filter"] = FILTERED_TAGS # Not yet implemented
         retriever = vectorstore.as_retriever(search_kwargs=search_kwargs)
         return retriever
 
