@@ -26,7 +26,7 @@ assert TOGETHER_API_KEY and ANTHROPIC_API_KEY, "Please set API keys in .env file
 # JSON mode, reproducible outputs, parallel function calling (training data up to Dec 2023)
 # 128K model context size
 
-def get_openai_gpt4() -> ChatOpenAI:
+def get_openai_gpt4(hyperparameters=None) -> ChatOpenAI:
     assert OPENAI_API_KEY, "Please set OPENAI_API_KEY in .env file"
     return ChatOpenAI(
         model="gpt-4-0125-preview",
@@ -37,7 +37,7 @@ def get_openai_gpt4() -> ChatOpenAI:
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
-def get_together_dolphin() -> ChatOpenAI:
+def get_together_dolphin(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
         base_url="https://api.together.xyz",
@@ -49,7 +49,7 @@ def get_together_dolphin() -> ChatOpenAI:
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
-def get_together_quen() -> ChatOpenAI:
+def get_together_quen(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
         base_url="https://api.together.xyz",
@@ -62,7 +62,7 @@ def get_together_quen() -> ChatOpenAI:
     )
 
 
-def get_together_nous_mix() -> ChatOpenAI:
+def get_together_nous_mix(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
         base_url="https://api.together.xyz",
@@ -75,7 +75,7 @@ def get_together_nous_mix() -> ChatOpenAI:
     )
 
 
-def get_together_fn_mix() -> ChatOpenAI:
+def get_together_fn_mix(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
         base_url="https://api.together.xyz",
@@ -88,7 +88,7 @@ def get_together_fn_mix() -> ChatOpenAI:
     )
 
 
-def get_together_fn_mistral() -> ChatOpenAI:
+def get_together_fn_mistral(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
         base_url="https://api.together.xyz",
@@ -101,7 +101,7 @@ def get_together_fn_mistral() -> ChatOpenAI:
     )
 
 
-def get_together_deepseek_4k() -> ChatOpenAI:
+def get_together_deepseek_4k(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
         base_url="https://api.together.xyz",
@@ -113,7 +113,7 @@ def get_together_deepseek_4k() -> ChatOpenAI:
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
-def get_together_deepseek_32k() -> ChatOpenAI:
+def get_together_deepseek_32k(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
         base_url="https://api.together.xyz",
@@ -126,7 +126,7 @@ def get_together_deepseek_32k() -> ChatOpenAI:
     )
 
 
-def get_claude_sonnet() -> ChatAnthropic:
+def get_claude_sonnet(hyperparameters=None) -> ChatAnthropic:
     return ChatAnthropic(
         model_name="claude-3-sonnet-20240229",
         anthropic_api_key=ANTHROPIC_API_KEY,
@@ -136,7 +136,7 @@ def get_claude_sonnet() -> ChatAnthropic:
     )
 
 
-def get_claude_opus() -> ChatAnthropic:
+def get_claude_opus(hyperparameters=None) -> ChatAnthropic:
     assert ANTHROPIC_API_KEY, "Please set ANTHROPIC_API_KEY in .env file"
     return ChatAnthropic(
         temperature=0,
@@ -148,7 +148,7 @@ def get_claude_opus() -> ChatAnthropic:
     )
 
 
-def get_openai_embedder_large() -> OpenAIEmbeddings:
+def get_openai_embedder_large(hyperparameters=None) -> OpenAIEmbeddings:
     assert OPENAI_API_KEY, "Please set OPENAI_API_KEY in .env file"
     return OpenAIEmbeddings(
         model="text-embedding-3-large",
@@ -156,7 +156,7 @@ def get_openai_embedder_large() -> OpenAIEmbeddings:
     )
 
 
-def get_together_embedder_large() -> TogetherEmbeddings:
+def get_together_embedder_large(hyperparameters=None) -> TogetherEmbeddings:
     # assert False, "This model is not available yet. Please use get_openai_embedder_large() instead."
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return TogetherEmbeddings(
@@ -165,7 +165,7 @@ def get_together_embedder_large() -> TogetherEmbeddings:
     )
 
 
-def get_local_model() -> ChatOpenAI:
+def get_local_model(hyperparameters=None) -> ChatOpenAI:
     return ChatOpenAI(
         base_url="http://localhost:1234/v1",
         api_key='lm-studio',
@@ -177,19 +177,10 @@ def get_local_model() -> ChatOpenAI:
     )
 
 
-def get_nomic_local_embedder() -> OllamaEmbeddings:
+def get_nomic_local_embedder(hyperparameters=None) -> OllamaEmbeddings:
     return OllamaEmbeddings(
         model="nomic-embed-text"
     )
-
-
-class LLM(ChatOpenAI, ChatAnthropic):
-    pass
-
-
-class Embedder(OpenAIEmbeddings, TogetherEmbeddings, OllamaEmbeddings):
-    pass
-
 
 MODEL_DICT = {
     "get_openai_gpt4": get_openai_gpt4,
@@ -212,3 +203,54 @@ EMBEDDING_CONTEXT_SIZE_DICT = {
     "get_together_embedder_large": 8192,
     "get_nomic_local_embedder": 8192
 }
+
+
+# Create class LLM_FN that takes a function that is a value in MODEL_DICT
+class LLM_FN:
+    def __init__(self, model_fn, hyperparameters=None):
+        # If it's not a value in MODEL_DICT, raise an error
+        # This technically means embedding models would pass here, but fine for now
+        if model_fn not in MODEL_DICT.values():
+            raise ValueError(f"Model function {model_fn} not found in MODEL_DICT")
+        self.model_fn = model_fn
+        self.hyperparameters = None
+        if hyperparameters is not None:
+            # assert isinstance(hyperparameters, dict), "This can be any check to make sure hyperparams are valid"
+            self.hyperparameters = hyperparameters
+    
+    def get_llm(self, hyperparameters=None):
+        if hyperparameters is not None:
+            return self.model_fn(hyperparameters)
+        else:
+            return self.model_fn(self.hyperparameters)
+    
+
+class LLM:
+    def __init__(self, llm_fn: LLM_FN, hyperparameters=None):
+        assert llm_fn.model_fn  in MODEL_DICT.values(), "Model function not found in MODEL_DICT"
+        # I will split these into LLM_DICT and EMBEDDING_DICT to filter out embedding models
+        if hyperparameters is not None:
+            # replace the hyperparameters with the new ones
+            self.llm = llm_fn.get_llm(hyperparameters)
+        else:
+            self.llm = llm_fn.get_llm()
+        
+        self.model_name = self.get_model_name()
+    
+    def get_model_name(self) -> str:
+        name = 'Unknown'
+        if hasattr(self.llm, 'model_name'):
+            name = self.llm.model_name
+        elif hasattr(self.llm, 'model'):
+            name = self.llm.model
+        assert isinstance(name, str), "Model name must be a string"
+        return name
+    pass
+
+    def invoke(self, query):
+        # This will break embedding models if they don't have an invoke method
+        return self.llm.invoke(query)
+
+
+class Embedder(OpenAIEmbeddings, TogetherEmbeddings, OllamaEmbeddings):
+    pass
