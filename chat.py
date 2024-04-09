@@ -4,7 +4,7 @@ from helpers import save_response_to_markdown_file, save_history_to_markdown_fil
 from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, EXPLANATION_TEMPLATE
 from config import SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, LOCAL_MODEL_ONLY, EXPLAIN_EXCERPT
 from classes import Config
-from models import MODEL_DICT, LLM, Embedder
+from models import MODEL_DICT, LLM_FN, LLM
 from rag import vectorstore_from_inputs, get_rag_chain
 
 DEFAULT_DOCS_USED = 6  # This will be moved to a value in settings.json
@@ -26,7 +26,7 @@ class Chatbot:
         self.config = config
         self.settings = self.get_chat_settings()
         self.rag_settings = self.get_rag_settings()
-        self.chat_model = self.settings["primary_model"]()
+        self.chat_model = self.get_chat_model()
         self.backup_model = None
         self.rag_chain = None
         self.retriever = None
@@ -40,6 +40,13 @@ class Chatbot:
         else:
             self.initialize_messages()
 
+    def get_chat_model(self, backup=False) -> LLM:
+        if backup:
+            uninitialized_llm = self.settings["backup_model"]
+        else:
+            uninitialized_llm = self.settings["primary_model"]
+        return LLM(LLM_FN(uninitialized_llm))
+    
     def initialize_messages(self):
         messages = []
         if self.rag_mode:
@@ -77,7 +84,7 @@ class Chatbot:
         self.config = config
         self.settings = self.get_chat_settings()
         self.rag_settings = self.get_rag_settings()
-        self.chat_model = self.settings["primary_model"]()
+        self.chat_model = self.get_chat_model()
         self.backup_model = None
 
         if self.rag_mode:
@@ -175,7 +182,7 @@ class Chatbot:
                 self.backup_model = self.chat_model
                 print('Switching to backup model')
                 try:
-                    self.chat_model = self.settings["backup_model"]()
+                    self.chat_model = self.get_chat_model(backup=True)
                 except BaseException:
                     print('Error switching to backup model')
                     raise SystemExit
@@ -202,14 +209,7 @@ class Chatbot:
                 print(f'Exchanges: {self.count}')
                 if self.settings["enable_system_message"]:
                     print(f'System message: {self.settings["system_message"]}')
-                try:
-                    # TODO: Implement better model name retrieval logic
-                    # Such attributes should be consistent in LLM interface
-                    model_name = self.chat_model.model_name if hasattr(
-                        self.chat_model, 'model_name') else self.chat_model.model
-                    print(f'LLM: {model_name}')
-                except AttributeError:
-                    print('Could not get model name from chat model')
+                print(f'LLM: {self.chat_model.model_name}')
                 return
             else:
                 try:
