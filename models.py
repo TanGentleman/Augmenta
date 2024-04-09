@@ -101,7 +101,19 @@ def get_together_fn_mistral() -> ChatOpenAI:
     )
 
 
-def get_together_coder() -> ChatOpenAI:
+def get_together_deepseek_4k() -> ChatOpenAI:
+    assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
+    return ChatOpenAI(
+        base_url="https://api.together.xyz",
+        api_key=TOGETHER_API_KEY,
+        model="deepseek-ai/deepseek-llm-67b-chat",
+        temperature=0,
+        max_tokens=2000,
+        streaming=True,
+        callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+    )
+
+def get_together_deepseek_32k() -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
         base_url="https://api.together.xyz",
@@ -185,7 +197,8 @@ MODEL_DICT = {
     "get_together_quen": get_together_quen,
     "get_together_nous_mix": get_together_nous_mix,
     "get_together_fn_mix": get_together_fn_mix,
-    "get_together_coder": get_together_coder,
+    "get_together_deepseek_4k": get_together_deepseek_4k,
+    "get_together_deepseek_32k": get_together_deepseek_32k,
     "get_claude_sonnet": get_claude_sonnet,
     "get_claude_opus": get_claude_opus,
     "get_local_model": get_local_model,

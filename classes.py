@@ -9,7 +9,8 @@ LLM_FN = Literal[
     "get_together_quen",
     "get_together_nous_mix",
     "get_together_fn_mix",
-    "get_together_coder",
+    "get_together_deepseek_4k",
+    "get_together_deepseek_32k",
     "get_claude_opus",
     "get_claude_sonnet",
     "get_local_model",
@@ -64,3 +65,16 @@ class Config():
         # TODO:
         # Enforce chunk size check against the embedder here
         pass
+
+    def __str__(self):
+        return self.props()
+    
+    def props(self):
+        """
+        Return the keys and values for each item in rag_config and chat_config
+        """
+        rag_config_str = "\n".join(f"{k}: {v}" for k, v in self.rag_config.items())
+        chat_config_str = "\n".join(f"{k}: {v}" for k, v in self.chat_config.items())
+        
+        return f"Rag Config:\n{rag_config_str}\n\nChat Config:\n{chat_config_str}"
+        
