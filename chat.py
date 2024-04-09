@@ -22,7 +22,9 @@ COMMAND_LIST = [
     "reg"]
 
 class Chatbot:
-    def __init__(self, config):
+    def __init__(self, config = None):
+        if config is None:
+            config = Config()
         self.config = config
         self.settings = self.get_chat_settings()
         self.rag_settings = self.get_rag_settings()
@@ -230,6 +232,9 @@ class Chatbot:
                 print(f'Method: {self.rag_settings["method"]}')
                 print(f'Chunk size: {self.rag_settings["chunk_size"]}')
                 print(f'Chunk overlap: {self.rag_settings["chunk_overlap"]}')
+                print(f'Excerpts in context: {self.rag_settings["k_excerpts"]}')
+                if self.rag_settings["multivector_enabled"]:
+                    print(f'Multivector enabled! Using method: {self.rag_settings["multivector_method"]}')
                 return
         elif prompt == "rag":
             self.ingest_documents()
