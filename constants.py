@@ -10,10 +10,22 @@ MAX_CHAT_EXCHANGES = 20
 
 CODE_SYSTEM_MESSAGE = "You are an expert programmer that helps to review Python code and provide optimizations."
 
-EXPLANATION_TEMPLATE = '''Explain the following text using comprehensive bulletpoints:
-"""
+# This is the template for the RAG prompt
+RAG_CONTEXT_TEMPLATE = """Answer the question based only on the following context:
+<context>
+{context}
+</context>
+
+Question: {question}
+
+AI: """
+
+# This is a basic summary template
+SUMMARY_TEMPLATE = """Summarize the following text, retaining the main keywords:
+<excerpt>
 {excerpt}
-"""'''
+</excerpt>"""
+
 
 
 def get_rag_template():
@@ -21,13 +33,7 @@ def get_rag_template():
     Fetches the RAG template for the prompt.
     This template expects to be passed values for both context and question.
     """
-    template = template = (
-    "Answer the question based only on the following context:\n"
-    "<context>\n"
-    "{context}\n"
-    "</context>\n"
-    "Question: {question}"
-    )
+    template = RAG_CONTEXT_TEMPLATE
     rag_prompt_template = ChatPromptTemplate.from_template(template)
     rag_prompt_template.messages.insert(0, SystemMessage(
         content="You are a helpful AI. Use the document excerpts to respond to the best of your ability."))
@@ -38,18 +44,7 @@ def get_summary_template():
     """
     Fetches the template for summarization.
     """
-    template = """Summarize the following text:
-    <excerpt>
-    {excerpt}
-    </excerpt>"""
+    template = SUMMARY_TEMPLATE
     summary_template = ChatPromptTemplate.from_template(template)
-    summary_template.messages.insert(0,
-                                     SystemMessage(
-                                         content="You are a helpful AI."
-                                     )
-                                     )
+    summary_template.messages.insert(0,SystemMessage(content="You are a helpful AI."))
     return summary_template
-
-
-RAG_TEMPLATE = get_rag_template()
-SUMMARY_TEMPLATE = get_summary_template()
