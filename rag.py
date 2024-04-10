@@ -27,7 +27,7 @@ def get_summary_chain(llm):
     """
     chain = (
         {"excerpt": lambda x: x}
-        | get_rag_template()
+        | get_summary_template()
         | llm
         | StrOutputParser()
     )
@@ -41,7 +41,7 @@ def get_rag_chain(retriever, llm):
     Can be invoked with a question, like `chain.invoke("How do I do x task using this framework?")` to get a response.
     """
     # Get prompt template
-    rag_prompt_template = get_summary_template()
+    rag_prompt_template = get_rag_template()
     chain = (
         {"context": retriever | format_docs, "question": RunnablePassthrough()}
         | rag_prompt_template
