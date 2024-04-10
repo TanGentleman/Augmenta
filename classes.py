@@ -74,7 +74,7 @@ class Config:
         k = self.rag_config["k_excerpts"]
         # get context length of the model. For now, 128K to not throw errors
         context_max = 128000
-        max_chars = context_max * 4
+        max_chars = context_max * 5
         if chunk_size * k > max_chars:
             return False
         return True
@@ -90,6 +90,10 @@ class Config:
         # Enforce chunk size check against the embedder here
         if not self.__check_context_max():
             raise ValueError("Context max exceeds model limit")
+        
+        if self.chat_config["rag_mode"]:
+            if not self.rag_config["inputs"] or not self.rag_config["inputs"][0]:
+                raise ValueError("RAG mode requires inputs")
         pass
 
     def __str__(self):

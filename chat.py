@@ -76,7 +76,13 @@ class Chatbot:
             else:
                 print('System message is disabled')
         self.messages = messages
+        self.count = 0
 
+    def check_inputs_valid(self):
+        assert self.rag_settings["inputs"], "No inputs provided"
+        for i in range(len(self.rag_settings["inputs"])):
+            if not self.rag_settings["inputs"][i]:
+                raise ValueError(f"Input {i} is empty")
 
     def ingest_documents(self):
         """
@@ -85,6 +91,8 @@ class Chatbot:
         if self.retriever is not None:
             print('Retriever already exists. Use "reg" to clear it first')
             return
+        
+        self.check_inputs_valid()
         # From this point forward, the rag_llm is of type LLM
         self.rag_settings["rag_llm"] = self.get_rag_model()
         assert isinstance(self.rag_settings["rag_llm"], LLM), "RAG LLM not initialized"
@@ -95,7 +103,6 @@ class Chatbot:
         self.retriever = self.get_retriever()
         self.rag_chain = get_rag_chain(
             self.retriever, self.rag_settings["rag_llm"].llm)
-        self.count = 0
         
         self.initialize_messages()
         if self.rag_settings["multivector_enabled"]:
@@ -136,9 +143,13 @@ class Chatbot:
         assert "rag_mode" in self.config.chat_config, "rag_mode key not found in chat_config"
         if LOCAL_MODEL_ONLY:
             assert self.config.chat_config["primary_model"] == "get_local_model", "LOCAL_MODEL_ONLY is set to True"
+        
+        primary_model = MODEL_DICT[self.config.chat_config["primary_model"]]["function"]
+        backup_model = MODEL_DICT[self.config.chat_config["backup_model"]]["function"]
+
         chat_settings = {
-            "primary_model": MODEL_DICT[self.config.chat_config["primary_model"]],
-            "backup_model": MODEL_DICT[self.config.chat_config["backup_model"]],
+            "primary_model": primary_model,
+            "backup_model": backup_model,
             "enable_system_message": self.config.chat_config["enable_system_message"],
             "system_message": self.config.chat_config["system_message"],
             "rag_mode": self.config.chat_config["rag_mode"]
@@ -146,14 +157,17 @@ class Chatbot:
         return chat_settings
     
     def get_rag_settings(self):
+        # The embedding function gets called immediately
+        embedding_model = self.config.rag_config["embedding_model"]["function"]()
+        rag_llm = self.config.rag_config["rag_llm"]["function"]
         rag_settings = {
             "collection_name": self.config.rag_config["collection_name"],
-            "embedding_model": MODEL_DICT[self.config.rag_config["embedding_model"]](),
+            "embedding_model": embedding_model,
             "method": self.config.rag_config["method"],
             "chunk_size": self.config.rag_config["chunk_size"],
             "chunk_overlap": self.config.rag_config["chunk_overlap"],
             "k_excerpts": self.config.rag_config["k_excerpts"],
-            "rag_llm": MODEL_DICT[self.config.rag_config["rag_llm"]],
+            "rag_llm": rag_llm,
             "inputs": self.config.rag_config["inputs"],
             "multivector_enabled": self.config.rag_config["multivector_enabled"],
             "multivector_method": self.config.rag_config["multivector_method"]
@@ -171,6 +185,7 @@ class Chatbot:
         assert self.doc_ids, "Doc IDs not created"
 
     def get_child_docs(self):
+        # This function has limits for doc count/size set in constants.py
         assert self.rag_settings["multivector_enabled"], "Multivector not enabled"
         assert isinstance(self.rag_settings["rag_llm"], LLM), "RAG LLM not initialized"
         # When qa is supported, this will check self.rag_settings["multivector_method"] 
