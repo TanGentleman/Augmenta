@@ -1,11 +1,18 @@
 from typing import Any
+from uuid import uuid4
 from langchain.schema import HumanMessage, SystemMessage
-from helpers import save_response_to_markdown_file, save_history_to_markdown_file, read_sample, update_manifest
+from helpers import collection_exists, get_doc_ids_from_manifest, save_response_to_markdown_file, save_history_to_markdown_file, read_sample, update_manifest
 from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, EXPLANATION_TEMPLATE
 from config import SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, LOCAL_MODEL_ONLY, EXPLAIN_EXCERPT
 from classes import Config
 from models import MODEL_DICT, LLM_FN, LLM
-from rag import vectorstore_from_inputs, get_rag_chain
+from rag import get_summary_chain, input_to_docs, get_rag_chain
+from embed import chroma_vectorstore_from_docs, faiss_vectorstore_from_docs, load_faiss_vectorstore, load_chroma_vectorstore, split_documents
+from langchain_core.documents import Document
+from langchain.retrievers.multi_vector import MultiVectorRetriever
+from langchain.storage import InMemoryByteStore
+
+ID_KEY = "doc_id"
 
 REFORMATTING_PROMPTS = ["paste", "read"]
 COMMAND_LIST = [
@@ -29,6 +36,9 @@ class Chatbot:
         self.rag_settings = self.get_rag_settings()
         self.chat_model = self.get_chat_model()
         self.backup_model = None
+
+        self.parent_docs = None
+        self.doc_ids = []
         self.rag_chain = None
         self.retriever = None
         self.count = 0
@@ -49,6 +59,9 @@ class Chatbot:
         return LLM(LLM_FN(uninitialized_llm))
     
     def get_rag_model(self) -> LLM:
+        if isinstance(self.rag_settings["rag_llm"], LLM):
+            print('RAG LLM already initialized')
+            return self.rag_settings["rag_llm"]
         return LLM(LLM_FN(self.rag_settings["rag_llm"]))
     
     def initialize_messages(self):
@@ -74,15 +87,21 @@ class Chatbot:
             return
         # From this point forward, the rag_llm is of type LLM
         self.rag_settings["rag_llm"] = self.get_rag_model()
-        assert self.rag_settings["rag_llm"].llm is not None, "LLM not initialized"
+        assert isinstance(self.rag_settings["rag_llm"], LLM), "RAG LLM not initialized"
         self.rag_mode = True
-        self.retriever = self.get_retriever_from_settings()
+        # get doc_ids
+        if self.rag_settings["multivector_enabled"]:
+            self.doc_ids = get_doc_ids_from_manifest(self.rag_settings["collection_name"])
+        self.retriever = self.get_retriever()
         self.rag_chain = get_rag_chain(
             self.retriever, self.rag_settings["rag_llm"].llm)
         self.count = 0
         
         self.initialize_messages()
-        update_manifest(self.rag_settings)
+        if self.rag_settings["multivector_enabled"]:
+            if not self.doc_ids:
+                raise ValueError("Doc IDs not initialized")
+        update_manifest(self.rag_settings, self.doc_ids)
 
     def refresh_config(self, config: Config = None):
         if config is None:
@@ -93,6 +112,10 @@ class Chatbot:
         self.rag_settings = self.get_rag_settings()
         self.chat_model = self.get_chat_model()
         self.backup_model = None
+        self.retriever = None
+        self.rag_chain = None
+        self.doc_ids = []
+        self.parent_docs = None
 
         if self.rag_mode:
             self.ingest_documents()
@@ -119,7 +142,7 @@ class Chatbot:
             "rag_mode": self.config.chat_config["rag_mode"]
         }
         return chat_settings
-
+    
     def get_rag_settings(self):
         rag_settings = {
             "collection_name": self.config.rag_config["collection_name"],
@@ -129,27 +152,114 @@ class Chatbot:
             "chunk_overlap": self.config.rag_config["chunk_overlap"],
             "k_excerpts": self.config.rag_config["k_excerpts"],
             "rag_llm": MODEL_DICT[self.config.rag_config["rag_llm"]],
-            "inputs": self.config.rag_config["inputs"]
+            "inputs": self.config.rag_config["inputs"],
+            "multivector_enabled": self.config.rag_config["multivector_enabled"],
+            "multivector_method": self.config.rag_config["multivector_method"]
         }
         return rag_settings
 
-    def get_retriever_from_settings(self):
-        try:
-            vectorstore = vectorstore_from_inputs(
-                self.rag_settings["inputs"],
-                self.rag_settings["method"],
-                self.rag_settings["embedding_model"],
-                self.rag_settings["collection_name"],
-                self.rag_settings["chunk_size"],
-                self.rag_settings["chunk_overlap"])
-        except Exception as e:
-            print(f'Error: {e}\n')
-            print(f'Error creating vectorstore, check RAG settings in settings.json!')
-            raise SystemExit
+    def set_doc_ids(self):
+        assert self.rag_settings["multivector_enabled"], "Multivector not enabled"
+        assert self.parent_docs, "Parent docs not initialized"
+
+        if self.doc_ids:
+            print("Doc IDs already initialized")
+        else:
+            self.doc_ids = [str(uuid4()) for _ in self.parent_docs]
+        assert self.doc_ids, "Doc IDs not created"
+
+    def get_child_docs(self, parent_docs):
+        assert self.rag_settings["multivector_enabled"], "Multivector not enabled"
+        assert isinstance(self.rag_settings["rag_llm"], LLM), "RAG LLM not initialized"
+        # When qa is supported, this will check self.rag_settings["multivector_method"] 
+        summarize_chain = get_summary_chain(self.rag_settings["rag_llm"].llm)
+        parent_texts = [doc.page_content + '\nsource: ' + doc.metadata["source"] for doc in parent_docs]
+        assert len(parent_texts) < 8, "Temporary limit of 8 parent Documents"
+        child_texts = summarize_chain.batch(parent_texts, {"max_concurrency": 5})
+        assert len(parent_docs) == len(child_texts), "Parent and child texts do not match"
+        
+        assert self.doc_ids, "Doc IDs not initialized"
+
+        child_docs = []
+        for i, text in enumerate(child_texts):
+            new_doc = Document(page_content=text, metadata={ID_KEY: self.doc_ids[i]})
+            child_docs.append(new_doc)
+        return child_docs
+
+    def get_vectorstore(self):
+        assert self.rag_mode, "RAG mode not enabled"
+        collection_name = self.rag_settings["collection_name"]
+        method = self.rag_settings["method"]
+        embedder = self.rag_settings["embedding_model"]
+        vectorstore = None
+        inputs = self.rag_settings["inputs"]
+        docs = []
+        # If collection exists, load it
+        if collection_exists(collection_name, method):
+            print(f"Collection {collection_name} exists, now loading")
+            if method == "chroma":
+                vectorstore = load_chroma_vectorstore(
+                    collection_name, embedder)
+            elif method == "faiss":
+                vectorstore = load_faiss_vectorstore(
+                    collection_name, embedder)
+            assert vectorstore is not None, "Collection exists but not loaded properly"
+            if self.rag_settings["multivector_enabled"]:
+                for i in range(len(inputs)): 
+                    docs.extend(input_to_docs(self.rag_settings["inputs"][i]))
+                assert docs, "No documents to make parent docs"
+                # There should be an assertion to make sure parent docs are correctly formed
+                self.parent_docs = docs
+                assert len(self.parent_docs) == len(self.doc_ids), "Parent docs and doc IDs do not match length"
+            return vectorstore
+        
+        # Ingest documents
+        for i in range(len(inputs)): 
+            # In the future this can be parallelized
+            docs.extend(input_to_docs(self.rag_settings["inputs"][i]))
+        
+        # THIS MAY LEAD TO BAD OUTPUTS IF MULTIVECTOR IS ENABLED
+        if self.rag_settings["multivector_enabled"]:
+            # Make sure the parent docs aren't too wordy
+            for doc in docs:
+                if doc.metadata["char_count"] > 20000: # This number is arbitrary for now
+                    raise ValueError('Document too long, split before making child documents')
+            
+            
+            # Add child docs to vectorstore instead
+            # split documents that are too long
+            self.set_doc_ids()
+            docs = self.get_child_docs(docs)
+        else:
+            docs = split_documents(docs, self.rag_settings["chunk_size"], self.rag_settings["chunk_overlap"])
+        if method == "chroma":
+            vectorstore = chroma_vectorstore_from_docs(collection_name, embedder, docs)
+        elif method == "faiss":
+            vectorstore = faiss_vectorstore_from_docs(collection_name, embedder, docs)
+        assert vectorstore is not None, "Vectorstore not created properly"
+        return vectorstore
+
+    def get_retriever(self):
+        # try:
+        vectorstore = self.get_vectorstore()
+        # except Exception as e:
+        #     print(f'Error: {e}\n')
+        #     print(f'Error creating vectorstore, check RAG settings in settings.json!')
+        #     raise SystemExit
         search_kwargs = {}
         search_kwargs["k"] = self.rag_settings["k_excerpts"]
         # search_kwargs["filter"] = FILTERED_TAGS # Not yet implemented
-        retriever = vectorstore.as_retriever(search_kwargs=search_kwargs)
+        if self.rag_settings["multivector_enabled"]:
+            assert self.parent_docs, "Parent docs not initialized"
+            assert self.doc_ids, "Doc IDs not initialized"
+            retriever = MultiVectorRetriever(
+                vectorstore=vectorstore,
+                byte_store=InMemoryByteStore(),
+                id_key=ID_KEY,
+            )
+            retriever.docstore.mset(list(zip(self.doc_ids, self.parent_docs)))
+        else:
+            retriever = vectorstore.as_retriever(search_kwargs=search_kwargs)
         return retriever
 
     def messages_to_strings(self, messages):
