@@ -2,8 +2,8 @@ from typing import Any
 from uuid import uuid4
 from langchain.schema import HumanMessage, SystemMessage
 from helpers import collection_exists, get_doc_ids_from_manifest, save_response_to_markdown_file, save_history_to_markdown_file, read_sample, update_manifest
-from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, EXPLANATION_TEMPLATE
-from config import SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, LOCAL_MODEL_ONLY, EXPLAIN_EXCERPT
+from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, SUMMARY_TEMPLATE
+from config import MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, LOCAL_MODEL_ONLY, EXPLAIN_EXCERPT
 from classes import Config
 from models import MODEL_DICT, LLM_FN, LLM
 from rag import get_summary_chain, input_to_docs, get_rag_chain
@@ -111,6 +111,8 @@ class Chatbot:
         self.settings = self.get_chat_settings()
         self.rag_settings = self.get_rag_settings()
         self.chat_model = self.get_chat_model()
+
+        self.rag_mode = self.settings["rag_mode"]
         self.backup_model = None
         self.retriever = None
         self.rag_chain = None
@@ -168,15 +170,21 @@ class Chatbot:
             self.doc_ids = [str(uuid4()) for _ in self.parent_docs]
         assert self.doc_ids, "Doc IDs not created"
 
-    def get_child_docs(self, parent_docs):
+    def get_child_docs(self):
         assert self.rag_settings["multivector_enabled"], "Multivector not enabled"
         assert isinstance(self.rag_settings["rag_llm"], LLM), "RAG LLM not initialized"
         # When qa is supported, this will check self.rag_settings["multivector_method"] 
+        assert self.parent_docs and len(self.parent_docs) < MAX_PARENT_DOCS, "Temporary limit of 8 parent Documents"
+        print('Now estimating token usage for child documents')
+        for doc in self.parent_docs:
+            if "char_count" not in doc.metadata:
+                print('Char count not found in metadata. This means parent docs were never split')
+            if len(doc.page_content) > MAX_CHARACTERS_IN_PARENT_DOC:
+                raise ValueError('Document too long, split before making child documents')
+        parent_texts = [doc.page_content + '\nsource: ' + doc.metadata["source"] for doc in self.parent_docs]
         summarize_chain = get_summary_chain(self.rag_settings["rag_llm"].llm)
-        parent_texts = [doc.page_content + '\nsource: ' + doc.metadata["source"] for doc in parent_docs]
-        assert len(parent_texts) < 8, "Temporary limit of 8 parent Documents"
         child_texts = summarize_chain.batch(parent_texts, {"max_concurrency": 5})
-        assert len(parent_docs) == len(child_texts), "Parent and child texts do not match"
+        assert len(self.parent_docs) == len(child_texts), "Parent and child texts do not match"
         
         assert self.doc_ids, "Doc IDs not initialized"
 
@@ -218,20 +226,18 @@ class Chatbot:
             # In the future this can be parallelized
             docs.extend(input_to_docs(self.rag_settings["inputs"][i]))
         
-        # THIS MAY LEAD TO BAD OUTPUTS IF MULTIVECTOR IS ENABLED
+        assert docs, "No documents to create collection"
+        docs = split_documents(docs, self.rag_settings["chunk_size"], self.rag_settings["chunk_overlap"])
         if self.rag_settings["multivector_enabled"]:
             # Make sure the parent docs aren't too wordy
             for doc in docs:
                 if doc.metadata["char_count"] > 20000: # This number is arbitrary for now
                     raise ValueError('Document too long, split before making child documents')
             
-            
+            self.parent_docs = docs
             # Add child docs to vectorstore instead
-            # split documents that are too long
             self.set_doc_ids()
-            docs = self.get_child_docs(docs)
-        else:
-            docs = split_documents(docs, self.rag_settings["chunk_size"], self.rag_settings["chunk_overlap"])
+            docs = self.get_child_docs()
         if method == "chroma":
             vectorstore = chroma_vectorstore_from_docs(collection_name, embedder, docs)
         elif method == "faiss":
@@ -472,7 +478,7 @@ if __name__ == "__main__":
         if DEFAULT_TO_SAMPLE:
             excerpt_as_prompt = read_sample()
             if EXPLAIN_EXCERPT:
-                excerpt_as_prompt = EXPLANATION_TEMPLATE.format(
+                excerpt_as_prompt = SUMMARY_TEMPLATE.format(
                     excerpt=excerpt_as_prompt)
             prompt = excerpt_as_prompt
 
