@@ -124,6 +124,9 @@ def split_documents(
     chunked_docs = RecursiveCharacterTextSplitter(
         chunk_size=chunk_size, chunk_overlap=chunk_overlap
     ).split_documents(docs)
+    # Add the char count as metadata to each document
+    for doc in chunked_docs:
+        doc.metadata["char_count"] = len(doc.page_content)
     return chunked_docs
 
 

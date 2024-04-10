@@ -74,7 +74,6 @@ def clean_docs(docs: list[Document]) -> list[Document]:
     """
     for doc in docs:
         doc.page_content = clean_text(doc.page_content)
-        doc.metadata["char_count"] = len(doc.page_content)
     # Replace emojis, weird unicode characters, etc.
     return docs
 
