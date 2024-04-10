@@ -74,6 +74,29 @@ def get_together_nous_mix(hyperparameters=None) -> ChatOpenAI:
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
+def get_together_bigmix(hyperparameters=None) -> ChatOpenAI:
+    assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
+    return ChatOpenAI(
+        base_url="https://api.together.xyz",
+        api_key=TOGETHER_API_KEY,
+        model="mistralai/Mixtral-8x22B",
+        temperature=0.1,
+        max_tokens=1000,
+        streaming=True,
+        callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+    )
+
+def get_together_dbrx(hyperparameters=None) -> ChatOpenAI:
+    assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
+    return ChatOpenAI(
+        base_url="https://api.together.xyz",
+        api_key=TOGETHER_API_KEY,
+        model="databricks/dbrx-instruct",
+        temperature=0.1,
+        max_tokens=1000,
+        streaming=True,
+        callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+    )
 
 def get_together_fn_mix(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
@@ -99,7 +122,6 @@ def get_together_fn_mistral(hyperparameters=None) -> ChatOpenAI:
         streaming=True,
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
-
 
 def get_together_deepseek_4k(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
@@ -183,19 +205,97 @@ def get_nomic_local_embedder(hyperparameters=None) -> OllamaEmbeddings:
     )
 
 MODEL_DICT = {
-    "get_openai_gpt4": get_openai_gpt4,
-    "get_together_dolphin": get_together_dolphin,
-    "get_together_quen": get_together_quen,
-    "get_together_nous_mix": get_together_nous_mix,
-    "get_together_fn_mix": get_together_fn_mix,
-    "get_together_deepseek_4k": get_together_deepseek_4k,
-    "get_together_deepseek_32k": get_together_deepseek_32k,
-    "get_claude_sonnet": get_claude_sonnet,
-    "get_claude_opus": get_claude_opus,
-    "get_local_model": get_local_model,
-    "get_openai_embedder_large": get_openai_embedder_large,
-    "get_together_embedder_large": get_together_embedder_large,
-    "get_nomic_local_embedder": get_nomic_local_embedder
+    "get_openai_gpt4": {
+        "function": get_openai_gpt4,
+        "context_size": 128000,
+        "model_name": "gpt-4-0125-preview",
+        "type": "llm"
+    },
+    "get_together_dolphin": {
+        "function": get_together_dolphin,
+        "context_size": 32768,
+        "model_name": "cognitivecomputations/dolphin-2.5-mixtral-8x7b",
+        "type": "llm"
+    },
+    "get_together_quen": {
+        "function": get_together_quen,
+        "context_size": 4096,
+        "model_name": "Qwen/Qwen1.5-72B-Chat",
+        "type": "llm"
+    },
+    "get_together_nous_mix": {
+        "function": get_together_nous_mix,
+        "context_size": 32768,
+        "model_name": "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
+        "type": "llm"
+    },
+    "get_together_fn_mix": {
+        "function": get_together_fn_mix,
+        "context_size": 32768,
+        "model_name": "mistralai/Mixtral-8x7B-Instruct-v0.1",
+        "type": "llm"
+    },
+    "get_together_bigmix": {
+        "function": get_together_bigmix,
+        "context_size": 65536,
+        "model_name": "mistralai/Mixtral-8x22B",
+        "type": "llm"
+    },
+    "get_together_dbrx": {
+        "function": get_together_dbrx,
+        "context_size": 32768,
+        "model_name": "databricks/dbrx-instruct",
+        "type": "llm"
+    },
+    "get_together_deepseek_4k": {
+        "function": get_together_deepseek_4k,
+        "context_size": 4096,
+        "model_name": "deepseek-ai/deepseek-llm-67b-chat",
+        "type": "llm"
+    },
+    "get_together_deepseek_32k": {
+        "function": get_together_deepseek_32k,
+        "context_size": 32768,
+        "model_name": "deepseek-ai/deepseek-coder-33b-instruct",
+        "type": "llm"
+    },
+    "get_claude_sonnet": {
+        "function": get_claude_sonnet,
+        "context_size": 200000,
+        "model_name": "claude-3-sonnet-20240229",
+        "type": "llm"
+    },
+    "get_claude_opus": {
+        "function": get_claude_opus,
+        "context_size": 200000,
+        "model_name": "claude-3-opus-20240229",
+        "type": "llm"
+    },
+    # Note: Local model has an undefined context size
+    "get_local_model": {
+        "function": get_local_model,
+        "context_size": 32768,
+        "model_name": "local-model",
+        "type": "llm"
+    },
+    "get_openai_embedder_large": {
+        "function": get_openai_embedder_large,
+        "context_size": 128000,
+        "model_name": "text-embedding-3-large",
+        "type": "embedder"
+    },
+    "get_together_embedder_large": {
+        "function": get_together_embedder_large,
+        "context_size": 8192,
+        "model_name": "BAAI/bge-large-en-v1.5",
+        "type": "embedder"
+    },
+    "get_nomic_local_embedder": {
+        "function": get_nomic_local_embedder,
+        "context_size": 8192,
+        "model_name": "nomic-embed-text",
+        "type": "embedder"
+    }
 }
 
 EMBEDDING_CONTEXT_SIZE_DICT = {
@@ -210,8 +310,18 @@ class LLM_FN:
     def __init__(self, model_fn, hyperparameters=None):
         # If it's not a value in MODEL_DICT, raise an error
         # This technically means embedding models would pass here, but fine for now
-        if model_fn not in MODEL_DICT.values():
+        self.model_name = "Unknown"
+        self.context_size = 0
+        found = False
+        for value in MODEL_DICT.values():
+            if value["function"] == model_fn:
+                self.model_name = value["model_name"]
+                self.context_size = value["context_size"]
+                found = True
+                break
+        if not found:
             raise ValueError(f"Model function {model_fn} not found in MODEL_DICT")
+        assert self.context_size > 0, "Context size must be greater than 0"
         self.model_fn = model_fn
         self.hyperparameters = None
         if hyperparameters is not None:
@@ -227,27 +337,36 @@ class LLM_FN:
 
 class LLM:
     def __init__(self, llm_fn: LLM_FN, hyperparameters=None):
-        assert llm_fn.model_fn  in MODEL_DICT.values(), "Model function not found in MODEL_DICT"
+        assert llm_fn.model_fn  in [i["function"] for i in MODEL_DICT.values()], "Model function not found in MODEL_DICT"
         # I will split these into LLM_DICT and EMBEDDING_DICT to filter out embedding models
+        
+        self.model_name = llm_fn.model_name
+        self.context_size = llm_fn.context_size
         if hyperparameters is not None:
             # replace the hyperparameters with the new ones
             self.llm = llm_fn.get_llm(hyperparameters)
         else:
             self.llm = llm_fn.get_llm()
         
-        self.model_name = self.get_model_name()
+        self.confirm_model_name()
     
-    def get_model_name(self) -> str:
+    def confirm_model_name(self) -> str:
+        """
+        Get the name of the model
+        """
         name = 'Unknown'
         if hasattr(self.llm, 'model_name'):
             name = self.llm.model_name
         elif hasattr(self.llm, 'model'):
             name = self.llm.model
-        assert isinstance(name, str), "Model name must be a string"
-        return name
+        if name != self.model_name:
+            raise ValueError(f"Model name from API {name} does not match expected model name {self.model_name}")
     pass
 
     def invoke(self, query):
+        """
+        Generate a response from the model
+        """
         # This will break embedding models if they don't have an invoke method
         return self.llm.invoke(query)
 
