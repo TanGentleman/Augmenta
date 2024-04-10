@@ -27,6 +27,7 @@ COMMAND_LIST = [
     "rag",
     "reg"]
 
+
 class Chatbot:
     """
     This class is an interactive RAG-capable chatbot.
@@ -52,7 +53,8 @@ class Chatbot:
     Methods:
     - chat: The main chat loop. It's as simple as `from chat import Chatbot; Chatbot().chat()`
     """
-    def __init__(self, config = None):
+
+    def __init__(self, config=None):
         if config is None:
             config = Config()
         self.config = config
@@ -81,13 +83,13 @@ class Chatbot:
         else:
             uninitialized_llm = self.settings["primary_model"]
         return LLM(LLM_FN(uninitialized_llm))
-    
+
     def get_rag_model(self) -> LLM:
         if isinstance(self.rag_settings["rag_llm"], LLM):
             print('RAG LLM already initialized')
             return self.rag_settings["rag_llm"]
         return LLM(LLM_FN(self.rag_settings["rag_llm"]))
-    
+
     def initialize_messages(self):
         messages = []
         if self.rag_mode:
@@ -115,19 +117,21 @@ class Chatbot:
         if self.retriever is not None:
             print('Retriever already exists. Use "reg" to clear it first')
             return
-        
+
         self.check_inputs_valid()
         # From this point forward, the rag_llm is of type LLM
         self.rag_settings["rag_llm"] = self.get_rag_model()
-        assert isinstance(self.rag_settings["rag_llm"], LLM), "RAG LLM not initialized"
+        assert isinstance(
+            self.rag_settings["rag_llm"], LLM), "RAG LLM not initialized"
         self.rag_mode = True
         # get doc_ids
         if self.rag_settings["multivector_enabled"]:
-            self.doc_ids = get_doc_ids_from_manifest(self.rag_settings["collection_name"])
+            self.doc_ids = get_doc_ids_from_manifest(
+                self.rag_settings["collection_name"])
         self.retriever = self.get_retriever()
         self.rag_chain = get_rag_chain(
             self.retriever, self.rag_settings["rag_llm"].llm)
-        
+
         self.initialize_messages()
         if self.rag_settings["multivector_enabled"]:
             if not self.doc_ids:
@@ -167,7 +171,7 @@ class Chatbot:
         assert "rag_mode" in self.config.chat_config, "rag_mode key not found in chat_config"
         if LOCAL_MODEL_ONLY:
             assert self.config.chat_config["primary_model"] == "get_local_model", "LOCAL_MODEL_ONLY is set to True"
-        
+
         primary_model = MODEL_DICT[self.config.chat_config["primary_model"]]["function"]
         backup_model = MODEL_DICT[self.config.chat_config["backup_model"]]["function"]
 
@@ -176,14 +180,13 @@ class Chatbot:
             "backup_model": backup_model,
             "enable_system_message": self.config.chat_config["enable_system_message"],
             "system_message": self.config.chat_config["system_message"],
-            "rag_mode": self.config.chat_config["rag_mode"]
-        }
+            "rag_mode": self.config.chat_config["rag_mode"]}
         return chat_settings
-    
+
     def get_rag_settings(self):
         # The embedding function gets called immediately
         embedding_model = MODEL_DICT[self.config.rag_config["embedding_model"]]["function"]
-        embedding_model = embedding_model() # Initialize the embedder
+        embedding_model = embedding_model()  # Initialize the embedder
         rag_llm = MODEL_DICT[self.config.rag_config["rag_llm"]]["function"]
         rag_settings = {
             "collection_name": self.config.rag_config["collection_name"],
@@ -195,8 +198,7 @@ class Chatbot:
             "rag_llm": rag_llm,
             "inputs": self.config.rag_config["inputs"],
             "multivector_enabled": self.config.rag_config["multivector_enabled"],
-            "multivector_method": self.config.rag_config["multivector_method"]
-        }
+            "multivector_method": self.config.rag_config["multivector_method"]}
         return rag_settings
 
     def set_doc_ids(self):
@@ -212,25 +214,35 @@ class Chatbot:
     def get_child_docs(self):
         # This function has limits for doc count/size set in constants.py
         assert self.rag_settings["multivector_enabled"], "Multivector not enabled"
-        assert isinstance(self.rag_settings["rag_llm"], LLM), "RAG LLM not initialized"
-        # When qa is supported, this will check self.rag_settings["multivector_method"] 
-        assert self.parent_docs and len(self.parent_docs) < MAX_PARENT_DOCS, "Temporary limit of 8 parent Documents"
+        assert isinstance(
+            self.rag_settings["rag_llm"], LLM), "RAG LLM not initialized"
+        # When qa is supported, this will check
+        # self.rag_settings["multivector_method"]
+        assert self.parent_docs and len(
+            self.parent_docs) < MAX_PARENT_DOCS, "Temporary limit of 8 parent Documents"
         print('Now estimating token usage for child documents')
         for doc in self.parent_docs:
             if "char_count" not in doc.metadata:
-                print('Char count not found in metadata. This means parent docs were never split')
+                print(
+                    'Char count not found in metadata. This means parent docs were never split')
             if len(doc.page_content) > MAX_CHARACTERS_IN_PARENT_DOC:
-                raise ValueError('Document too long, split before making child documents')
-        parent_texts = [doc.page_content + '\nsource: ' + doc.metadata["source"] for doc in self.parent_docs]
+                raise ValueError(
+                    'Document too long, split before making child documents')
+        parent_texts = [doc.page_content + '\nsource: ' +
+                        doc.metadata["source"] for doc in self.parent_docs]
         summarize_chain = get_summary_chain(self.rag_settings["rag_llm"].llm)
-        child_texts = summarize_chain.batch(parent_texts, {"max_concurrency": 5})
-        assert len(self.parent_docs) == len(child_texts), "Parent and child texts do not match"
-        
+        child_texts = summarize_chain.batch(
+            parent_texts, {"max_concurrency": 5})
+        assert len(self.parent_docs) == len(
+            child_texts), "Parent and child texts do not match"
+
         assert self.doc_ids, "Doc IDs not initialized"
 
         child_docs = []
         for i, text in enumerate(child_texts):
-            new_doc = Document(page_content=text, metadata={ID_KEY: self.doc_ids[i]})
+            new_doc = Document(
+                page_content=text, metadata={
+                    ID_KEY: self.doc_ids[i]})
             child_docs.append(new_doc)
         return child_docs
 
@@ -253,36 +265,47 @@ class Chatbot:
                     collection_name, embedder)
             assert vectorstore is not None, "Collection exists but not loaded properly"
             if self.rag_settings["multivector_enabled"]:
-                for i in range(len(inputs)): 
+                for i in range(len(inputs)):
                     docs.extend(input_to_docs(self.rag_settings["inputs"][i]))
                 assert docs, "No documents to make parent docs"
-                docs = split_documents(docs, self.rag_settings["chunk_size"], self.rag_settings["chunk_overlap"])
-                # There should be an assertion to make sure parent docs are correctly formed
+                docs = split_documents(docs,
+                                       self.rag_settings["chunk_size"],
+                                       self.rag_settings["chunk_overlap"])
+                # There should be an assertion to make sure parent docs are
+                # correctly formed
                 self.parent_docs = docs
-                assert len(self.parent_docs) == len(self.doc_ids), "Parent docs and doc IDs do not match length"
+                assert len(
+                    self.parent_docs) == len(
+                    self.doc_ids), "Parent docs and doc IDs do not match length"
             return vectorstore
-        
+
         # Ingest documents
-        for i in range(len(inputs)): 
+        for i in range(len(inputs)):
             # In the future this can be parallelized
             docs.extend(input_to_docs(self.rag_settings["inputs"][i]))
-        
+
         assert docs, "No documents to create collection"
-        docs = split_documents(docs, self.rag_settings["chunk_size"], self.rag_settings["chunk_overlap"])
+        docs = split_documents(docs,
+                               self.rag_settings["chunk_size"],
+                               self.rag_settings["chunk_overlap"])
         if self.rag_settings["multivector_enabled"]:
             # Make sure the parent docs aren't too wordy
             for doc in docs:
-                if doc.metadata["char_count"] > 20000: # This number is arbitrary for now
-                    raise ValueError('Document too long, split before making child documents')
-            
+                # This number is arbitrary for now
+                if doc.metadata["char_count"] > 20000:
+                    raise ValueError(
+                        'Document too long, split before making child documents')
+
             self.parent_docs = docs
             # Add child docs to vectorstore instead
             self.set_doc_ids()
             docs = self.get_child_docs()
         if method == "chroma":
-            vectorstore = chroma_vectorstore_from_docs(collection_name, embedder, docs)
+            vectorstore = chroma_vectorstore_from_docs(
+                collection_name, embedder, docs)
         elif method == "faiss":
-            vectorstore = faiss_vectorstore_from_docs(collection_name, embedder, docs)
+            vectorstore = faiss_vectorstore_from_docs(
+                collection_name, embedder, docs)
         assert vectorstore is not None, "Vectorstore not created properly"
         return vectorstore
 
@@ -374,7 +397,8 @@ class Chatbot:
                 print(f'LLM: {model_name}')
                 return
             else:
-                assert isinstance(self.rag_settings["rag_llm"], LLM), "RAG LLM not initialized"
+                assert isinstance(
+                    self.rag_settings["rag_llm"], LLM), "RAG LLM not initialized"
                 model_name = self.rag_settings["rag_llm"].model_name
                 print(f'LLM: {model_name}')
                 print(
@@ -385,9 +409,11 @@ class Chatbot:
                 print(f'Method: {self.rag_settings["method"]}')
                 print(f'Chunk size: {self.rag_settings["chunk_size"]}')
                 print(f'Chunk overlap: {self.rag_settings["chunk_overlap"]}')
-                print(f'Excerpts in context: {self.rag_settings["k_excerpts"]}')
+                print(
+                    f'Excerpts in context: {self.rag_settings["k_excerpts"]}')
                 if self.rag_settings["multivector_enabled"]:
-                    print(f'Multivector enabled! Using method: {self.rag_settings["multivector_method"]}')
+                    print(
+                        f'Multivector enabled! Using method: {self.rag_settings["multivector_method"]}')
                 return
         elif prompt == "rag":
             self.ingest_documents()

@@ -18,8 +18,8 @@ VALID_LLM = Literal[
     "get_local_model",
 ]
 VALID_EMBEDDER = Literal["get_openai_embedder_large",
-                      "get_together_embedder_large",
-                      "get_nomic_local_embedder"]
+                         "get_together_embedder_large",
+                         "get_nomic_local_embedder"]
 
 
 class RagSchema(BaseModel):
@@ -49,12 +49,14 @@ class ChatSchema(BaseModel):
     system_message: str
     rag_mode: bool
 
+
 class HyperparameterSchema(BaseModel):
     """
     Hyperparameters for LLM
     """
     max_tokens: int
     temperature: float
+
 
 class Config:
     """
@@ -92,7 +94,7 @@ class Config:
         # Enforce chunk size check against the embedder here
         if not self.__check_context_max():
             raise ValueError("Context max exceeds model limit")
-        
+
         if self.chat_config["rag_mode"]:
             if not self.rag_config["inputs"] or not self.rag_config["inputs"][0]:
                 raise ValueError("RAG mode requires inputs")
@@ -100,14 +102,18 @@ class Config:
 
     def __str__(self):
         return self.props()
-    
+
     def props(self):
         """
         Return the keys and values for each item in rag_config and chat_config
         """
-        rag_config_str = "\n".join(f"{k}: {v}" for k, v in self.rag_config.items())
-        chat_config_str = "\n".join(f"{k}: {v}" for k, v in self.chat_config.items())
-        hyperparameters_str = "\n".join(f"{k}: {v}" for k, v in self.hyperparameters.items())
-        
+        rag_config_str = "\n".join(
+            f"{k}: {v}" for k,
+            v in self.rag_config.items())
+        chat_config_str = "\n".join(
+            f"{k}: {v}" for k,
+            v in self.chat_config.items())
+        hyperparameters_str = "\n".join(
+            f"{k}: {v}" for k, v in self.hyperparameters.items())
+
         return f"Rag Config:\n{rag_config_str}\n\nChat Config:\n{chat_config_str}\n\nHyperparameters:\n{hyperparameters_str}"
-        

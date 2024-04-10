@@ -14,5 +14,5 @@ CHROMA_FOLDER = "chroma" + VECTOR_DB_SUFFIX
 FAISS_FOLDER = "faiss" + VECTOR_DB_SUFFIX
 
 ### RAG ###
-MAX_PARENT_DOCS = 8 # This is only relevant for the multiretrieval mode with child docs
+MAX_PARENT_DOCS = 8  # This is only relevant for the multiretrieval mode with child docs
 MAX_CHARACTERS_IN_PARENT_DOC = 20000

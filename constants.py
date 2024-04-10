@@ -27,7 +27,6 @@ SUMMARY_TEMPLATE = """Summarize the following text, retaining the main keywords:
 </excerpt>"""
 
 
-
 def get_rag_template():
     """
     Fetches the RAG template for the prompt.
@@ -46,5 +45,7 @@ def get_summary_template():
     """
     template = SUMMARY_TEMPLATE
     summary_template = ChatPromptTemplate.from_template(template)
-    summary_template.messages.insert(0,SystemMessage(content="You are a helpful AI."))
+    summary_template.messages.insert(
+        0, SystemMessage(
+            content="You are a helpful AI."))
     return summary_template

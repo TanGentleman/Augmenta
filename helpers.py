@@ -12,7 +12,9 @@ from config import VECTOR_DB_SUFFIX
 # Add a ROOT_FILEPATH constant and use os.join to create the filepaths
 
 
-def save_response_to_markdown_file(response_string: str, filename="response.md"):
+def save_response_to_markdown_file(
+        response_string: str,
+        filename="response.md"):
     """
     Save a response string to a markdown file.
 
@@ -36,7 +38,7 @@ def save_history_to_markdown_file(messages: list[str], filename="history.md"):
         for message in messages:
             file.write(f"{message}\n\n")
 
- 
+
 def read_sample():
     """
     Read the sample.txt file and return the excerpt.
@@ -81,7 +83,7 @@ def clean_docs(docs: list[Document]) -> list[Document]:
 def format_docs(docs: list[Document], save_excerpts=True) -> str:
     """
     Formats the list of documents into a single string as context to be passed to LLM.
-    
+
     Parameters:
     - docs (list[Document]): A list of Document objects.
     - save_excerpts (bool, optional): Whether to save the excerpts to a markdown file. Defaults to True.
@@ -128,6 +130,7 @@ def get_current_time() -> str:
     """
     return str(datetime.now().strftime("%Y-%m-%d"))
 
+
 def get_doc_ids_from_manifest(collection_name):
     """
     Get the doc ids from the manifest.json file
@@ -140,6 +143,7 @@ def get_doc_ids_from_manifest(collection_name):
                 doc_ids = item["metadata"]["doc_ids"]
                 return doc_ids
     return doc_ids
+
 
 def update_manifest(rag_settings, doc_ids=[]):
     """

@@ -37,6 +37,7 @@ def get_openai_gpt4(hyperparameters=None) -> ChatOpenAI:
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
+
 def get_together_dolphin(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
@@ -48,6 +49,7 @@ def get_together_dolphin(hyperparameters=None) -> ChatOpenAI:
         streaming=True,
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
+
 
 def get_together_quen(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
@@ -74,6 +76,7 @@ def get_together_nous_mix(hyperparameters=None) -> ChatOpenAI:
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
+
 def get_together_bigmix(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
@@ -86,6 +89,7 @@ def get_together_bigmix(hyperparameters=None) -> ChatOpenAI:
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
+
 def get_together_dbrx(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
@@ -97,6 +101,7 @@ def get_together_dbrx(hyperparameters=None) -> ChatOpenAI:
         streaming=True,
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
+
 
 def get_together_fn_mix(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
@@ -123,6 +128,7 @@ def get_together_fn_mistral(hyperparameters=None) -> ChatOpenAI:
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
+
 def get_together_deepseek_4k(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
@@ -134,6 +140,7 @@ def get_together_deepseek_4k(hyperparameters=None) -> ChatOpenAI:
         streaming=True,
         callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
+
 
 def get_together_deepseek_32k(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
@@ -203,6 +210,7 @@ def get_nomic_local_embedder(hyperparameters=None) -> OllamaEmbeddings:
     return OllamaEmbeddings(
         model="nomic-embed-text"
     )
+
 
 MODEL_DICT = {
     "get_openai_gpt4": {
@@ -309,7 +317,8 @@ EMBEDDING_CONTEXT_SIZE_DICT = {
 class LLM_FN:
     def __init__(self, model_fn, hyperparameters=None):
         # If it's not a value in MODEL_DICT, raise an error
-        # This technically means embedding models would pass here, but fine for now
+        # This technically means embedding models would pass here, but fine for
+        # now
         self.model_name = "Unknown"
         self.context_size = 0
         found = False
@@ -320,26 +329,29 @@ class LLM_FN:
                 found = True
                 break
         if not found:
-            raise ValueError(f"Model function {model_fn} not found in MODEL_DICT")
+            raise ValueError(
+                f"Model function {model_fn} not found in MODEL_DICT")
         assert self.context_size > 0, "Context size must be greater than 0"
         self.model_fn = model_fn
         self.hyperparameters = None
         if hyperparameters is not None:
             # assert isinstance(hyperparameters, dict), "This can be any check to make sure hyperparams are valid"
             self.hyperparameters = hyperparameters
-    
+
     def get_llm(self, hyperparameters=None):
         if hyperparameters is not None:
             return self.model_fn(hyperparameters)
         else:
             return self.model_fn(self.hyperparameters)
-    
+
 
 class LLM:
     def __init__(self, llm_fn: LLM_FN, hyperparameters=None):
-        assert llm_fn.model_fn  in [i["function"] for i in MODEL_DICT.values()], "Model function not found in MODEL_DICT"
-        # I will split these into LLM_DICT and EMBEDDING_DICT to filter out embedding models
-        
+        assert llm_fn.model_fn in [i["function"] for i in MODEL_DICT.values(
+        )], "Model function not found in MODEL_DICT"
+        # I will split these into LLM_DICT and EMBEDDING_DICT to filter out
+        # embedding models
+
         self.model_name = llm_fn.model_name
         self.context_size = llm_fn.context_size
         if hyperparameters is not None:
@@ -347,9 +359,9 @@ class LLM:
             self.llm = llm_fn.get_llm(hyperparameters)
         else:
             self.llm = llm_fn.get_llm()
-        
+
         self.confirm_model_name()
-    
+
     def confirm_model_name(self) -> str:
         """
         Get the name of the model
@@ -360,7 +372,8 @@ class LLM:
         elif hasattr(self.llm, 'model'):
             name = self.llm.model
         if name != self.model_name:
-            raise ValueError(f"Model name from API {name} does not match expected model name {self.model_name}")
+            raise ValueError(
+                f"Model name from API {name} does not match expected model name {self.model_name}")
     pass
 
     def invoke(self, query):

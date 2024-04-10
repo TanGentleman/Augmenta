@@ -128,7 +128,7 @@ def split_documents(
     for doc in chunked_docs:
         char_count = len(doc.page_content)
         doc.metadata["char_count"] = char_count
-        if char_count > 20000: # This number is arbitrary
+        if char_count > 20000:  # This number is arbitrary
             print("Warning: Document is really long, consider splitting it further.")
     return chunked_docs
 
