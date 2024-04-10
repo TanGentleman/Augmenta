@@ -28,6 +28,30 @@ COMMAND_LIST = [
     "reg"]
 
 class Chatbot:
+    """
+    This class is an interactive RAG-capable chatbot.
+
+    Parameters:
+    - config (Config, optional): The configuration object. Defaults to None.
+
+    Attributes:
+    - config (Config): The configuration object.
+    - settings (dict): The chat settings. See classes.ChatSchema
+    - rag_settings (dict): The RAG settings. See classes.RAGSchema
+    - chat_model (LLM): The chat model.
+    - backup_model (LLM): The backup model.
+    - parent_docs (list[Document]): The parent documents.
+    - doc_ids (list[str]): The document IDs.
+    - rag_chain (Runnable): The RAG chain.
+    - retriever (MultiVectorRetriever): The retriever.
+    - count (int): How many exchanges (back and forth messages) in history.
+    - rag_mode (bool): If RAG mode is enabled.
+    - exit (bool): The exit flag for the chat loop.
+    - messages: The message history used in context for non-RAG chat.
+
+    Methods:
+    - chat: The main chat loop. It's as simple as `from chat import Chatbot; Chatbot().chat()`
+    """
     def __init__(self, config = None):
         if config is None:
             config = Config()
@@ -232,6 +256,7 @@ class Chatbot:
                 for i in range(len(inputs)): 
                     docs.extend(input_to_docs(self.rag_settings["inputs"][i]))
                 assert docs, "No documents to make parent docs"
+                docs = split_documents(docs, self.rag_settings["chunk_size"], self.rag_settings["chunk_overlap"])
                 # There should be an assertion to make sure parent docs are correctly formed
                 self.parent_docs = docs
                 assert len(self.parent_docs) == len(self.doc_ids), "Parent docs and doc IDs do not match length"
