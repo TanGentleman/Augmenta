@@ -64,6 +64,8 @@ def input_to_docs(input: str) -> list[Document]:
     if not docs:
         print("No documents found")
         return None
+    for doc in docs:
+        doc.metadata["source"] = input
     docs = clean_docs(docs)
     return docs
 
@@ -101,6 +103,7 @@ def vectorstore_from_inputs(
         assert vectorstore is not None, "Collection exists but not loaded properly"
         return vectorstore
     for i in range(len(inputs)):
+        # In the future this can be parallelized
         docs = input_to_docs(inputs[i])
         docs = embed.split_documents(docs, chunk_size, chunk_overlap)
         if i == 0:

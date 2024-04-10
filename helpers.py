@@ -74,6 +74,7 @@ def clean_docs(docs: list[Document]) -> list[Document]:
     """
     for doc in docs:
         doc.page_content = clean_text(doc.page_content)
+        doc.metadata["char_count"] = len(doc.page_content)
     # Replace emojis, weird unicode characters, etc.
     return docs
 
@@ -85,7 +86,6 @@ def format_docs(docs: list[Document], save_excerpts=True) -> str:
     Parameters:
     - docs (list[Document]): A list of Document objects.
     - save_excerpts (bool, optional): Whether to save the excerpts to a markdown file. Defaults to True.
-
     """
     summaries = []
     # save documents here to excerpts.md
@@ -154,7 +154,9 @@ def update_manifest(rag_settings):
             # Make sure the embedding model is the same
             if item["metadata"]["embedding_model"] != rag_settings["embedding_model"].model:
                 raise ValueError("Embedding model must match manifest")
-            # print("No need to update manifest.json")
+            if "item"["metadata"]["multivector_enabled"] != rag_settings["multivector_enabled"]:
+                raise ValueError("Incompatibility with multivector_enabled")
+            # No need to update manifest.json
             return
     # get unique id
     unique_id = str(uuid4())
