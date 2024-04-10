@@ -21,12 +21,13 @@ def get_rag_template():
     Fetches the RAG template for the prompt.
     This template expects to be passed values for both context and question.
     """
-    template = """Answer the question based only on the following context:
-    <context>
-    {context}
-    </context>
-
-    Question: {question}"""
+    template = template = (
+    "Answer the question based only on the following context:\n"
+    "<context>\n"
+    "{context}\n"
+    "</context>\n"
+    "Question: {question}"
+    )
     rag_prompt_template = ChatPromptTemplate.from_template(template)
     rag_prompt_template.messages.insert(0, SystemMessage(
         content="You are a helpful AI. Use the document excerpts to respond to the best of your ability."))

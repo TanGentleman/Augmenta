@@ -111,6 +111,7 @@ def format_docs(docs: list[Document], save_excerpts=True) -> str:
     if save_excerpts:
         with open("excerpts.md", "w") as f:
             f.write(f"Context:\n{context_string}")
+    context_string = context_string.strip()
     return context_string
 
 
@@ -128,8 +129,20 @@ def get_current_time() -> str:
     """
     return str(datetime.now().strftime("%Y-%m-%d"))
 
+def get_doc_ids_from_manifest(collection_name):
+    """
+    Get the doc ids from the manifest.json file
+    """
+    doc_ids = []
+    with open('manifest.json', 'r') as f:
+        data = json_load(f)
+        for item in data["databases"]:
+            if item["collection_name"] == collection_name:
+                doc_ids = item["metadata"]["doc_ids"]
+                return doc_ids
+    return doc_ids
 
-def update_manifest(rag_settings):
+def update_manifest(rag_settings, doc_ids=[]):
     """
     Update the manifest.json file with the new collection
 
@@ -154,10 +167,9 @@ def update_manifest(rag_settings):
             # Make sure the embedding model is the same
             if item["metadata"]["embedding_model"] != rag_settings["embedding_model"].model:
                 raise ValueError("Embedding model must match manifest")
-            if "item"["metadata"]["multivector_enabled"] != rag_settings["multivector_enabled"]:
+            if item["metadata"]["multivector_enabled"] != rag_settings["multivector_enabled"]:
                 raise ValueError("Incompatibility with multivector_enabled")
             # No need to update manifest.json
-            return
     # get unique id
     unique_id = str(uuid4())
     print()
@@ -175,7 +187,10 @@ def update_manifest(rag_settings):
             "chunk_size": str(rag_settings["chunk_size"]),
             "chunk_overlap": str(rag_settings["chunk_overlap"]),
             "inputs": rag_settings["inputs"],
-            "timestamp": get_current_time()
+            "timestamp": get_current_time(),
+            "multivector_enabled": rag_settings["multivector_enabled"],
+            "multivector_method": rag_settings["multivector_method"],
+            "doc_ids": doc_ids
         }
     }
     databases.append(manifest)

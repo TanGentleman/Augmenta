@@ -1,18 +1,24 @@
 {
     "databases": [
         {
-            "id": "c2a75dbe-0843-4f39-9a1b-e05ddd34dd40",
-            "collection_name": "rag_medium_and_txt_collection",
+            "id": "01bd19ab-afca-49ca-93a3-07449dc6d7a5",
+            "collection_name": "wegner_multi_collection",
             "metadata": {
                 "embedding_model": "text-embedding-3-large",
                 "method": "faiss",
-                "chunk_size": "3000",
-                "chunk_overlap": "200",
+                "chunk_size": "1024",
+                "chunk_overlap": "150",
                 "inputs": [
-                    "ragMedium.pdf",
-                    "paper.txt"
+                    "wegner.pdf"
                 ],
-                "timestamp": "2024-03-25"
+                "timestamp": "2024-04-10",
+                "multivector_enabled": true,
+                "multivector_method": "summary",
+                "doc_ids": [
+                    "5bf4dbc0-c64d-4e50-b266-01380df897f0",
+                    "982cd3ff-cb4d-4446-bdf7-928dfdd294cd",
+                    "dac4ecd4-4ffb-4031-a0f3-57ca1ad3fc04"
+                ]
             }
         }
     ]
