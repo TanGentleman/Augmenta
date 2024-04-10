@@ -5,7 +5,7 @@ from langchain.schema import SystemMessage
 DEFAULT_QUERY = '''Name 5 strange vegetables that I am unlikely to see in Western countries.'''
 # DEFAULT_SYSTEM_MESSAGE = "You are a domain expert AI for a graduate class. Be articulate, clear, and concise and your response."
 DEFAULT_SYSTEM_MESSAGE = "You are a helpful AI."
-MAX_CHARS_IN_PROMPT = 50000
+MAX_CHARS_IN_PROMPT = 200000
 MAX_CHAT_EXCHANGES = 20
 
 CODE_SYSTEM_MESSAGE = "You are an expert programmer that helps to review Python code and provide optimizations."

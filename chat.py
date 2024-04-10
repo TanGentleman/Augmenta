@@ -158,8 +158,9 @@ class Chatbot:
     
     def get_rag_settings(self):
         # The embedding function gets called immediately
-        embedding_model = self.config.rag_config["embedding_model"]["function"]()
-        rag_llm = self.config.rag_config["rag_llm"]["function"]
+        embedding_model = MODEL_DICT[self.config.rag_config["embedding_model"]]["function"]
+        embedding_model = embedding_model() # Initialize the embedder
+        rag_llm = MODEL_DICT[self.config.rag_config["rag_llm"]]["function"]
         rag_settings = {
             "collection_name": self.config.rag_config["collection_name"],
             "embedding_model": embedding_model,
