@@ -4,7 +4,7 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
 from helpers import clean_docs, collection_exists, format_docs
-from constants import RAG_TEMPLATE, SUMMARY_TEMPLATE
+from constants import get_rag_template, get_summary_template
 import embed
 
 # These are the urls that get ingested as documents. Should be a list of
@@ -27,7 +27,7 @@ def get_summary_chain(llm):
     """
     chain = (
         {"excerpt": lambda x: x}
-        | SUMMARY_TEMPLATE
+        | get_rag_template()
         | llm
         | StrOutputParser()
     )
@@ -41,7 +41,7 @@ def get_rag_chain(retriever, llm):
     Can be invoked with a question, like `chain.invoke("How do I do x task using this framework?")` to get a response.
     """
     # Get prompt template
-    rag_prompt_template = RAG_TEMPLATE
+    rag_prompt_template = get_summary_template()
     chain = (
         {"context": retriever | format_docs, "question": RunnablePassthrough()}
         | rag_prompt_template
