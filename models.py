@@ -319,7 +319,7 @@ class LLM_FN:
         # If it's not a value in MODEL_DICT, raise an error
         # This technically means embedding models would pass here, but fine for
         # now
-        self.model_name = "Unknown"
+        self.model_name = ""
         self.context_size = 0
         found = False
         for value in MODEL_DICT.values():
@@ -331,12 +331,15 @@ class LLM_FN:
         if not found:
             raise ValueError(
                 f"Model function {model_fn} not found in MODEL_DICT")
-        assert self.context_size > 0, "Context size must be greater than 0"
+        
         self.model_fn = model_fn
         self.hyperparameters = None
         if hyperparameters is not None:
             # assert isinstance(hyperparameters, dict), "This can be any check to make sure hyperparams are valid"
             self.hyperparameters = hyperparameters
+        
+        assert isinstance(self.model_name, str) and len(self.model_name) > 0, "Model name must be a non-empty string"
+        assert isinstance(self.context_size, int) and self.context_size > 0, "Context size must be greater than 0"
 
     def get_llm(self, hyperparameters=None):
         if hyperparameters is not None:
@@ -347,10 +350,14 @@ class LLM_FN:
 
 class LLM:
     def __init__(self, llm_fn: LLM_FN, hyperparameters=None):
-        assert llm_fn.model_fn in [i["function"] for i in MODEL_DICT.values(
-        )], "Model function not found in MODEL_DICT"
-        # I will split these into LLM_DICT and EMBEDDING_DICT to filter out
-        # embedding models
+        found = False
+        for model in MODEL_DICT:
+            if model["function"] == llm_fn.model_fn:
+                assert model["model_name"] == llm_fn.model_name, "Model name does not match"
+                found = True
+                break
+        assert found, "Model function not found in MODEL_DICT"
+        # TODO:Filter out embedding models
 
         self.model_name = llm_fn.model_name
         self.context_size = llm_fn.context_size
@@ -366,14 +373,15 @@ class LLM:
         """
         Get the name of the model
         """
-        name = 'Unknown'
         if hasattr(self.llm, 'model_name'):
             name = self.llm.model_name
         elif hasattr(self.llm, 'model'):
             name = self.llm.model
+        else:
+            raise ValueError("Model name not found in model object")
         if name != self.model_name:
             raise ValueError(
-                f"Model name from API {name} does not match expected model name {self.model_name}")
+                f"Model name from API: {name} does not match expected model name: {self.model_name}")
     pass
 
     def invoke(self, query):
