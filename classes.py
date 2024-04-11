@@ -32,12 +32,11 @@ class RagSchema(BaseModel):
     chunk_size: int = Field(ge=0)
     chunk_overlap: int = Field(ge=0)
     k_excerpts: int = Field(ge=0, le=8)
-    rag_llm: str
+    rag_llm: VALID_LLM
     inputs: list[str]
     multivector_enabled: bool
     multivector_method: Literal["summary", "qa"]
     pass
-
 
 class ChatSchema(BaseModel):
     """
@@ -96,8 +95,11 @@ class Config:
             raise ValueError("Context max exceeds model limit")
 
         if self.chat_config["rag_mode"]:
-            if not self.rag_config["inputs"] or not self.rag_config["inputs"][0]:
+            if not self.rag_config["inputs"]:
                 raise ValueError("RAG mode requires inputs")
+            for i in range(len(self.rag_settings["inputs"])):
+                if not self.rag_settings["inputs"][i]:
+                    raise ValueError(f"Input {i} is empty")
         pass
 
     def __str__(self):
