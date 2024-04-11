@@ -168,7 +168,7 @@ def update_manifest(rag_settings, doc_ids=[]):
     for item in databases:
         if item["collection_name"] == rag_settings["collection_name"]:
             # Make sure the embedding model is the same
-            if item["metadata"]["embedding_model"] != rag_settings["embedding_model"].model:
+            if item["metadata"]["embedding_model"] != rag_settings["embedding_model"].model_name:
                 raise ValueError("Embedding model must match manifest")
             if item["metadata"]["multivector_enabled"] != rag_settings["multivector_enabled"]:
                 raise ValueError("Incompatibility with multivector_enabled")

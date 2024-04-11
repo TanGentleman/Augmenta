@@ -178,10 +178,9 @@ class Chatbot:
 
     def get_rag_settings(self):
         collection_name = self.config.rag_config["collection_name"]
-        embedding_model_fn = self.config.rag_config["embedding_model"]
-        assert isinstance(embedding_model_fn, LLM_FN)
+        embedding_model = self.config.rag_config["embedding_model"]
+        assert isinstance(embedding_model, LLM_FN)
         # Initialize the embedder
-        embedding_model = embedding_model_fn.get_llm()
         method = self.config.rag_config["method"]
         chunk_size = self.config.rag_config["chunk_size"]
         chunk_overlap = self.config.rag_config["chunk_overlap"]
@@ -264,7 +263,10 @@ class Chatbot:
         assert self.rag_mode, "RAG mode not enabled"
         collection_name = self.rag_settings["collection_name"]
         method = self.rag_settings["method"]
-        embedder = self.rag_settings["embedding_model"]
+        embedding_model_fn = self.rag_settings["embedding_model"]
+        assert isinstance(embedding_model_fn, LLM_FN)
+        embedder = embedding_model_fn.get_llm()
+
         vectorstore = None
         inputs = self.rag_settings["inputs"]
         docs = []
@@ -400,25 +402,23 @@ class Chatbot:
             print(f'Saved {self.count} exchanges to history.md')
             return
         elif prompt == "info":
-            model_name = "Unknown model"
             print(f'RAG mode: {self.rag_mode}')
             if self.rag_mode is False:
                 print(f'Exchanges: {self.count}')
                 if self.settings["enable_system_message"]:
                     print(f'System message: {self.settings["system_message"]}')
-                model_name = self.chat_model.model_name
-                print(f'LLM: {model_name}')
+                print(f'LLM: {self.chat_model.model_name}')
                 return
             else:
+                # TODO: Make sure important fields are consistent with manifest
                 assert isinstance(
                     self.rag_settings["rag_llm"], LLM), "RAG LLM not initialized"
-                model_name = self.rag_settings["rag_llm"].model_name
-                print(f'LLM: {model_name}')
+                print(f'RAG LLM: {self.rag_settings["rag_llm"].model_name}')
                 print(
                     f'Using vectorstore: {self.rag_settings["collection_name"]}')
                 print(f'Inputs: {self.rag_settings["inputs"]}')
                 print(
-                    f'Embedding model: {self.rag_settings["embedding_model"].model}')
+                    f'Embedding model: {self.rag_settings["embedding_model"].model_name}')
                 print(f'Method: {self.rag_settings["method"]}')
                 print(f'Chunk size: {self.rag_settings["chunk_size"]}')
                 print(f'Chunk overlap: {self.rag_settings["chunk_overlap"]}')
