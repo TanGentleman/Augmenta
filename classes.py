@@ -3,6 +3,8 @@ from helpers import read_settings
 from typing import Literal
 from pydantic import BaseModel, Field
 
+from models import LLM_FN, MODEL_DICT
+
 VALID_LLM = Literal[
     "get_openai_gpt4",
     "get_together_dolphin",
@@ -69,18 +71,32 @@ class Config:
         self.hyperparameters = config["hyperparameters"]
         self.__validate_configs()
 
-    def __check_context_max(self) -> bool:
+    def __check_context_max(self):
         """
         Validate the context maxes
         """
+        rag_llm = self.rag_config["rag_llm"]
+        assert isinstance(rag_llm, LLM_FN), "Rag LLM must be type LLM_FN"
+        context_max = rag_llm.context_size
         chunk_size = self.rag_config["chunk_size"]
         k = self.rag_config["k_excerpts"]
         # get context length of the model. For now, 128K to not throw errors
-        context_max = 128000
-        max_chars = context_max * 5
+        max_chars = context_max * 4
         if chunk_size * k > max_chars:
-            return False
-        return True
+            raise ValueError(f"Chunk size * k exceeds model limit: {chunk_size * k} > {max_chars}")
+
+    def __validate_rag_settings(self):
+        """
+        Validate the RAG settings
+        """
+        if self.chat_config["rag_mode"]:
+            if not self.rag_config["inputs"]:
+                raise ValueError("RAG mode requires inputs")
+            for i in range(len(self.rag_settings["inputs"])):
+                if not self.rag_settings["inputs"][i]:
+                    raise ValueError(f"Input {i} is empty")
+                
+        self.__check_context_max()
 
     def __validate_configs(self):
         """
@@ -89,18 +105,16 @@ class Config:
         RagSchema(**self.rag_config)
         ChatSchema(**self.chat_config)
         HyperparameterSchema(**self.hyperparameters)
-        # TODO:
-        # Enforce chunk size check against the embedder here
-        if not self.__check_context_max():
-            raise ValueError("Context max exceeds model limit")
+        # Set LLMs
+        rag_llm_fn = MODEL_DICT[self.rag_config["rag_llm"]]["function"]
+        primary_model_fn = MODEL_DICT[self.chat_config["primary_model"]]["function"]
+        backup_model_fn = MODEL_DICT[self.chat_config["backup_model"]]["function"]
 
-        if self.chat_config["rag_mode"]:
-            if not self.rag_config["inputs"]:
-                raise ValueError("RAG mode requires inputs")
-            for i in range(len(self.rag_settings["inputs"])):
-                if not self.rag_settings["inputs"][i]:
-                    raise ValueError(f"Input {i} is empty")
-        pass
+        self.rag_config["rag_llm"] = LLM_FN(rag_llm_fn)
+        self.chat_config["primary_model"] = LLM_FN(primary_model_fn)
+        self.chat_config["backup_model"] = LLM_FN(backup_model_fn)
+
+        self.__validate_rag_settings()
 
     def __str__(self):
         return self.props()
