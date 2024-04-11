@@ -1,9 +1,9 @@
 from typing import Any
 from uuid import uuid4
 from langchain.schema import HumanMessage, SystemMessage
-from helpers import collection_exists, get_doc_ids_from_manifest, save_response_to_markdown_file, save_history_to_markdown_file, read_sample, update_manifest
+from helpers import collection_exists, scan_manifest, save_response_to_markdown_file, save_history_to_markdown_file, read_sample, update_manifest
 from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, SUMMARY_TEMPLATE
-from config import MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, LOCAL_MODEL_ONLY, EXPLAIN_EXCERPT
+from config import MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, EXPLAIN_EXCERPT
 from classes import Config
 from models import MODEL_DICT, LLM_FN, LLM
 from rag import get_summary_chain, input_to_docs, get_rag_chain
@@ -60,8 +60,8 @@ class Chatbot:
         self.config = config
         self.settings = self.get_chat_settings()
         self.rag_settings = self.get_rag_settings()
-        self.chat_model = self.get_chat_model()
-        self.backup_model = None
+        self.chat_model = self.activate_chat_model() # This activates the primary model
+        self.backup_model = self.settings["backup_model"]
 
         self.parent_docs = None
         self.doc_ids = []
@@ -77,18 +77,22 @@ class Chatbot:
         else:
             self.initialize_messages()
 
-    def get_chat_model(self, backup=False) -> LLM:
+    def activate_chat_model(self, backup=False) -> LLM:
         if backup:
-            uninitialized_llm = self.settings["backup_model"]
+            llm_fn = self.settings["backup_model"]
         else:
-            uninitialized_llm = self.settings["primary_model"]
-        return LLM(LLM_FN(uninitialized_llm))
+            llm_fn = self.settings["primary_model"]
+        
+        assert isinstance(llm_fn, LLM_FN)
+        return LLM(llm_fn)
 
     def get_rag_model(self) -> LLM:
         if isinstance(self.rag_settings["rag_llm"], LLM):
             print('RAG LLM already initialized')
             return self.rag_settings["rag_llm"]
-        return LLM(LLM_FN(self.rag_settings["rag_llm"]))
+        llm_fn = self.rag_settings["rag_llm"]
+        assert isinstance(llm_fn, LLM_FN)
+        return LLM(llm_fn)
 
     def initialize_messages(self):
         messages = []
@@ -104,12 +108,6 @@ class Chatbot:
         self.messages = messages
         self.count = 0
 
-    def check_inputs_valid(self):
-        assert self.rag_settings["inputs"], "No inputs provided"
-        for i in range(len(self.rag_settings["inputs"])):
-            if not self.rag_settings["inputs"][i]:
-                raise ValueError(f"Input {i} is empty")
-
     def ingest_documents(self):
         """
         This function performs the initial RAG steps
@@ -118,7 +116,6 @@ class Chatbot:
             print('Retriever already exists. Use "reg" to clear it first')
             return
 
-        self.check_inputs_valid()
         # From this point forward, the rag_llm is of type LLM
         self.rag_settings["rag_llm"] = self.get_rag_model()
         assert isinstance(
@@ -126,8 +123,7 @@ class Chatbot:
         self.rag_mode = True
         # get doc_ids
         if self.rag_settings["multivector_enabled"]:
-            self.doc_ids = get_doc_ids_from_manifest(
-                self.rag_settings["collection_name"])
+            self.doc_ids = scan_manifest(self.rag_settings)
         self.retriever = self.get_retriever()
         self.rag_chain = get_rag_chain(
             self.retriever, self.rag_settings["rag_llm"].llm)
@@ -145,10 +141,10 @@ class Chatbot:
         self.config = config
         self.settings = self.get_chat_settings()
         self.rag_settings = self.get_rag_settings()
-        self.chat_model = self.get_chat_model()
+        self.chat_model = self.activate_chat_model()
 
         self.rag_mode = self.settings["rag_mode"]
-        self.backup_model = None
+        self.backup_model = self.settings["backup_model"]
         self.retriever = None
         self.rag_chain = None
         self.doc_ids = []
@@ -161,44 +157,62 @@ class Chatbot:
             self.count = 0
 
     def get_chat_settings(self):
-        assert "primary_model" in self.config.chat_config and self.config.chat_config[
-            "primary_model"] in MODEL_DICT, "set valid primary_model in settings.json"
-        assert "backup_model" in self.config.chat_config and self.config.chat_config[
-            "backup_model"] in MODEL_DICT, "set valid backup_model in settings.json"
-        assert "enable_system_message" in self.config.chat_config and isinstance(
-            self.config.chat_config["enable_system_message"], bool), "set valid enable_system_message in settings.json"
-        assert "system_message" in self.config.chat_config, "system_message key not found in chat_config"
-        assert "rag_mode" in self.config.chat_config, "rag_mode key not found in chat_config"
-        if LOCAL_MODEL_ONLY:
-            assert self.config.chat_config["primary_model"] == "get_local_model", "LOCAL_MODEL_ONLY is set to True"
-
-        primary_model = MODEL_DICT[self.config.chat_config["primary_model"]]["function"]
-        backup_model = MODEL_DICT[self.config.chat_config["backup_model"]]["function"]
+        primary_model = self.config.chat_config["primary_model"]
+        backup_model = self.config.chat_config["backup_model"]
+        enable_system_message = self.config.chat_config["enable_system_message"]
+        system_message = self.config.chat_config["system_message"]
+        rag_mode = self.config.chat_config["rag_mode"]
+        assert isinstance(primary_model, LLM_FN)
+        assert isinstance(backup_model, LLM_FN)
+        assert isinstance(enable_system_message, bool)
+        assert isinstance(system_message, str)
+        assert isinstance(rag_mode, bool)
 
         chat_settings = {
             "primary_model": primary_model,
             "backup_model": backup_model,
-            "enable_system_message": self.config.chat_config["enable_system_message"],
-            "system_message": self.config.chat_config["system_message"],
-            "rag_mode": self.config.chat_config["rag_mode"]}
+            "enable_system_message": enable_system_message,
+            "system_message": system_message,
+            "rag_mode": rag_mode}
         return chat_settings
 
     def get_rag_settings(self):
-        # The embedding function gets called immediately
-        embedding_model = MODEL_DICT[self.config.rag_config["embedding_model"]]["function"]
-        embedding_model = embedding_model()  # Initialize the embedder
-        rag_llm = MODEL_DICT[self.config.rag_config["rag_llm"]]["function"]
+        collection_name = self.config.rag_config["collection_name"]
+        embedding_model_fn = self.config.rag_config["embedding_model"]
+        assert isinstance(embedding_model_fn, LLM_FN)
+        # Initialize the embedder
+        embedding_model = embedding_model_fn.get_llm()
+        method = self.config.rag_config["method"]
+        chunk_size = self.config.rag_config["chunk_size"]
+        chunk_overlap = self.config.rag_config["chunk_overlap"]
+        k_excerpts = self.config.rag_config["k_excerpts"]
+        rag_llm = self.config.rag_config["rag_llm"]
+        inputs = self.config.rag_config["inputs"]
+        # Not sure if I want to keep these
+        multivector_enabled = self.config.rag_config["multivector_enabled"]
+        multivector_method = self.config.rag_config["multivector_method"]
+        # TODO: Add doc_ids to rag_settings. This will be used for multivector.
+
+        assert isinstance(collection_name, str)
+        assert isinstance(method, str)
+        assert isinstance(chunk_size, int)
+        assert isinstance(chunk_overlap, int)
+        assert isinstance(k_excerpts, int)
+        assert isinstance(rag_llm, LLM_FN), "RAG LLM not initialized"
+        assert isinstance(inputs, list)
+        
         rag_settings = {
-            "collection_name": self.config.rag_config["collection_name"],
+            "collection_name": collection_name,
             "embedding_model": embedding_model,
-            "method": self.config.rag_config["method"],
-            "chunk_size": self.config.rag_config["chunk_size"],
-            "chunk_overlap": self.config.rag_config["chunk_overlap"],
-            "k_excerpts": self.config.rag_config["k_excerpts"],
+            "method": method,
+            "chunk_size": chunk_size,
+            "chunk_overlap": chunk_overlap,
+            "k_excerpts": k_excerpts,
             "rag_llm": rag_llm,
-            "inputs": self.config.rag_config["inputs"],
-            "multivector_enabled": self.config.rag_config["multivector_enabled"],
-            "multivector_method": self.config.rag_config["multivector_method"]}
+            "inputs": inputs,
+            "multivector_enabled": multivector_enabled,
+            "multivector_method": multivector_method
+        }
         return rag_settings
 
     def set_doc_ids(self):
@@ -362,14 +376,13 @@ class Chatbot:
             return
         elif prompt == "switch":
             # TODO: Create a method for switching models
-            if self.backup_model is None:
-                self.backup_model = self.chat_model
-                print('Switching to backup model')
-                try:
-                    self.chat_model = self.get_chat_model(backup=True)
-                except BaseException:
-                    print('Error switching to backup model')
-                    raise SystemExit
+            self.backup_model = self.chat_model
+            print('Switching to backup model')
+            try:
+                self.chat_model = self.activate_chat_model(backup=True)
+            except BaseException:
+                print('Error switching to backup model')
+                raise SystemExit
         elif prompt == "refresh":
             self.refresh_config()
             return
