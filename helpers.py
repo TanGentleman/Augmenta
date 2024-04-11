@@ -131,15 +131,15 @@ def get_current_time() -> str:
     return str(datetime.now().strftime("%Y-%m-%d"))
 
 
-def get_doc_ids_from_manifest(collection_name):
+def scan_manifest(rag_settings):
     """
-    Get the doc ids from the manifest.json file
+    Scan the manifest.json file for the collection name and return the doc_ids
     """
     doc_ids = []
     with open('manifest.json', 'r') as f:
         data = json_load(f)
         for item in data["databases"]:
-            if item["collection_name"] == collection_name:
+            if item["collection_name"] == rag_settings["collection_name"]:
                 doc_ids = item["metadata"]["doc_ids"]
                 return doc_ids
     return doc_ids
@@ -172,20 +172,21 @@ def update_manifest(rag_settings, doc_ids=[]):
                 raise ValueError("Embedding model must match manifest")
             if item["metadata"]["multivector_enabled"] != rag_settings["multivector_enabled"]:
                 raise ValueError("Incompatibility with multivector_enabled")
+            
+            # Override rag_settings
+            
             # No need to update manifest.json
     # get unique id
     unique_id = str(uuid4())
     print()
-    try:
-        model_name = str(rag_settings["embedding_model"].model)
-    except BaseException:
-        print("Could not get model name from embedding model")
-        model_name = "Unknown model"
+    # This is temporary since embedding model
+    embedding_model_fn = rag_settings["embedding_model"]
+    embedding_model_name = embedding_model_fn.model_name
     manifest = {
         "id": unique_id,
         "collection_name": rag_settings["collection_name"],
         "metadata": {
-            "embedding_model": model_name,
+            "embedding_model": embedding_model_name,
             "method": rag_settings["method"],
             "chunk_size": str(rag_settings["chunk_size"]),
             "chunk_overlap": str(rag_settings["chunk_overlap"]),
