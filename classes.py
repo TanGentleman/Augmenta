@@ -41,6 +41,7 @@ class RagSchema(BaseModel):
     multivector_method: Literal["summary", "qa"]
     pass
 
+
 class ChatSchema(BaseModel):
     """
     Configuration for Chat
@@ -84,7 +85,8 @@ class Config:
         # get context length of the model. For now, 128K to not throw errors
         max_chars = context_max * 4
         if chunk_size * k > max_chars:
-            raise ValueError(f"Chunk size * k exceeds model limit: {chunk_size * k} > {max_chars}")
+            raise ValueError(
+                f"Chunk size * k exceeds model limit: {chunk_size * k} > {max_chars}")
 
     def __validate_rag_config(self):
         """
@@ -96,7 +98,7 @@ class Config:
             for i in range(len(self.rag_config["inputs"])):
                 if not self.rag_config["inputs"][i]:
                     raise ValueError(f"Input {i} is empty")
-        
+
         self.__check_context_max()
 
     def __validate_configs(self):
@@ -119,20 +121,21 @@ class Config:
         self.chat_config["primary_model"] = LLM_FN(primary_model_fn)
         self.chat_config["backup_model"] = LLM_FN(backup_model_fn)
 
-        
         if LOCAL_MODEL_ONLY:
-            llm_models = [self.chat_config["primary_model"], 
-                      self.chat_config["backup_model"], 
-                      self.rag_config["rag_llm"], 
-            ]
+            llm_models = [self.chat_config["primary_model"],
+                          self.chat_config["backup_model"],
+                          self.rag_config["rag_llm"],
+                          ]
             for model in llm_models:
                 if model.model_name != "local-model":
-                    raise ValueError(f"LOCAL_MODEL_ONLY is set to True. {model.model_name}, is non-local.")
+                    raise ValueError(
+                        f"LOCAL_MODEL_ONLY is set to True. {model.model_name}, is non-local.")
             assert self.rag_config["embedding_model"].model_name == "nomic-embed-text", "Only local embedder supported is get_nomic_local_embedder"
             if self.chat_config["rag_mode"]:
                 for input in self.rag_config["inputs"]:
                     if "https" in input:
-                        raise ValueError(f"LOCAL_MODEL_ONLY is set to True. {input}, is non-local.")
+                        raise ValueError(
+                            f"LOCAL_MODEL_ONLY is set to True. {input}, is non-local.")
         self.__validate_rag_config()
 
     def __str__(self):

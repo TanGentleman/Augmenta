@@ -327,25 +327,27 @@ class LLM_FN:
                 self.model_name = model["model_name"]
                 self.context_size = model["context_size"]
 
-                assert len(self.model_name) > 0, "Model name must be a non-empty string"
+                assert len(
+                    self.model_name) > 0, "Model name must be a non-empty string"
                 assert isinstance(self.model_name, str)
                 assert self.context_size > 0, "Context size must be greater than 0"
                 assert isinstance(self.context_size, int)
                 found = True
                 break
         assert found, "Model function not found in MODEL_DICT"
-        
+
         self.model_fn = model_fn
         self.hyperparameters = None
         if hyperparameters is not None:
             # assert isinstance(hyperparameters, dict), "This can be any check to make sure hyperparams are valid"
             self.hyperparameters = hyperparameters
-        
+
     def get_llm(self, hyperparameters=None):
         if hyperparameters is not None:
             return self.model_fn(hyperparameters)
         else:
             return self.model_fn(self.hyperparameters)
+
 
 class LLM:
     def __init__(self, llm_fn: LLM_FN, hyperparameters=None):

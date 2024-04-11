@@ -172,9 +172,9 @@ def update_manifest(rag_settings, doc_ids=[]):
                 raise ValueError("Embedding model must match manifest")
             if item["metadata"]["multivector_enabled"] != rag_settings["multivector_enabled"]:
                 raise ValueError("Incompatibility with multivector_enabled")
-            
+
             # Override rag_settings
-            
+
             # No need to update manifest.json
     # get unique id
     unique_id = str(uuid4())

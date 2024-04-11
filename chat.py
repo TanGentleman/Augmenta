@@ -60,7 +60,7 @@ class Chatbot:
         self.config = config
         self.settings = self.get_chat_settings()
         self.rag_settings = self.get_rag_settings()
-        self.chat_model = self.activate_chat_model() # This activates the primary model
+        self.chat_model = self.activate_chat_model()  # This activates the primary model
         self.backup_model = self.settings["backup_model"]
 
         self.parent_docs = None
@@ -82,7 +82,7 @@ class Chatbot:
             llm_fn = self.settings["backup_model"]
         else:
             llm_fn = self.settings["primary_model"]
-        
+
         assert isinstance(llm_fn, LLM_FN)
         return LLM(llm_fn)
 
@@ -200,7 +200,7 @@ class Chatbot:
         assert isinstance(k_excerpts, int)
         assert isinstance(rag_llm, LLM_FN), "RAG LLM not initialized"
         assert isinstance(inputs, list)
-        
+
         rag_settings = {
             "collection_name": collection_name,
             "embedding_model": embedding_model,
