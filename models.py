@@ -322,15 +322,18 @@ class LLM_FN:
         self.model_name = ""
         self.context_size = 0
         found = False
-        for value in MODEL_DICT.values():
-            if value["function"] == model_fn:
-                self.model_name = value["model_name"]
-                self.context_size = value["context_size"]
+        for model in MODEL_DICT.values():
+            if model["function"] == model_fn:
+                self.model_name = model["model_name"]
+                self.context_size = model["context_size"]
+
+                assert len(self.model_name) > 0, "Model name must be a non-empty string"
+                assert isinstance(self.model_name, str)
+                assert self.context_size > 0, "Context size must be greater than 0"
+                assert isinstance(self.context_size, int)
                 found = True
                 break
-        if not found:
-            raise ValueError(
-                f"Model function {model_fn} not found in MODEL_DICT")
+        assert found, "Model function not found in MODEL_DICT"
         
         self.model_fn = model_fn
         self.hyperparameters = None
@@ -338,26 +341,22 @@ class LLM_FN:
             # assert isinstance(hyperparameters, dict), "This can be any check to make sure hyperparams are valid"
             self.hyperparameters = hyperparameters
         
-        assert isinstance(self.model_name, str) and len(self.model_name) > 0, "Model name must be a non-empty string"
-        assert isinstance(self.context_size, int) and self.context_size > 0, "Context size must be greater than 0"
-
     def get_llm(self, hyperparameters=None):
         if hyperparameters is not None:
             return self.model_fn(hyperparameters)
         else:
             return self.model_fn(self.hyperparameters)
 
-
 class LLM:
     def __init__(self, llm_fn: LLM_FN, hyperparameters=None):
         found = False
-        for model in MODEL_DICT:
+        for model in MODEL_DICT.values():
             if model["function"] == llm_fn.model_fn:
                 assert model["model_name"] == llm_fn.model_name, "Model name does not match"
                 found = True
                 break
         assert found, "Model function not found in MODEL_DICT"
-        # TODO:Filter out embedding models
+        # TODO: Filter out embedding models
 
         self.model_name = llm_fn.model_name
         self.context_size = llm_fn.context_size
