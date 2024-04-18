@@ -82,7 +82,7 @@ def get_together_bigmix(hyperparameters=None) -> ChatOpenAI:
     return ChatOpenAI(
         base_url="https://api.together.xyz",
         api_key=TOGETHER_API_KEY,
-        model="mistralai/Mixtral-8x22B",
+        model="mistralai/Mixtral-8x22B-Instruct-v0.1",
         temperature=0.1,
         max_tokens=1000,
         streaming=True,
@@ -246,7 +246,7 @@ MODEL_DICT = {
     "get_together_bigmix": {
         "function": get_together_bigmix,
         "context_size": 65536,
-        "model_name": "mistralai/Mixtral-8x22B",
+        "model_name": "mistralai/Mixtral-8x22B-Instruct-v0.1",
         "type": "llm"
     },
     "get_together_dbrx": {
@@ -317,8 +317,7 @@ EMBEDDING_CONTEXT_SIZE_DICT = {
 class LLM_FN:
     def __init__(self, model_fn, hyperparameters=None):
         # If it's not a value in MODEL_DICT, raise an error
-        # This technically means embedding models would pass here, but fine for
-        # now
+        # This means embedding models pass here (for now)
         self.model_name = ""
         self.context_size = 0
         found = False
