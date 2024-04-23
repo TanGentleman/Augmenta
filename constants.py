@@ -26,6 +26,9 @@ SUMMARY_TEMPLATE = """Summarize the following text, retaining the main keywords:
 {excerpt}
 </excerpt>"""
 
+RAG_SYSTEM_MESSAGE = "You are a helpful AI. Use the document excerpts to respond to the best of your ability."
+PROMPT_CHOOSER_SYSTEM_MESSAGE = "Use the given prompting examples from Anthropic's website, create a sample system message and user message template for the given task."
+
 
 def get_rag_template():
     """
@@ -35,7 +38,7 @@ def get_rag_template():
     template = RAG_CONTEXT_TEMPLATE
     rag_prompt_template = ChatPromptTemplate.from_template(template)
     rag_prompt_template.messages.insert(0, SystemMessage(
-        content="You are a helpful AI. Use the document excerpts to respond to the best of your ability."))
+        content=RAG_SYSTEM_MESSAGE))
     return rag_prompt_template
 
 

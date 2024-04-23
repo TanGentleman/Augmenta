@@ -1,7 +1,7 @@
 from typing import Any
 from uuid import uuid4
 from langchain.schema import HumanMessage, SystemMessage
-from helpers import collection_exists, scan_manifest, save_response_to_markdown_file, save_history_to_markdown_file, read_sample, update_manifest
+from helpers import collection_exists, process_docs, scan_manifest, save_response_to_markdown_file, save_history_to_markdown_file, read_sample, update_manifest
 from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, SUMMARY_TEMPLATE
 from config import MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, EXPLAIN_EXCERPT
 from classes import Config
@@ -11,6 +11,9 @@ from embed import chroma_vectorstore_from_docs, faiss_vectorstore_from_docs, loa
 from langchain_core.documents import Document
 from langchain.retrievers.multi_vector import MultiVectorRetriever
 from langchain.storage import InMemoryByteStore
+
+# PROCESSING_DOCS_FN = None
+PROCESSING_DOCS_FN = process_docs
 
 ID_KEY = "doc_id"
 
@@ -113,7 +116,7 @@ class Chatbot:
         This function performs the initial RAG steps
         """
         if self.retriever is not None:
-            print('Retriever already exists. Use "reg" to clear it first')
+            print('Retriever already exists. Use "refresh" to clear it first')
             return
 
         # From this point forward, the rag_llm is of type LLM
@@ -259,7 +262,7 @@ class Chatbot:
             child_docs.append(new_doc)
         return child_docs
 
-    def get_vectorstore(self):
+    def get_vectorstore(self, processing_docs_fn: callable = PROCESSING_DOCS_FN):
         assert self.rag_mode, "RAG mode not enabled"
         collection_name = self.rag_settings["collection_name"]
         method = self.rag_settings["method"]
@@ -282,6 +285,9 @@ class Chatbot:
             assert vectorstore is not None, "Collection exists but not loaded properly"
             if self.rag_settings["multivector_enabled"]:
                 for i in range(len(inputs)):
+                    if not inputs[i]:
+                        print(f'Input {i} is empty, skipping')
+                        continue
                     docs.extend(input_to_docs(self.rag_settings["inputs"][i]))
                 assert docs, "No documents to make parent docs"
                 docs = split_documents(docs,
@@ -298,9 +304,14 @@ class Chatbot:
         # Ingest documents
         for i in range(len(inputs)):
             # In the future this can be parallelized
-            docs.extend(input_to_docs(self.rag_settings["inputs"][i]))
+            if not inputs[i]:
+                print(f'Input {i} is empty, skipping')
+                continue
+            docs.extend(input_to_docs(inputs[i]))
 
         assert docs, "No documents to create collection"
+        if processing_docs_fn:
+                    docs = processing_docs_fn(docs)
         docs = split_documents(docs,
                                self.rag_settings["chunk_size"],
                                self.rag_settings["chunk_overlap"])

@@ -1,4 +1,4 @@
-from json import load as json_load
+from json import JSONDecodeError, load as json_load
 from json import dump as json_dump
 from re import sub as re_sub
 from uuid import uuid4
@@ -56,7 +56,12 @@ def read_settings(config_file="settings.json") -> dict:
     """
     settings = {}
     with open(config_file, 'r') as file:
-        settings = json_load(file)
+        try:
+            settings = json_load(file)
+        except JSONDecodeError:
+            print("Error reading settings file")
+            exit(1)
+
         assert isinstance(settings, dict), "Settings file is not a dictionary"
     return settings
 
@@ -79,8 +84,30 @@ def clean_docs(docs: list[Document]) -> list[Document]:
     # Replace emojis, weird unicode characters, etc.
     return docs
 
+def process_docs(docs: list[Document]) -> list[Document]:
+    """
+    Process the documents and extract relevant content. This is set for Anthropic prompt library scraping.
 
-def format_docs(docs: list[Document], save_excerpts=True) -> str:
+    Parameters:
+    - docs (list[Document]): A list of Document objects.
+
+    Returns:
+    - list[Document]: The processed list of Document objects.
+    """
+    left_string = "try it for yourself"
+    right_string = "Example output"
+    for doc in docs:
+        start_index = doc.page_content.find(left_string)
+        end_index = doc.page_content.find(right_string)
+        if start_index != -1 and end_index != -1:
+            extracted_content = doc.page_content[start_index + len(left_string):end_index]
+            doc.page_content = extracted_content
+            print('trimmed content')
+        else:
+            print("Role/example not found in document")
+    return docs
+
+def format_docs(docs: list[Document], save_excerpts=True, process_docs_fn=None) -> str:
     """
     Formats the list of documents into a single string as context to be passed to LLM.
 
@@ -91,6 +118,8 @@ def format_docs(docs: list[Document], save_excerpts=True) -> str:
     summaries = []
     # save documents here to excerpts.md
     context_string = ""
+    if process_docs_fn:
+        docs = process_docs_fn(docs)
     for doc in docs:
         # check if "Summary" is a key in the dict
         # print(doc.metadata.keys())
