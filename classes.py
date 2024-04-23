@@ -5,6 +5,7 @@ from typing import Literal
 from pydantic import BaseModel, Field
 
 from models import LLM_FN, MODEL_DICT
+from os import path, mkdir
 
 VALID_LLM = Literal[
     "get_openai_gpt4",
@@ -98,8 +99,24 @@ class Config:
             for i in range(len(self.rag_config["inputs"])):
                 if not self.rag_config["inputs"][i]:
                     raise ValueError(f"Input {i} is empty")
-
+            # Check if the collection exists
+            # If exists, compare the collection fields like in update_manifest
+            # Adjust rag_config with correct fields (include print statements)
+            # helpers.py should have function get_collection_from_manifest(rag_settings)
+            # This will return an object with the dictionary from the manifest, or will be blank
+            # This will allow us to compare against collection_exists output too!!
         self.__check_context_max()
+
+    def __check_folders(self):
+        """
+        Make the folders for the collection
+        """
+        # Make a folder called documents if it doesn't exist
+        if not path.exists("documents"):
+            mkdir("documents")
+        
+
+        
 
     def __validate_configs(self):
         """
@@ -133,12 +150,18 @@ class Config:
             assert self.rag_config["embedding_model"].model_name == "nomic-embed-text", "Only local embedder supported is get_nomic_local_embedder"
             if self.chat_config["rag_mode"]:
                 for input in self.rag_config["inputs"]:
+                    if not input:
+                        raise ValueError("Empty input in RAG mode, fix in settings.json")
                     if "https" in input:
                         raise ValueError(
                             f"LOCAL_MODEL_ONLY is set to True. {input}, is non-local.")
         self.__validate_rag_config()
+        self.__check_folders()
 
     def __str__(self):
+        return self.props()
+    
+    def __repr__(self):
         return self.props()
 
     def props(self):
