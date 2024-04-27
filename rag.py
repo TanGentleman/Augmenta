@@ -22,7 +22,7 @@ def get_summary_chain(llm):
     return chain
 
 
-def get_rag_chain(retriever, llm, format_fn: callable = format_docs):
+def get_rag_chain(retriever, llm, format_fn: callable = format_docs, system_message: str = None):
     """
     Returns a chain for the RAG pipeline.
 
@@ -32,7 +32,7 @@ def get_rag_chain(retriever, llm, format_fn: callable = format_docs):
     - format_fn (callable): A function that takes a list of Document objects and returns a string.
     """
     # Get prompt template
-    rag_prompt_template = get_rag_template()
+    rag_prompt_template = get_rag_template(system_message)
     chain = (
         {"context": retriever | format_fn, "question": RunnablePassthrough()}
         | rag_prompt_template

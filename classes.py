@@ -140,26 +140,27 @@ class Config:
                 for item in data["databases"]:
                     if item["collection_name"] == self.rag_config["collection_name"]:
                         collection_in_manifest = True
-                if collection_in_manifest:
-                    if database_exists(
-                            self.rag_config["collection_name"],
-                            self.rag_config["method"]):
-                        self.database_exists = True
+                if database_exists(
+                        self.rag_config["collection_name"],
+                        self.rag_config["method"]):
+                    self.database_exists = True
+                    if collection_in_manifest:
                         print("Collection found in vector DB")
                         # Adjust rag config to match the collection
                         self.__adjust_rag_config(item["metadata"])
 
                     else:
-                        if not any(i for i in self.rag_config["inputs"]):
-                            raise ValueError("RAG mode requires inputs")
-                        self.database_exists = False
+                        print("Collection found in vector DB, but not in manifest.json")
+                else:
+                    if not any(i for i in self.rag_config["inputs"]):
+                        raise ValueError("RAG mode requires inputs")
+                    self.database_exists = False
+                    if collection_in_manifest:
                         print("Vector DB does not exist, removing from manifest.json")
                         data["databases"] = [item for item in data["databases"]
                                              if item["collection_name"] != self.rag_config["collection_name"]]
                         with open("manifest.json", "w") as f:
                             json_dump(data, f, indent=2)
-                else:
-                    self.database_exists = False
                     print(
                         "Setting database_exists to False. Will Config.database_exists stay up-to-date in all cases?")
 

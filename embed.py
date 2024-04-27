@@ -120,7 +120,10 @@ def split_documents(
         chunk_size=chunk_size, chunk_overlap=chunk_overlap
     ).split_documents(docs)
     # Add the char count as metadata to each document
+    excerpt_count = 0
     for doc in chunked_docs:
+        excerpt_count += 1
+        doc.metadata["index"] = excerpt_count
         char_count = len(doc.page_content)
         doc.metadata["char_count"] = char_count
         if char_count > 20000:  # This number is arbitrary
