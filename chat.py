@@ -1,7 +1,7 @@
 from typing import Any
 from uuid import uuid4
 from langchain.schema import HumanMessage, SystemMessage
-from helpers import collection_exists, process_docs, scan_manifest, save_response_to_markdown_file, save_history_to_markdown_file, read_sample, update_manifest
+from helpers import database_exists, process_docs, scan_manifest, save_response_to_markdown_file, save_history_to_markdown_file, read_sample, update_manifest
 from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, SUMMARY_TEMPLATE
 from config import MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, EXPLAIN_EXCERPT
 from classes import Config
@@ -12,8 +12,8 @@ from langchain_core.documents import Document
 from langchain.retrievers.multi_vector import MultiVectorRetriever
 from langchain.storage import InMemoryByteStore
 
-# PROCESSING_DOCS_FN = None
-PROCESSING_DOCS_FN = process_docs
+PROCESSING_DOCS_FN = None
+# PROCESSING_DOCS_FN = process_docs
 
 ID_KEY = "doc_id"
 
@@ -63,7 +63,8 @@ class Chatbot:
         self.config = config
         self.settings = self.get_chat_settings()
         self.rag_settings = self.get_rag_settings()
-        self.chat_model = self.activate_chat_model()  # This activates the primary model
+        # TODO: Disable this activation when RAG is enabled. This means forcing it when refreshing
+        self.chat_model = None
         self.backup_model = self.settings["backup_model"]
 
         self.parent_docs = None
@@ -78,6 +79,7 @@ class Chatbot:
         if self.rag_mode:
             self.ingest_documents()
         else:
+            self.chat_model = self.activate_chat_model() # This activates the primary model
             self.initialize_messages()
 
     def activate_chat_model(self, backup=False) -> LLM:
@@ -86,6 +88,9 @@ class Chatbot:
         else:
             llm_fn = self.settings["primary_model"]
 
+        if isinstance(llm_fn, LLM):
+            print('Model already initialized')
+            return llm_fn
         assert isinstance(llm_fn, LLM_FN)
         return LLM(llm_fn)
 
@@ -144,7 +149,6 @@ class Chatbot:
         self.config = config
         self.settings = self.get_chat_settings()
         self.rag_settings = self.get_rag_settings()
-        self.chat_model = self.activate_chat_model()
 
         self.rag_mode = self.settings["rag_mode"]
         self.backup_model = self.settings["backup_model"]
@@ -156,6 +160,7 @@ class Chatbot:
         if self.rag_mode:
             self.ingest_documents()
         else:
+            self.chat_model = self.activate_chat_model()
             self.initialize_messages()
             self.count = 0
 
@@ -274,7 +279,7 @@ class Chatbot:
         inputs = self.rag_settings["inputs"]
         docs = []
         # If collection exists, load it
-        if collection_exists(collection_name, method):
+        if database_exists(collection_name, method):
             print(f"Collection {collection_name} exists, now loading")
             if method == "chroma":
                 vectorstore = load_chroma_vectorstore(
@@ -388,11 +393,14 @@ class Chatbot:
             self.exit = True
             return
         elif prompt == "switch":
-            # TODO: Create a method for switching models
+            if self.rag_mode:
+                print("Cannot switch models in RAG mode")
+                return
             self.backup_model = self.chat_model
-            print('Switching to backup model')
+            print(f'Switching to backup model {self.backup_model.model_name}')
             try:
                 self.chat_model = self.activate_chat_model(backup=True)
+                return
             except BaseException:
                 print('Error switching to backup model')
                 raise SystemExit
@@ -427,7 +435,6 @@ class Chatbot:
                 print(f'RAG LLM: {self.rag_settings["rag_llm"].model_name}')
                 print(
                     f'Using vectorstore: {self.rag_settings["collection_name"]}')
-                print(f'Inputs: {self.rag_settings["inputs"]}')
                 print(
                     f'Embedding model: {self.rag_settings["embedding_model"].model_name}')
                 print(f'Method: {self.rag_settings["method"]}')
@@ -443,6 +450,8 @@ class Chatbot:
             self.ingest_documents()
             return
         elif prompt == "reg":
+            # Activate chat model (cast to LLM) if needed
+            self.chat_model = self.activate_chat_model()
             self.rag_mode = False
             self.retriever = None
             self.rag_chain = None
@@ -453,6 +462,7 @@ class Chatbot:
             return
 
     def get_chat_response(self, prompt: str):
+        assert self.chat_model is not None, "Chat model not initialized"
         self.messages.append(HumanMessage(content=prompt))
         print(f'Fetching response #{self.count + 1}!')
         try:
@@ -561,7 +571,7 @@ if __name__ == "__main__":
         action='store_true',
         help='Enable RAG mode')
     args = parser.parse_args()
-    config = Config()
+    config = Config(rag_mode=args.rag_mode)
     prompt = args.prompt
 
     persistence_enabled = not args.not_persistent
