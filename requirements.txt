@@ -18,3 +18,5 @@ chromadb
 
 arxiv
 pymupdf
+
+unstructured[all-docs]

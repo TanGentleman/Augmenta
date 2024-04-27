@@ -49,16 +49,22 @@ def input_to_docs(input: str) -> list[Document]:
     """
     Converts the input to a list of documents.
     """
+    EXPERIMENTAL_UNSTRUCTURED = False
     if input.startswith("http"):
         docs = embed.documents_from_url(input)
-    elif input.endswith(".txt"):
-        docs = embed.documents_from_text_file(input)
+    
     else:
-        # Loading pdf
-        docs = embed.documents_from_local_pdf(input)
+        if EXPERIMENTAL_UNSTRUCTURED:
+            docs = embed.documents_from_arbitrary_file(input)
+        else:
+            if input.endswith(".txt"):
+                docs = embed.documents_from_text_file(input)
+            else:
+                assert input.endswith(".pdf"), "Invalid file type. Try enabling EXPERIMENTAL_UNSTRUCTURED."
+                docs = embed.documents_from_local_pdf(input)
     if not docs:
         print("No documents found")
-        return None
+        raise ValueError("No documents found")
     for doc in docs:
         doc.metadata["source"] = input
     docs = clean_docs(docs)
@@ -103,6 +109,9 @@ def vectorstore_from_inputs(
         if not input:
             continue
         docs = input_to_docs(input)
+        if not docs:
+            print(f"No documents found for input {input}")
+            continue
         docs = embed.split_documents(docs, chunk_size, chunk_overlap)
         if i == 0:
             if method == "chroma":

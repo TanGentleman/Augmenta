@@ -12,6 +12,9 @@ from config import CHROMA_FOLDER, FAISS_FOLDER
 from helpers import database_exists
 from models import Embedder
 
+from langchain_community.document_loaders import UnstructuredFileLoader
+from unstructured.cleaners.core import clean_extra_whitespace
+
 
 def loader_from_arxiv_url(url: str) -> list[Document]:
     """
@@ -25,6 +28,14 @@ def loader_from_arxiv_url(url: str) -> list[Document]:
     loader = ArxivLoader(query=doc_id)
     return loader
 
+def loader_from_file_unstructured(filepath: str) -> list[Document]:
+    """
+    Load documents from any file, return List[Document]
+    """
+    element_loader = UnstructuredFileLoader("documents/applied-teaching.docx", 
+                                        mode="elements",
+                                        post_processors=[clean_extra_whitespace])
+    return element_loader
 
 def loader_from_notebook_url(url: str):
     """
@@ -94,6 +105,18 @@ def documents_from_local_pdf(filepath) -> list[Document]:
         raise ValueError(f"Failed to read PDF and return documents.")
     return docs
 
+def documents_from_arbitrary_file(filepath: str) -> list[Document]:
+    """
+    Load a pdf from the "documents" folder
+    Returns List[Document]
+    """
+    filepath = join("documents", filepath)
+    assert exists(filepath), "Local PDF file not found"
+    element_loader = loader_from_file_unstructured(filepath)
+    docs = element_loader.load()
+    if not docs:
+        raise ValueError(f"Did not get docs from local document at {filepath}")
+    return docs
 
 def documents_from_text_file(filepath: str = "sample.txt") -> list[Document]:
     """

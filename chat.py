@@ -362,7 +362,12 @@ class Chatbot:
             if not inputs[i]:
                 print(f'Input {i} is empty, skipping')
                 continue
-            docs.extend(input_to_docs(inputs[i]))
+            print(inputs[i])
+            new_docs = input_to_docs(inputs[i])
+            if not new_docs:
+                print(f'No documents found in input {i}')
+                continue
+            docs.extend(new_docs)
 
         assert docs, "No documents to create collection"
         if processing_docs_fn:
@@ -395,7 +400,7 @@ class Chatbot:
         vectorstore = self.get_vectorstore()
         search_kwargs = {}
         search_kwargs["k"] = self.rag_settings["k_excerpts"]
-        # search_kwargs["filter"] = FILTERED_TAGS # Not yet implemented
+        # search_kwargs["filter"] = {'page': 0}
         if self.rag_settings["multivector_enabled"]:
             assert self.parent_docs, "Parent docs not initialized"
             assert self.doc_ids, "Doc IDs not initialized"
