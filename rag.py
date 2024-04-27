@@ -10,9 +10,10 @@ import embed
 EXPERIMENTAL_UNSTRUCTURED = False
 try:
     from unstructured.cleaners.core import clean_extra_whitespace
-except:
+except BaseException:
     print("Unstructured library not loaded")
     assert EXPERIMENTAL_UNSTRUCTURED is False
+
 
 def get_summary_chain(llm):
     """
@@ -57,7 +58,7 @@ def input_to_docs(input: str) -> list[Document]:
     """
     if input.startswith("http"):
         docs = embed.documents_from_url(input)
-    
+
     else:
         if EXPERIMENTAL_UNSTRUCTURED:
             docs = embed.documents_from_arbitrary_file(input)
@@ -65,7 +66,8 @@ def input_to_docs(input: str) -> list[Document]:
             if input.endswith(".txt"):
                 docs = embed.documents_from_text_file(input)
             else:
-                assert input.endswith(".pdf"), "Invalid file type. Try enabling EXPERIMENTAL_UNSTRUCTURED."
+                assert input.endswith(
+                    ".pdf"), "Invalid file type. Try enabling EXPERIMENTAL_UNSTRUCTURED."
                 docs = embed.documents_from_local_pdf(input)
     if not docs:
         print("No documents found")

@@ -527,7 +527,7 @@ class Chatbot:
             # Get collection names from database
             db_method = self.rag_settings["method"]
             print("Fetching collection names for method: ", db_method)
-            collection_names = get_db_collection_names(method = db_method)
+            collection_names = get_db_collection_names(method=db_method)
             print("Collection names:")
             for name in collection_names:
                 print("-", name)
@@ -651,6 +651,7 @@ class Chatbot:
         self.messages.pop()
         print('Deleted last exchange')
         self.count -= 1
+
 
 # Argparse implementation
 if __name__ == "__main__":

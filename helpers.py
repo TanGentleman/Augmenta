@@ -194,6 +194,7 @@ def scan_manifest(rag_settings):
                 return doc_ids
     return doc_ids
 
+
 def get_db_collection_names(method: str) -> list[str]:
     """
     Get the collection names from the manifest.json file
@@ -203,8 +204,10 @@ def get_db_collection_names(method: str) -> list[str]:
     # All the folders in method+VECTOR_DB_SUFFIX
     folder = method + VECTOR_DB_SUFFIX
     if path_exists(folder):
-        collection_names = [name for name in listdir(folder) if path_isdir(path_join(folder, name))]
+        collection_names = [name for name in listdir(
+            folder) if path_isdir(path_join(folder, name))]
     return collection_names
+
 
 def update_manifest(rag_settings, doc_ids=[]):
     """
