@@ -12,9 +12,12 @@ from config import CHROMA_FOLDER, FAISS_FOLDER
 from helpers import database_exists
 from models import Embedder
 
-from langchain_community.document_loaders import UnstructuredFileLoader
-from unstructured.cleaners.core import clean_extra_whitespace
-
+try:
+    from unstructured.cleaners.core import clean_extra_whitespace
+    from langchain_community.document_loaders import UnstructuredFileLoader
+except:
+    print("Unstructured functions in embed.py will not be accessible")
+    pass
 
 def loader_from_arxiv_url(url: str) -> list[Document]:
     """
@@ -32,10 +35,16 @@ def loader_from_file_unstructured(filepath: str) -> list[Document]:
     """
     Load documents from any file, return List[Document]
     """
-    element_loader = UnstructuredFileLoader("documents/applied-teaching.docx", 
-                                        mode="elements",
-                                        post_processors=[clean_extra_whitespace])
-    return element_loader
+    LOAD_ELEMENTS = False
+    if LOAD_ELEMENTS:
+        element_loader = UnstructuredFileLoader("documents/applied-teaching.docx", 
+                                            mode="elements",
+                                            post_processors=[clean_extra_whitespace])
+        loader = element_loader
+    else:
+        loader = UnstructuredFileLoader("documents/applied-teaching.docx", 
+                                            post_processors=[clean_extra_whitespace])
+    return loader
 
 def loader_from_notebook_url(url: str):
     """

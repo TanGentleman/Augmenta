@@ -7,6 +7,12 @@ from helpers import clean_docs, database_exists, format_docs
 from constants import get_rag_template, get_summary_template
 import embed
 
+EXPERIMENTAL_UNSTRUCTURED = False
+try:
+    from unstructured.cleaners.core import clean_extra_whitespace
+except:
+    print("Unstructured library not loaded")
+    assert EXPERIMENTAL_UNSTRUCTURED is False
 
 def get_summary_chain(llm):
     """
@@ -49,7 +55,6 @@ def input_to_docs(input: str) -> list[Document]:
     """
     Converts the input to a list of documents.
     """
-    EXPERIMENTAL_UNSTRUCTURED = False
     if input.startswith("http"):
         docs = embed.documents_from_url(input)
     
