@@ -397,9 +397,9 @@ class Chatbot:
                 print("Cannot switch models in RAG mode")
                 return
             self.backup_model = self.chat_model
-            print(f'Switching to backup model {self.backup_model.model_name}')
             try:
                 self.chat_model = self.activate_chat_model(backup=True)
+                print(f'Switching to backup model {self.chat_model.model_name}')
                 return
             except BaseException:
                 print('Error switching to backup model')
