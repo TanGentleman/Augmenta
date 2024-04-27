@@ -10,11 +10,15 @@ from embed import chroma_vectorstore_from_docs, faiss_vectorstore_from_docs, loa
 from langchain_core.documents import Document
 from langchain.retrievers.multi_vector import MultiVectorRetriever
 from langchain.storage import InMemoryByteStore
+from langchain.schema import AIMessage
 
 from os import get_terminal_size
-from platform import system
-if system() != 'Windows': import gnureadline
 from textwrap import fill
+try:
+    import gnureadline
+except:
+    pass
+
 TERMINAL_WIDTH = get_terminal_size().columns
 def print_adjusted(text, end = '\n', width=TERMINAL_WIDTH) -> None:
     '''
@@ -27,9 +31,8 @@ def print_adjusted(text, end = '\n', width=TERMINAL_WIDTH) -> None:
         # If the line is longer than the terminal width, wrap it to fit within the width
         if len(line) > width:
             wrapped_line = fill(line, width=width)
-            print(wrapped_line, end = end)
-        else:
-            print(line, end = end)
+            line = wrapped_line
+        print(line, end = end)
 
 PROCESSING_DOCS_FN = None
 # PROCESSING_DOCS_FN = process_docs
@@ -288,6 +291,7 @@ class Chatbot:
     def get_vectorstore(
             self,
             processing_docs_fn: callable = PROCESSING_DOCS_FN):
+        # The processing_docs_fn can be used to format or clean up the documents before indexing.
         assert self.rag_mode, "RAG mode not enabled"
         collection_name = self.rag_settings["collection_name"]
         method = self.rag_settings["method"]
@@ -484,12 +488,22 @@ class Chatbot:
             print('Invalid command: ', prompt)
             return
 
-    def get_chat_response(self, prompt: str):
+    def get_chat_response(self, prompt: str, stream: bool = False):
         assert self.chat_model is not None, "Chat model not initialized"
         self.messages.append(HumanMessage(content=prompt))
         print(f'Fetching response #{self.count + 1}!')
         try:
-            response = self.chat_model.invoke(self.messages)
+            if stream:
+                response_string = ""
+                for chunk in self.chat_model.stream(self.messages):
+                    print(chunk.content, end="", flush=True)
+                    response_string += chunk.content
+                if not response_string:
+                    raise ValueError('No response generated')
+                response = AIMessage(content=response_string)
+            else:
+                response = self.chat_model.invoke(self.messages)
+                print_adjusted(response.content)
         except KeyboardInterrupt:
             print('Keyboard interrupt, aborting generation.')
             self.messages.pop()
@@ -502,11 +516,20 @@ class Chatbot:
         self.count += 1
         return response
 
-    def get_rag_response(self, prompt: str):
+    def get_rag_response(self, prompt: str, stream: bool = False):
         self.messages.append(HumanMessage(content=prompt))
         print(f'RAG engine response #{self.count + 1}!')
         try:
-            response = self.rag_chain.invoke(prompt)
+            if stream:
+                response_string = ""
+                for chunk in self.rag_chain.stream(prompt):
+                    print(chunk.content, end="", flush=True)
+                    response_string += chunk.content
+                response = AIMessage(content=response_string)
+            else:
+                response = self.rag_chain.invoke(prompt)
+                print_adjusted(response.content)
+                
         except KeyboardInterrupt:
             print('Keyboard interrupt, aborting generation.')
             return
@@ -565,9 +588,9 @@ class Chatbot:
                 continue
             # Generate response
             if self.rag_mode:
-                self.get_rag_response(prompt)
+                self.get_rag_response(prompt, stream=True)
             else:
-                self.get_chat_response(prompt)
+                self.get_chat_response(prompt, stream=True)
             print()
         if save_response:
             save_response_to_markdown_file(self.messages[-1].content)

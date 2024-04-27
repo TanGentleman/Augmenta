@@ -34,7 +34,7 @@ def get_openai_gpt4(hyperparameters=None) -> ChatOpenAI:
         temperature=0.1,
         max_tokens=1000,
         streaming=True,
-        callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
 
@@ -47,7 +47,7 @@ def get_together_dolphin(hyperparameters=None) -> ChatOpenAI:
         temperature=0,
         max_tokens=1000,
         streaming=True,
-        callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
 
@@ -60,7 +60,7 @@ def get_together_quen(hyperparameters=None) -> ChatOpenAI:
         temperature=0.1,
         max_tokens=1000,
         streaming=True,
-        callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
 
@@ -73,7 +73,7 @@ def get_together_nous_mix(hyperparameters=None) -> ChatOpenAI:
         temperature=0.1,
         max_tokens=1000,
         streaming=True,
-        callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
 
@@ -86,7 +86,7 @@ def get_together_bigmix(hyperparameters=None) -> ChatOpenAI:
         temperature=0.1,
         max_tokens=1000,
         streaming=True,
-        callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
 
@@ -99,7 +99,7 @@ def get_together_dbrx(hyperparameters=None) -> ChatOpenAI:
         temperature=0.1,
         max_tokens=1000,
         streaming=True,
-        callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
 
@@ -112,7 +112,7 @@ def get_together_fn_mix(hyperparameters=None) -> ChatOpenAI:
         temperature=0.1,
         max_tokens=1000,
         streaming=True,
-        callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
 
@@ -125,7 +125,7 @@ def get_together_fn_mistral(hyperparameters=None) -> ChatOpenAI:
         temperature=0.1,
         max_tokens=1000,
         streaming=True,
-        callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
 
@@ -138,7 +138,7 @@ def get_together_deepseek_4k(hyperparameters=None) -> ChatOpenAI:
         temperature=0,
         max_tokens=2000,
         streaming=True,
-        callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
 
@@ -151,7 +151,7 @@ def get_together_deepseek_32k(hyperparameters=None) -> ChatOpenAI:
         temperature=0,
         max_tokens=2000,
         streaming=True,
-        callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
 
@@ -161,7 +161,7 @@ def get_claude_sonnet(hyperparameters=None) -> ChatAnthropic:
         anthropic_api_key=ANTHROPIC_API_KEY,
         temperature=0,
         streaming=True,
-        callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
 
@@ -173,7 +173,7 @@ def get_claude_opus(hyperparameters=None) -> ChatAnthropic:
         model_name="claude-3-opus-20240229",
         max_tokens_to_sample=4000,
         streaming=True,
-        callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
 
@@ -202,7 +202,7 @@ def get_local_model(hyperparameters=None) -> ChatOpenAI:
         temperature=0.1,
         max_tokens=1000,
         streaming=True,
-        callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
 
@@ -396,6 +396,12 @@ class LLM:
         """
         # This will break embedding models if they don't have an invoke method
         return self.llm.invoke(query)
+
+    def stream(self, query):
+        """
+        Generate a response from the model
+        """
+        return self.llm.stream(query)
 
     def __str__(self):
         return f"LLM: model_name={self.model_name}, context_size={self.context_size}"
