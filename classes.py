@@ -90,10 +90,12 @@ class Config:
         # get context length of the model. For now, 128K to not throw errors
         max_chars = context_max * 4
         if chunk_size * k > max_chars:
-            print("Warning: Chunk size * k exceeds model limit. This is expected to cause errors.")
+            print(
+                "Warning: Chunk size * k exceeds model limit. This is expected to cause errors.")
             # # In the future, throw an error here.
             # raise ValueError(
-            #     f"Chunk size * k exceeds model limit: {chunk_size * k} > {max_chars}")
+            # f"Chunk size * k exceeds model limit: {chunk_size * k} >
+            # {max_chars}")
 
     def __validate_rag_config(self):
         """
@@ -101,7 +103,7 @@ class Config:
         """
         if self.rag_mode:
             self.chat_config["rag_mode"] = True
-        
+
         if not path.exists("documents"):
             mkdir("documents")
         if not path.exists("manifest.json"):
@@ -109,7 +111,7 @@ class Config:
             with open("manifest.json", "w") as f:
                 # Make databases key
                 f.write('{"databases": []}')
-        
+
         if self.chat_config["rag_mode"]:
             self.rag_mode = True
             self.__check_rag_files()
@@ -122,7 +124,7 @@ class Config:
         assert self.rag_mode is True, "RAG mode must be enabled"
         # This step is potentially destructive! Be careful here.
         self.rag_config = adjust_rag_config(self.rag_config, metadata)
-                
+
     def __check_rag_files(self):
         """
         Make sure documents folder and manifest.json initialized correctly.
@@ -139,24 +141,28 @@ class Config:
                     if item["collection_name"] == self.rag_config["collection_name"]:
                         collection_in_manifest = True
                 if collection_in_manifest:
-                    if database_exists(self.rag_config["collection_name"], self.rag_config["method"]):
+                    if database_exists(
+                            self.rag_config["collection_name"],
+                            self.rag_config["method"]):
                         self.database_exists = True
                         print("Collection found in vector DB")
                         # Adjust rag config to match the collection
                         self.__adjust_rag_config(item["metadata"])
-                    
+
                     else:
                         if not any(i for i in self.rag_config["inputs"]):
                             raise ValueError("RAG mode requires inputs")
                         self.database_exists = False
                         print("Vector DB does not exist, removing from manifest.json")
-                        data["databases"] = [item for item in data["databases"] if item["collection_name"] != self.rag_config["collection_name"]]
+                        data["databases"] = [item for item in data["databases"]
+                                             if item["collection_name"] != self.rag_config["collection_name"]]
                         with open("manifest.json", "w") as f:
                             json_dump(data, f, indent=2)
                 else:
                     self.database_exists = False
-                    print("Setting database_exists to False. Will Config.database_exists stay up-to-date in all cases?")
-                    
+                    print(
+                        "Setting database_exists to False. Will Config.database_exists stay up-to-date in all cases?")
+
     def __validate_configs(self):
         """
         Validate the configuration
@@ -177,8 +183,6 @@ class Config:
         self.chat_config["primary_model"] = LLM_FN(primary_model_fn)
         self.chat_config["backup_model"] = LLM_FN(backup_model_fn)
 
-        
-            
         self.__validate_rag_config()
         if LOCAL_MODEL_ONLY:
             if self.rag_mode:
@@ -188,9 +192,12 @@ class Config:
                 ALLOWED_EMBEDDERS = ["nomic-embed-text"]
                 if self.rag_config["embedding_model"].model_name not in ALLOWED_EMBEDDERS:
                     print(self.rag_config["embedding_model"].model_name)
-                    raise ValueError("Only local embedder supported is get_nomic_local_embedder")
+                    raise ValueError(
+                        "Only local embedder supported is get_nomic_local_embedder")
             else:
-                for model in [self.chat_config["primary_model"], self.chat_config["backup_model"]]:
+                for model in [
+                        self.chat_config["primary_model"],
+                        self.chat_config["backup_model"]]:
                     if model.model_name != "local-model":
                         raise ValueError(
                             f"LOCAL_MODEL_ONLY is set to True. {model.model_name}, is non-local.")
@@ -202,7 +209,7 @@ class Config:
 
     def __str__(self):
         return self.props()
-    
+
     def __repr__(self):
         return self.props()
 

@@ -7,6 +7,7 @@ from helpers import clean_docs, database_exists, format_docs
 from constants import get_rag_template, get_summary_template
 import embed
 
+
 def get_summary_chain(llm):
     """
     Returns a chain for summarization only.
@@ -26,7 +27,7 @@ def get_rag_chain(retriever, llm, format_fn: callable = format_docs):
     Returns a chain for the RAG pipeline.
 
     Can be invoked with a question, like `chain.invoke("How do I do x task using this framework?")` to get a response.
-    Inputs: 
+    Inputs:
     - retriever (contains vectorstore with documents) and llm
     - format_fn (callable): A function that takes a list of Document objects and returns a string.
     """
@@ -113,4 +114,3 @@ def vectorstore_from_inputs(
     assert vectorstore is not None, "Vectorstore not initialized. Provide valid inputs."
     return vectorstore
 
-# TODO: Implement these main functions in embed.py and rag.py as test cases in a file tests.py

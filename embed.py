@@ -12,6 +12,7 @@ from config import CHROMA_FOLDER, FAISS_FOLDER
 from helpers import database_exists
 from models import Embedder
 
+
 def loader_from_arxiv_url(url: str) -> list[Document]:
     """
     Load documents from an arXiv URL, return List[Document]

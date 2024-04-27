@@ -84,6 +84,7 @@ def clean_docs(docs: list[Document]) -> list[Document]:
     # Replace emojis, weird unicode characters, etc.
     return docs
 
+
 def process_docs(docs: list[Document]) -> list[Document]:
     """
     Process the documents and extract relevant content. This is set for Anthropic prompt library scraping.
@@ -100,14 +101,19 @@ def process_docs(docs: list[Document]) -> list[Document]:
         start_index = doc.page_content.find(left_string)
         end_index = doc.page_content.find(right_string)
         if start_index != -1 and end_index != -1:
-            extracted_content = doc.page_content[start_index + len(left_string):end_index]
+            extracted_content = doc.page_content[start_index +
+                                                 len(left_string):end_index]
             doc.page_content = extracted_content
             print('trimmed content')
         else:
             print("Role/example not found in document")
     return docs
 
-def format_docs(docs: list[Document], save_excerpts=True, process_docs_fn=None) -> str:
+
+def format_docs(
+        docs: list[Document],
+        save_excerpts=True,
+        process_docs_fn=None) -> str:
     """
     Formats the list of documents into a single string as context to be passed to LLM.
 
@@ -203,7 +209,7 @@ def update_manifest(rag_settings, doc_ids=[]):
             return
     # get unique id
     unique_id = str(uuid4())
-    print() # Why do I need this again?
+    print()  # Why do I need this again?
     # This is temporary since embedding model
     embedding_model_name = rag_settings["embedding_model"].model_name
     manifest = {
@@ -224,6 +230,7 @@ def update_manifest(rag_settings, doc_ids=[]):
         json_dump(data, f, indent=4)
     print("Updated manifest.json")
 
+
 def adjust_rag_config(rag_settings, manifest_metadata):
     """
     Adjust the RAG settings based on the metadata from manifest.json
@@ -231,20 +238,24 @@ def adjust_rag_config(rag_settings, manifest_metadata):
     metadata = manifest_metadata
     if metadata["embedding_model"] != rag_settings["embedding_model"].model_name:
         rag_settings["embedding_model"] = metadata["embedding_model"]
-        print(f"Warning: Embedding model in settings.json switched to {rag_settings['embedding_model'].model_name} from manifest.json.")
+        print(
+            f"Warning: Embedding model in settings.json switched to {rag_settings['embedding_model'].model_name} from manifest.json.")
     if metadata["method"] != rag_settings["method"]:
-        print(f"Warning: Method in settings.json has been switched to {rag_settings['method']} from manifest.json.")
+        print(
+            f"Warning: Method in settings.json has been switched to {rag_settings['method']} from manifest.json.")
         rag_settings["method"] = metadata["method"]
-    
+
     manifest_chunk_size = int(metadata["chunk_size"])
     if manifest_chunk_size != rag_settings["chunk_size"]:
         rag_settings["chunk_size"] = manifest_chunk_size
-        print(f"Warning: Chunk size in settings.json has been switched to {rag_settings['chunk_size']} from manifest.json.")
-    
+        print(
+            f"Warning: Chunk size in settings.json has been switched to {rag_settings['chunk_size']} from manifest.json.")
+
     manifest_chunk_overlap = int(metadata["chunk_overlap"])
     if manifest_chunk_overlap != rag_settings["chunk_overlap"]:
         rag_settings["chunk_overlap"] = manifest_chunk_overlap
-        print(f"Warning: Chunk overlap in settings.json has been switched to {rag_settings['chunk_overlap']} from manifest.json.")
+        print(
+            f"Warning: Chunk overlap in settings.json has been switched to {rag_settings['chunk_overlap']} from manifest.json.")
     if metadata["inputs"] != rag_settings["inputs"]:
         rag_settings["inputs"] = metadata["inputs"]
         print("Warning: Inputs loaded from manifest.json.")

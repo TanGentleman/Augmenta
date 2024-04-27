@@ -346,13 +346,13 @@ class LLM_FN:
             return self.model_fn(hyperparameters)
         else:
             return self.model_fn(self.hyperparameters)
-        
-    
+
     def __str__(self):
         return f"LLM: model_name={self.model_name}, context_size={self.context_size}"
 
     def __repr__(self):
         return f"LLM(model_name={self.model_name}, context_size={self.context_size})"
+
 
 class LLM:
     def __init__(self, llm_fn: LLM_FN, hyperparameters=None):
@@ -402,5 +402,7 @@ class LLM:
 
     def __repr__(self):
         return f"LLM(model_name={self.model_name}, context_size={self.context_size})"
+
+
 class Embedder(OpenAIEmbeddings, TogetherEmbeddings, OllamaEmbeddings):
     pass

@@ -63,7 +63,6 @@ class Chatbot:
         self.config = config
         self.settings = self.get_chat_settings()
         self.rag_settings = self.get_rag_settings()
-        # TODO: Disable this activation when RAG is enabled. This means forcing it when refreshing
         self.chat_model = None
         self.backup_model = self.settings["backup_model"]
 
@@ -79,7 +78,7 @@ class Chatbot:
         if self.rag_mode:
             self.ingest_documents()
         else:
-            self.chat_model = self.activate_chat_model() # This activates the primary model
+            self.chat_model = self.activate_chat_model()  # This activates the primary model
             self.initialize_messages()
 
     def activate_chat_model(self, backup=False) -> LLM:
@@ -267,7 +266,9 @@ class Chatbot:
             child_docs.append(new_doc)
         return child_docs
 
-    def get_vectorstore(self, processing_docs_fn: callable = PROCESSING_DOCS_FN):
+    def get_vectorstore(
+            self,
+            processing_docs_fn: callable = PROCESSING_DOCS_FN):
         assert self.rag_mode, "RAG mode not enabled"
         collection_name = self.rag_settings["collection_name"]
         method = self.rag_settings["method"]
@@ -316,7 +317,7 @@ class Chatbot:
 
         assert docs, "No documents to create collection"
         if processing_docs_fn:
-                    docs = processing_docs_fn(docs)
+            docs = processing_docs_fn(docs)
         docs = split_documents(docs,
                                self.rag_settings["chunk_size"],
                                self.rag_settings["chunk_overlap"])
@@ -399,7 +400,8 @@ class Chatbot:
             self.backup_model = self.chat_model
             try:
                 self.chat_model = self.activate_chat_model(backup=True)
-                print(f'Switching to backup model {self.chat_model.model_name}')
+                print(
+                    f'Switching to backup model {self.chat_model.model_name}')
                 return
             except BaseException:
                 print('Error switching to backup model')
