@@ -29,7 +29,7 @@ assert TOGETHER_API_KEY and ANTHROPIC_API_KEY, "Please set API keys in .env file
 def get_openai_gpt4(hyperparameters=None) -> ChatOpenAI:
     assert OPENAI_API_KEY, "Please set OPENAI_API_KEY in .env file"
     return ChatOpenAI(
-        model="gpt-4-0125-preview",
+        model="gpt-4-turbo-2024-04-09",
         api_key=OPENAI_API_KEY,
         temperature=0.1,
         max_tokens=1000,
@@ -216,7 +216,7 @@ MODEL_DICT = {
     "get_openai_gpt4": {
         "function": get_openai_gpt4,
         "context_size": 128000,
-        "model_name": "gpt-4-0125-preview",
+        "model_name": "gpt-4-turbo-2024-04-09",
         "type": "llm"
     },
     "get_together_dolphin": {
