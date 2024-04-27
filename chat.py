@@ -1,16 +1,35 @@
-from typing import Any
 from uuid import uuid4
 from langchain.schema import HumanMessage, SystemMessage
 from helpers import database_exists, process_docs, scan_manifest, save_response_to_markdown_file, save_history_to_markdown_file, read_sample, update_manifest
 from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, SUMMARY_TEMPLATE
 from config import MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, EXPLAIN_EXCERPT
 from classes import Config
-from models import MODEL_DICT, LLM_FN, LLM
+from models import LLM_FN, LLM
 from rag import get_summary_chain, input_to_docs, get_rag_chain
 from embed import chroma_vectorstore_from_docs, faiss_vectorstore_from_docs, load_faiss_vectorstore, load_chroma_vectorstore, split_documents
 from langchain_core.documents import Document
 from langchain.retrievers.multi_vector import MultiVectorRetriever
 from langchain.storage import InMemoryByteStore
+
+from os import get_terminal_size
+from platform import system
+if system() != 'Windows': import gnureadline
+from textwrap import fill
+TERMINAL_WIDTH = get_terminal_size().columns
+def print_adjusted(text, end = '\n', width=TERMINAL_WIDTH) -> None:
+    '''
+    Prints text with adjusted line wrapping
+    '''
+    if type(text) != str:
+        text = str(text)
+    lines = text.splitlines()
+    for line in lines:
+        # If the line is longer than the terminal width, wrap it to fit within the width
+        if len(line) > width:
+            wrapped_line = fill(line, width=width)
+            print(wrapped_line, end = end)
+        else:
+            print(line, end = end)
 
 PROCESSING_DOCS_FN = None
 # PROCESSING_DOCS_FN = process_docs
@@ -421,6 +440,8 @@ class Chatbot:
             message_strings = self.messages_to_strings(self.messages)
             save_history_to_markdown_file(message_strings)
             print(f'Saved {self.count} exchanges to history.md')
+            for message in message_strings:
+                print_adjusted(f"{message}\n\n")
             return
         elif prompt == "info":
             print(f'RAG mode: {self.rag_mode}')
