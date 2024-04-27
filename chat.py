@@ -1,7 +1,7 @@
 from uuid import uuid4
 from langchain.schema import HumanMessage, SystemMessage
 from helpers import database_exists, process_docs, scan_manifest, save_response_to_markdown_file, save_history_to_markdown_file, read_sample, update_manifest
-from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, SUMMARY_TEMPLATE
+from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SUMMARY_TEMPLATE
 from config import MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, EXPLAIN_EXCERPT
 from classes import Config
 from models import LLM_FN, LLM
@@ -50,7 +50,8 @@ COMMAND_LIST = [
     "saveall",
     "info",
     "rag",
-    "reg"]
+    "reg",
+    ".s"]
 
 
 class Chatbot:
@@ -139,7 +140,10 @@ class Chatbot:
 
     def ingest_documents(self):
         """
-        This function performs the initial RAG steps
+        Initializes the retriever and RAG chain.
+
+        Raises:
+            ValueError: Doc ID not initialized
         """
         if self.retriever is not None:
             print('Retriever already exists. Use "refresh" to clear it first')
@@ -154,8 +158,12 @@ class Chatbot:
         if self.rag_settings["multivector_enabled"]:
             self.doc_ids = scan_manifest(self.rag_settings)
         self.retriever = self.get_retriever()
+        if self.rag_settings["collection_name"] in RAG_COLLECTION_TO_SYSTEM_MESSAGE:
+            rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE[self.rag_settings["collection_name"]]
+        else:
+            rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE["default"]
         self.rag_chain = get_rag_chain(
-            self.retriever, self.rag_settings["rag_llm"].llm)
+            self.retriever, self.rag_settings["rag_llm"].llm, system_message=rag_system_message)
 
         self.initialize_messages()
         if self.rag_settings["multivector_enabled"]:
@@ -164,6 +172,12 @@ class Chatbot:
         update_manifest(self.rag_settings, self.doc_ids)
 
     def refresh_config(self, config: Config = None):
+        """
+        Refreshes the configuration.
+
+        Args:
+            config (Config, optional): The configuration object. Defaults to None.
+        """
         if config is None:
             # Reload config from settings.json
             config = Config()
@@ -185,7 +199,13 @@ class Chatbot:
             self.initialize_messages()
             self.count = 0
 
-    def get_chat_settings(self):
+    def get_chat_settings(self) -> dict[str, bool | str | LLM_FN]:
+        """
+        Gets the chat settings from the config object.
+
+        Returns:
+            dict[str, bool | str | LLM_FN]: The chat settings.
+        """
         primary_model = self.config.chat_config["primary_model"]
         backup_model = self.config.chat_config["backup_model"]
         enable_system_message = self.config.chat_config["enable_system_message"]
@@ -366,12 +386,7 @@ class Chatbot:
         return vectorstore
 
     def get_retriever(self):
-        # try:
         vectorstore = self.get_vectorstore()
-        # except Exception as e:
-        #     print(f'Error: {e}\n')
-        #     print(f'Error creating vectorstore, check RAG settings in settings.json!')
-        #     raise SystemExit
         search_kwargs = {}
         search_kwargs["k"] = self.rag_settings["k_excerpts"]
         # search_kwargs["filter"] = FILTERED_TAGS # Not yet implemented
@@ -459,6 +474,11 @@ class Chatbot:
                 # TODO: Make sure important fields are consistent with manifest
                 assert isinstance(
                     self.rag_settings["rag_llm"], LLM), "RAG LLM not initialized"
+                if self.rag_settings["collection_name"] in RAG_COLLECTION_TO_SYSTEM_MESSAGE:
+                    rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE[self.rag_settings["collection_name"]]
+                else:
+                    rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE["default"]
+                print(f'System message: {rag_system_message}')
                 print(f'RAG LLM: {self.rag_settings["rag_llm"].model_name}')
                 print(
                     f'Using vectorstore: {self.rag_settings["collection_name"]}')
@@ -483,6 +503,16 @@ class Chatbot:
             self.retriever = None
             self.rag_chain = None
             self.initialize_messages()
+            return
+        elif prompt == ".s":
+            user_system_message = input('Enter a new system message: ')
+            if not user_system_message:
+                print('No input given, try again')
+                return
+            self.settings["system_message"] = user_system_message
+            self.messages = [SystemMessage(content=self.settings["system_message"])]
+            self.count = 0
+            print('System message updated and chat history cleared')
             return
         else:
             print('Invalid command: ', prompt)
