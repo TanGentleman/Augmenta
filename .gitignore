@@ -11,3 +11,5 @@ faiss-vector-dbs/
 chroma-vector-dbs/
 !requirements.txt
 download_agent_files.py
+*.json
+*.png
