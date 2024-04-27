@@ -9,14 +9,8 @@ from os.path import exists, join
 from langchain_community.document_loaders import PyPDFLoader, ArxivLoader
 from langchain_community.vectorstores import FAISS
 from config import CHROMA_FOLDER, FAISS_FOLDER
-from helpers import collection_exists
+from helpers import database_exists
 from models import Embedder
-
-TEST_URL = "https://python.langchain.com/docs/integrations/vectorstores/faiss"
-# This is just a descriptive name for the vector db folder
-TEST_COLLECTION_NAME = "langchain_faiss_collection"
-TEST_QUESTION = "How can I initialize a faiss vector db?"
-
 
 def loader_from_arxiv_url(url: str) -> list[Document]:
     """
@@ -153,7 +147,7 @@ def chroma_vectorstore_from_docs(
         collection_name: str,
         embedder: Embedder,
         docs: list[Document]):
-    assert not collection_exists(
+    assert not database_exists(
         collection_name, "chroma"), "Collection already exists"
     if docs is None:
         raise ValueError(
@@ -165,7 +159,7 @@ def chroma_vectorstore_from_docs(
 
 
 def load_chroma_vectorstore(collection_name, embedder):
-    assert collection_exists(
+    assert database_exists(
         collection_name, "chroma"), "Collection does not exist"
     vectorstore = get_chroma_vectorstore(collection_name, embedder)
     # assert there are documents present
@@ -176,8 +170,9 @@ def faiss_vectorstore_from_docs(
         collection_name: str,
         embedder: Embedder,
         docs: list[Document]):
-    assert not collection_exists(
+    assert not database_exists(
         collection_name, "faiss"), "Collection already exists"
+    assert docs, "No documents found"
     filename = join(FAISS_FOLDER, collection_name)
     if docs is None:
         raise ValueError(
@@ -189,29 +184,9 @@ def faiss_vectorstore_from_docs(
 
 
 def load_faiss_vectorstore(collection_name: str, embedder: Embedder):
-    assert collection_exists(
+    assert database_exists(
         collection_name, "faiss"), "Collection does not exist"
     filename = join(FAISS_FOLDER, collection_name)
     vectorstore = FAISS.load_local(
         filename, embedder, allow_dangerous_deserialization=True)
     return vectorstore
-
-
-def main(
-        url=TEST_URL,
-        collection_name=TEST_COLLECTION_NAME,
-        question=TEST_QUESTION):
-    from models import get_openai_embedder_large
-    embedder = get_openai_embedder_large()
-    docs = documents_from_url(url)
-    chunked_docs = split_documents(docs)
-    vectorstore = chroma_vectorstore_from_docs(
-        collection_name, embedder, chunked_docs)
-    output = vectorstore.similarity_search(question, k=1)
-    print(output)
-    print('\nThe above document was found to be most relevant!')
-    return output
-
-
-if __name__ == "__main__":
-    main()

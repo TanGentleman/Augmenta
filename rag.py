@@ -3,22 +3,9 @@
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser
-from helpers import clean_docs, collection_exists, format_docs
+from helpers import clean_docs, database_exists, format_docs
 from constants import get_rag_template, get_summary_template
 import embed
-
-# These are the urls that get ingested as documents. Should be a list of
-# strings.
-DEFAULT_URLS = [
-    "https://python.langchain.com/docs/integrations/vectorstores/faiss",
-]
-# This the folder name within chroma-vector-dbs or faiss-dbs where the
-# vector db is stored
-DEFAULT_COLLECTION_NAME = "langchain_faiss_collection"
-# This is the question you want to ask (retriever will choose chunks of
-# the documents as context to answer the question)
-DEFAULT_QUESTION = """How can I add documents to an existing faiss vector db?"""
-
 
 def get_summary_chain(llm):
     """
@@ -34,16 +21,19 @@ def get_summary_chain(llm):
     return chain
 
 
-def get_rag_chain(retriever, llm):
+def get_rag_chain(retriever, llm, format_fn: callable = format_docs):
     """
-    Input: retriever (contains vectorstore with documents) and llm
     Returns a chain for the RAG pipeline.
+
     Can be invoked with a question, like `chain.invoke("How do I do x task using this framework?")` to get a response.
+    Inputs: 
+    - retriever (contains vectorstore with documents) and llm
+    - format_fn (callable): A function that takes a list of Document objects and returns a string.
     """
     # Get prompt template
     rag_prompt_template = get_rag_template()
     chain = (
-        {"context": retriever | format_docs, "question": RunnablePassthrough()}
+        {"context": retriever | format_fn, "question": RunnablePassthrough()}
         | rag_prompt_template
         | llm
     )
@@ -92,7 +82,7 @@ def vectorstore_from_inputs(
     assert method in ["chroma", "faiss"], "Invalid method"
     assert inputs, "No inputs provided"
     vectorstore = None
-    if collection_exists(collection_name, method):
+    if database_exists(collection_name, method):
         print(f"Collection {collection_name} exists, now loading")
         if method == "chroma":
             vectorstore = embed.load_chroma_vectorstore(
@@ -104,7 +94,10 @@ def vectorstore_from_inputs(
         return vectorstore
     for i in range(len(inputs)):
         # In the future this can be parallelized
-        docs = input_to_docs(inputs[i])
+        input = inputs[i]
+        if not input:
+            continue
+        docs = input_to_docs(input)
         docs = embed.split_documents(docs, chunk_size, chunk_overlap)
         if i == 0:
             if method == "chroma":
@@ -117,19 +110,7 @@ def vectorstore_from_inputs(
             assert vectorstore is not None, "Vectorstore not initialized"
             # This method should work for both Chroma and FAISS
             vectorstore.add_documents(docs)
+    assert vectorstore is not None, "Vectorstore not initialized. Provide valid inputs."
     return vectorstore
 
-# def main(inputs: str | list[str] = DEFAULT_URLS, collection_name: str = DEFAULT_COLLECTION_NAME, question: str = DEFAULT_QUESTION):
-#     # from models import get_openai_embedder_small, get_claude_sonnet
-#     from models import get_openai_embedder_large, get_claude_opus
-#     embedder = get_openai_embedder_large()
-#     llm = get_claude_opus()
-#     vectorstore = vectorstore_from_inputs(inputs, "chroma", embedder, collection_name)
-#     retriever = vectorstore.as_retriever()
-#     # Can add optional arguments like search_kwargs={"score_threshold": 0.5}
-#     chain = get_rag_chain(retriever, llm)
-#     output = chain.invoke(question)
-#     return output
-
-# if __name__ == "__main__":
-#     main()
+# TODO: Implement these main functions in embed.py and rag.py as test cases in a file tests.py
