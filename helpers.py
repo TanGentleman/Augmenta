@@ -118,8 +118,10 @@ def format_docs(docs: list[Document], save_excerpts=True, process_docs_fn=None) 
     summaries = []
     # save documents here to excerpts.md
     context_string = ""
-    if process_docs_fn:
-        docs = process_docs_fn(docs)
+    IS_ANTHROPIC_PROMPT_URL = False
+    if IS_ANTHROPIC_PROMPT_URL:
+        if process_docs_fn:
+            docs = process_docs_fn(docs)
     for doc in docs:
         # check if "Summary" is a key in the dict
         # print(doc.metadata.keys())
@@ -145,9 +147,9 @@ def format_docs(docs: list[Document], save_excerpts=True, process_docs_fn=None) 
     return context_string
 
 
-def collection_exists(collection_name: str, method: str) -> bool:
+def database_exists(collection_name: str, method: str) -> bool:
     """
-    Check if a collection exists
+    Check if a vector database exists from the given collection name and method.
     """
     filepath = path_join(f"{method}{VECTOR_DB_SUFFIX}", collection_name)
     return path_exists(filepath)
@@ -167,6 +169,9 @@ def scan_manifest(rag_settings):
     doc_ids = []
     with open('manifest.json', 'r') as f:
         data = json_load(f)
+        if not data:
+            print("manifest.json is empty")
+            return doc_ids
         for item in data["databases"]:
             if item["collection_name"] == rag_settings["collection_name"]:
                 doc_ids = item["metadata"]["doc_ids"]
@@ -190,27 +195,17 @@ def update_manifest(rag_settings, doc_ids=[]):
     with open('manifest.json', 'r') as f:
         data = json_load(f)
     assert isinstance(data, dict), "manifest.json is not a dict"
-    if "databases" not in data:
-        data["databases"] = []
-    databases = data["databases"]
+    assert "databases" in data, "databases key not found in manifest.json"
     # assert that the id is unique
-    for item in databases:
+    for item in data["databases"]:
         if item["collection_name"] == rag_settings["collection_name"]:
-            # Make sure the embedding model is the same
-            if item["metadata"]["embedding_model"] != rag_settings["embedding_model"].model_name:
-                raise ValueError("Embedding model must match manifest")
-            if item["metadata"]["multivector_enabled"] != rag_settings["multivector_enabled"]:
-                raise ValueError("Incompatibility with multivector_enabled")
-
-            # Override rag_settings
-
             # No need to update manifest.json
+            return
     # get unique id
     unique_id = str(uuid4())
-    print()
+    print() # Why do I need this again?
     # This is temporary since embedding model
-    embedding_model_fn = rag_settings["embedding_model"]
-    embedding_model_name = embedding_model_fn.model_name
+    embedding_model_name = rag_settings["embedding_model"].model_name
     manifest = {
         "id": unique_id,
         "collection_name": rag_settings["collection_name"],
@@ -221,12 +216,10 @@ def update_manifest(rag_settings, doc_ids=[]):
             "chunk_overlap": str(rag_settings["chunk_overlap"]),
             "inputs": rag_settings["inputs"],
             "timestamp": get_current_time(),
-            "multivector_enabled": rag_settings["multivector_enabled"],
-            "multivector_method": rag_settings["multivector_method"],
             "doc_ids": doc_ids
         }
     }
-    databases.append(manifest)
+    data["databases"].append(manifest)
     with open('manifest.json', 'w') as f:
         json_dump(data, f, indent=4)
     print("Updated manifest.json")

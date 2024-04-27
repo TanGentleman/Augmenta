@@ -1,11 +1,12 @@
 from config import LOCAL_MODEL_ONLY
-from helpers import read_settings
+from helpers import database_exists, read_settings
 # use pydantic to enforce Config schema
 from typing import Literal
 from pydantic import BaseModel, Field
 
 from models import LLM_FN, MODEL_DICT
 from os import path, mkdir
+from json import load as json_load, dump as json_dump
 
 VALID_LLM = Literal[
     "get_openai_gpt4",
@@ -35,7 +36,7 @@ class RagSchema(BaseModel):
     method: Literal["faiss", "chroma"]
     chunk_size: int = Field(ge=0)
     chunk_overlap: int = Field(ge=0)
-    k_excerpts: int = Field(ge=0, le=8)
+    k_excerpts: int = Field(ge=0, le=15)
     rag_llm: VALID_LLM
     inputs: list[str]
     multivector_enabled: bool
@@ -67,8 +68,11 @@ class Config:
     Configuration class
     """
 
-    def __init__(self, config_file="settings.json"):
+    def __init__(self, config_file="settings.json", rag_mode=False):
         config = read_settings(config_file)
+
+        self.database_exists = None
+        self.rag_mode = rag_mode
         self.rag_config = config["rag_config"]
         self.chat_config = config["chat_config"]
         self.hyperparameters = config["hyperparameters"]
@@ -86,38 +90,97 @@ class Config:
         # get context length of the model. For now, 128K to not throw errors
         max_chars = context_max * 4
         if chunk_size * k > max_chars:
-            raise ValueError(
-                f"Chunk size * k exceeds model limit: {chunk_size * k} > {max_chars}")
+            print("Warning: Chunk size * k exceeds model limit. This is expected to cause errors.")
+            # # In the future, throw an error here.
+            # raise ValueError(
+            #     f"Chunk size * k exceeds model limit: {chunk_size * k} > {max_chars}")
 
     def __validate_rag_config(self):
         """
         Validate the RAG settings
         """
+        if self.rag_mode:
+            self.chat_config["rag_mode"] = True
         if self.chat_config["rag_mode"]:
-            if not self.rag_config["inputs"]:
-                raise ValueError("RAG mode requires inputs")
-            for i in range(len(self.rag_config["inputs"])):
-                if not self.rag_config["inputs"][i]:
-                    raise ValueError(f"Input {i} is empty")
-            # Check if the collection exists
-            # If exists, compare the collection fields like in update_manifest
-            # Adjust rag_config with correct fields (include print statements)
-            # helpers.py should have function get_collection_from_manifest(rag_settings)
-            # This will return an object with the dictionary from the manifest, or will be blank
-            # This will allow us to compare against collection_exists output too!!
+            self.rag_mode = True
+            self.__check_rag_files()
         self.__check_context_max()
 
-    def __check_folders(self):
+    def __adjust_rag_config(self, metadata: dict):
         """
-        Make the folders for the collection
+        Adjust the rag_config based on the metadata from manifest.json
+        """
+        assert self.rag_mode is True, "RAG mode must be enabled"
+        if metadata["embedding_model"] != self.rag_config["embedding_model"].model_name:
+            self.rag_config["embedding_model"] = metadata["embedding_model"]
+            print(f"Warning: Embedding model in settings.json switched to {self.rag_config['embedding_model'].model_name} from manifest.json.")
+        if metadata["method"] != self.rag_config["method"]:
+            print(f"Warning: Method in settings.json has been switched to {self.rag_config['method']} from manifest.json.")
+            self.rag_config["method"] = metadata["method"]
+        
+        manifest_chunk_size = int(metadata["chunk_size"])
+        if manifest_chunk_size != self.rag_config["chunk_size"]:
+            self.rag_config["chunk_size"] = manifest_chunk_size
+            print(f"Warning: Chunk size in settings.json has been switched to {self.rag_config['chunk_size']} from manifest.json.")
+        
+        manifest_chunk_overlap = int(metadata["chunk_overlap"])
+        if manifest_chunk_overlap != self.rag_config["chunk_overlap"]:
+            self.rag_config["chunk_overlap"] = manifest_chunk_overlap
+            print(f"Warning: Chunk overlap in settings.json has been switched to {self.rag_config['chunk_overlap']} from manifest.json.")
+        if metadata["inputs"] != self.rag_config["inputs"]:
+            self.rag_config["inputs"] = metadata["inputs"]
+            print("Warning: Inputs loaded from manifest.json.")
+        if self.rag_config["multivector_enabled"]:
+            if not metadata["doc_ids"]:
+                raise ValueError("Multivector enabled but no doc_ids in manifest")
+        if metadata["doc_ids"]:
+            print("Multivector disabled but doc_ids in manifest")
+            print("Warning: Enabling multivector.")
+            self.rag_config["multivector_enabled"] = True
+                
+    def __check_rag_files(self):
+        """
+        Make sure documents folder and manifest.json initialized correctly.
         """
         # Make a folder called documents if it doesn't exist
         if not path.exists("documents"):
             mkdir("documents")
-        
+        if not path.exists("manifest.json"):
+            self.database_exists = False
+            with open("manifest.json", "w") as f:
+                # Make databases key
+                f.write('{"databases": []}')
+        else:
+            # Check if the collection exists in manifest.json/vector DB
+            # Adjust rag_config with correct fields (include print statements)
 
-        
-
+            with open("manifest.json", "r") as f:
+                data = json_load(f)
+                assert "databases" in data, "databases key not found in manifest.json"
+                collection_in_manifest = False
+                if self.chat_config["rag_mode"]:
+                    for item in data["databases"]:
+                        if item["collection_name"] == self.rag_config["collection_name"]:
+                            collection_in_manifest = True
+                    if collection_in_manifest:
+                        if database_exists(self.rag_config["collection_name"], self.rag_config["method"]):
+                            self.database_exists = True
+                            print("Collection found in vector DB")
+                            # Adjust rag config to match the collection
+                            self.__adjust_rag_config(item["metadata"])
+                        
+                        else:
+                            if not any(i for i in self.rag_config["inputs"]):
+                                raise ValueError("RAG mode requires inputs")
+                            self.database_exists = False
+                            print("Vector DB does not exist, removing from manifest.json")
+                            data["databases"] = [item for item in data["databases"] if item["collection_name"] != self.rag_config["collection_name"]]
+                            with open("manifest.json", "w") as f:
+                                json_dump(data, f, indent=2)
+                    else:
+                        self.database_exists = False
+                        print("Setting database_exists to False. Can this change later?")
+                    
     def __validate_configs(self):
         """
         Validate the configuration
@@ -138,25 +201,28 @@ class Config:
         self.chat_config["primary_model"] = LLM_FN(primary_model_fn)
         self.chat_config["backup_model"] = LLM_FN(backup_model_fn)
 
-        if LOCAL_MODEL_ONLY:
-            llm_models = [self.chat_config["primary_model"],
-                          self.chat_config["backup_model"],
-                          self.rag_config["rag_llm"],
-                          ]
-            for model in llm_models:
-                if model.model_name != "local-model":
-                    raise ValueError(
-                        f"LOCAL_MODEL_ONLY is set to True. {model.model_name}, is non-local.")
-            assert self.rag_config["embedding_model"].model_name == "nomic-embed-text", "Only local embedder supported is get_nomic_local_embedder"
-            if self.chat_config["rag_mode"]:
-                for input in self.rag_config["inputs"]:
-                    if not input:
-                        raise ValueError("Empty input in RAG mode, fix in settings.json")
-                    if "https" in input:
-                        raise ValueError(
-                            f"LOCAL_MODEL_ONLY is set to True. {input}, is non-local.")
+        
+            
         self.__validate_rag_config()
-        self.__check_folders()
+        if LOCAL_MODEL_ONLY:
+            if self.rag_mode:
+                if self.rag_config["rag_llm"].model_name != "local-model":
+                    raise ValueError(
+                        f"LOCAL_MODEL_ONLY is set to True. {self.rag_config['rag_llm'].model_name}, is non-local.")
+                ALLOWED_EMBEDDERS = ["nomic-embed-text"]
+                if self.rag_config["embedding_model"].model_name not in ALLOWED_EMBEDDERS:
+                    print(self.rag_config["embedding_model"].model_name)
+                    raise ValueError("Only local embedder supported is get_nomic_local_embedder")
+            else:
+                for model in [self.chat_config["primary_model"], self.chat_config["backup_model"]]:
+                    if model.model_name != "local-model":
+                        raise ValueError(
+                            f"LOCAL_MODEL_ONLY is set to True. {model.model_name}, is non-local.")
+            if self.chat_config["rag_mode"] and self.database_exists is False:
+                for input in self.rag_config["inputs"]:
+                    if input.startswith("http"):
+                        raise ValueError(
+                            f"LOCAL_MODEL_ONLY is set to True. '{input}' is non-local.")
 
     def __str__(self):
         return self.props()
