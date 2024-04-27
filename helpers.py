@@ -153,7 +153,7 @@ def format_docs(
             print("Warning: No index found in metadata")
         context_string += f"Source: {source_string}\n"
         context_string += doc.page_content + "\n\n"
-        
+
     if save_excerpts:
         with open("excerpts.md", "w") as f:
             f.write(f"Context:\n{context_string}")

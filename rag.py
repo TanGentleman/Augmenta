@@ -22,7 +22,11 @@ def get_summary_chain(llm):
     return chain
 
 
-def get_rag_chain(retriever, llm, format_fn: callable = format_docs, system_message: str = None):
+def get_rag_chain(
+        retriever,
+        llm,
+        format_fn: callable = format_docs,
+        system_message: str = None):
     """
     Returns a chain for the RAG pipeline.
 
@@ -113,4 +117,3 @@ def vectorstore_from_inputs(
             vectorstore.add_documents(docs)
     assert vectorstore is not None, "Vectorstore not initialized. Provide valid inputs."
     return vectorstore
-

@@ -150,7 +150,8 @@ class Config:
                         self.__adjust_rag_config(item["metadata"])
 
                     else:
-                        print("Collection found in vector DB, but not in manifest.json")
+                        print(
+                            "Collection found in vector DB, but not in manifest.json")
                 else:
                     if not any(i for i in self.rag_config["inputs"]):
                         raise ValueError("RAG mode requires inputs")

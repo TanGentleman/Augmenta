@@ -38,7 +38,8 @@ SUMMARY_TEMPLATE = """Summarize the following text, retaining the main keywords:
 {excerpt}
 </excerpt>"""
 
-def get_rag_template(system_message = None):
+
+def get_rag_template(system_message=None):
     """
     Fetches the RAG template for the prompt.
     This template expects to be passed values for both context and question.

@@ -16,11 +16,13 @@ from os import get_terminal_size
 from textwrap import fill
 try:
     import gnureadline
-except:
+except ImportError:
     pass
 
 TERMINAL_WIDTH = get_terminal_size().columns
-def print_adjusted(text, end = '\n', width=TERMINAL_WIDTH) -> None:
+
+
+def print_adjusted(text, end='\n', width=TERMINAL_WIDTH) -> None:
     '''
     Prints text with adjusted line wrapping
     '''
@@ -28,11 +30,12 @@ def print_adjusted(text, end = '\n', width=TERMINAL_WIDTH) -> None:
         text = str(text)
     lines = text.splitlines()
     for line in lines:
-        # If the line is longer than the terminal width, wrap it to fit within the width
+        # If line is longer than terminal width, wrap to fit
         if len(line) > width:
             wrapped_line = fill(line, width=width)
             line = wrapped_line
-        print(line, end = end)
+        print(line, end=end)
+
 
 PROCESSING_DOCS_FN = None
 # PROCESSING_DOCS_FN = process_docs
@@ -163,7 +166,9 @@ class Chatbot:
         else:
             rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE["default"]
         self.rag_chain = get_rag_chain(
-            self.retriever, self.rag_settings["rag_llm"].llm, system_message=rag_system_message)
+            self.retriever,
+            self.rag_settings["rag_llm"].llm,
+            system_message=rag_system_message)
 
         self.initialize_messages()
         if self.rag_settings["multivector_enabled"]:
@@ -311,7 +316,8 @@ class Chatbot:
     def get_vectorstore(
             self,
             processing_docs_fn: callable = PROCESSING_DOCS_FN):
-        # The processing_docs_fn can be used to format or clean up the documents before indexing.
+        # The processing_docs_fn can be used to format or clean up the
+        # documents before indexing.
         assert self.rag_mode, "RAG mode not enabled"
         collection_name = self.rag_settings["collection_name"]
         method = self.rag_settings["method"]
@@ -475,7 +481,8 @@ class Chatbot:
                 assert isinstance(
                     self.rag_settings["rag_llm"], LLM), "RAG LLM not initialized"
                 if self.rag_settings["collection_name"] in RAG_COLLECTION_TO_SYSTEM_MESSAGE:
-                    rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE[self.rag_settings["collection_name"]]
+                    rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE[
+                        self.rag_settings["collection_name"]]
                 else:
                     rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE["default"]
                 print(f'System message: {rag_system_message}')
@@ -510,7 +517,9 @@ class Chatbot:
                 print('No input given, try again')
                 return
             self.settings["system_message"] = user_system_message
-            self.messages = [SystemMessage(content=self.settings["system_message"])]
+            self.messages = [
+                SystemMessage(
+                    content=self.settings["system_message"])]
             self.count = 0
             print('System message updated and chat history cleared')
             return
@@ -559,7 +568,7 @@ class Chatbot:
             else:
                 response = self.rag_chain.invoke(prompt)
                 print_adjusted(response.content)
-                
+
         except KeyboardInterrupt:
             print('Keyboard interrupt, aborting generation.')
             return
