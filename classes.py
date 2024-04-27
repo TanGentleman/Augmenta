@@ -1,5 +1,5 @@
 from config import LOCAL_MODEL_ONLY
-from helpers import database_exists, read_settings
+from helpers import adjust_rag_config, database_exists, read_settings
 # use pydantic to enforce Config schema
 from typing import Literal
 from pydantic import BaseModel, Field
@@ -101,6 +101,15 @@ class Config:
         """
         if self.rag_mode:
             self.chat_config["rag_mode"] = True
+        
+        if not path.exists("documents"):
+            mkdir("documents")
+        if not path.exists("manifest.json"):
+            self.database_exists = False
+            with open("manifest.json", "w") as f:
+                # Make databases key
+                f.write('{"databases": []}')
+        
         if self.chat_config["rag_mode"]:
             self.rag_mode = True
             self.__check_rag_files()
@@ -111,75 +120,42 @@ class Config:
         Adjust the rag_config based on the metadata from manifest.json
         """
         assert self.rag_mode is True, "RAG mode must be enabled"
-        if metadata["embedding_model"] != self.rag_config["embedding_model"].model_name:
-            self.rag_config["embedding_model"] = metadata["embedding_model"]
-            print(f"Warning: Embedding model in settings.json switched to {self.rag_config['embedding_model'].model_name} from manifest.json.")
-        if metadata["method"] != self.rag_config["method"]:
-            print(f"Warning: Method in settings.json has been switched to {self.rag_config['method']} from manifest.json.")
-            self.rag_config["method"] = metadata["method"]
-        
-        manifest_chunk_size = int(metadata["chunk_size"])
-        if manifest_chunk_size != self.rag_config["chunk_size"]:
-            self.rag_config["chunk_size"] = manifest_chunk_size
-            print(f"Warning: Chunk size in settings.json has been switched to {self.rag_config['chunk_size']} from manifest.json.")
-        
-        manifest_chunk_overlap = int(metadata["chunk_overlap"])
-        if manifest_chunk_overlap != self.rag_config["chunk_overlap"]:
-            self.rag_config["chunk_overlap"] = manifest_chunk_overlap
-            print(f"Warning: Chunk overlap in settings.json has been switched to {self.rag_config['chunk_overlap']} from manifest.json.")
-        if metadata["inputs"] != self.rag_config["inputs"]:
-            self.rag_config["inputs"] = metadata["inputs"]
-            print("Warning: Inputs loaded from manifest.json.")
-        if self.rag_config["multivector_enabled"]:
-            if not metadata["doc_ids"]:
-                raise ValueError("Multivector enabled but no doc_ids in manifest")
-        if metadata["doc_ids"]:
-            print("Multivector disabled but doc_ids in manifest")
-            print("Warning: Enabling multivector.")
-            self.rag_config["multivector_enabled"] = True
+        # This step is potentially destructive! Be careful here.
+        self.rag_config = adjust_rag_config(self.rag_config, metadata)
                 
     def __check_rag_files(self):
         """
         Make sure documents folder and manifest.json initialized correctly.
         """
-        # Make a folder called documents if it doesn't exist
-        if not path.exists("documents"):
-            mkdir("documents")
-        if not path.exists("manifest.json"):
-            self.database_exists = False
-            with open("manifest.json", "w") as f:
-                # Make databases key
-                f.write('{"databases": []}')
-        else:
-            # Check if the collection exists in manifest.json/vector DB
-            # Adjust rag_config with correct fields (include print statements)
+        # Check if the collection exists in manifest.json/vector DB
+        # Adjust rag_config with correct fields (include print statements)
 
-            with open("manifest.json", "r") as f:
-                data = json_load(f)
-                assert "databases" in data, "databases key not found in manifest.json"
-                collection_in_manifest = False
-                if self.chat_config["rag_mode"]:
-                    for item in data["databases"]:
-                        if item["collection_name"] == self.rag_config["collection_name"]:
-                            collection_in_manifest = True
-                    if collection_in_manifest:
-                        if database_exists(self.rag_config["collection_name"], self.rag_config["method"]):
-                            self.database_exists = True
-                            print("Collection found in vector DB")
-                            # Adjust rag config to match the collection
-                            self.__adjust_rag_config(item["metadata"])
-                        
-                        else:
-                            if not any(i for i in self.rag_config["inputs"]):
-                                raise ValueError("RAG mode requires inputs")
-                            self.database_exists = False
-                            print("Vector DB does not exist, removing from manifest.json")
-                            data["databases"] = [item for item in data["databases"] if item["collection_name"] != self.rag_config["collection_name"]]
-                            with open("manifest.json", "w") as f:
-                                json_dump(data, f, indent=2)
+        with open("manifest.json", "r") as f:
+            data = json_load(f)
+            assert "databases" in data, "databases key not found in manifest.json"
+            collection_in_manifest = False
+            if self.chat_config["rag_mode"]:
+                for item in data["databases"]:
+                    if item["collection_name"] == self.rag_config["collection_name"]:
+                        collection_in_manifest = True
+                if collection_in_manifest:
+                    if database_exists(self.rag_config["collection_name"], self.rag_config["method"]):
+                        self.database_exists = True
+                        print("Collection found in vector DB")
+                        # Adjust rag config to match the collection
+                        self.__adjust_rag_config(item["metadata"])
+                    
                     else:
+                        if not any(i for i in self.rag_config["inputs"]):
+                            raise ValueError("RAG mode requires inputs")
                         self.database_exists = False
-                        print("Setting database_exists to False. Can this change later?")
+                        print("Vector DB does not exist, removing from manifest.json")
+                        data["databases"] = [item for item in data["databases"] if item["collection_name"] != self.rag_config["collection_name"]]
+                        with open("manifest.json", "w") as f:
+                            json_dump(data, f, indent=2)
+                else:
+                    self.database_exists = False
+                    print("Setting database_exists to False. Will Config.database_exists stay up-to-date in all cases?")
                     
     def __validate_configs(self):
         """
