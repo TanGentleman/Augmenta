@@ -3,7 +3,8 @@ from json import dump as json_dump
 from re import sub as re_sub
 from uuid import uuid4
 from langchain_core.documents import Document
-from os.path import exists as path_exists, join as path_join
+from os.path import exists as path_exists, join as path_join, isdir as path_isdir
+from os import listdir
 from datetime import datetime
 
 from config import VECTOR_DB_SUFFIX
@@ -145,12 +146,13 @@ def format_docs(
         source_string = doc.metadata["source"] if "source" in doc.metadata else "Unknown source"
         # in some cases having the page metadata is useful.
         # i currently don't have good a use case aside from creating child docs
-        # if "page" in doc.metadata:
-        #     source_string += f" (Page {doc.metadata['page']})"
+        if "page" in doc.metadata:
+            source_string += f" (Page {doc.metadata['page']})"
         if "index" in doc.metadata:
             source_string += f" (Index: {doc.metadata['index']})"
         else:
-            print("Warning: No index found in metadata")
+            # print("Warning: No index found in metadata")
+            pass
         context_string += f"Source: {source_string}\n"
         context_string += doc.page_content + "\n\n"
 
@@ -192,6 +194,17 @@ def scan_manifest(rag_settings):
                 return doc_ids
     return doc_ids
 
+def get_db_collection_names(method: str) -> list[str]:
+    """
+    Get the collection names from the manifest.json file
+    """
+    assert method in ["chroma", "faiss"], "Invalid method"
+    collection_names = []
+    # All the folders in method+VECTOR_DB_SUFFIX
+    folder = method + VECTOR_DB_SUFFIX
+    if path_exists(folder):
+        collection_names = [name for name in listdir(folder) if path_isdir(path_join(folder, name))]
+    return collection_names
 
 def update_manifest(rag_settings, doc_ids=[]):
     """

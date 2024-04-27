@@ -1,6 +1,6 @@
 from uuid import uuid4
 from langchain.schema import HumanMessage, SystemMessage
-from helpers import database_exists, process_docs, scan_manifest, save_response_to_markdown_file, save_history_to_markdown_file, read_sample, update_manifest
+from helpers import database_exists, get_db_collection_names, process_docs, scan_manifest, save_response_to_markdown_file, save_history_to_markdown_file, read_sample, update_manifest
 from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SUMMARY_TEMPLATE
 from config import MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, EXPLAIN_EXCERPT
 from classes import Config
@@ -54,7 +54,8 @@ COMMAND_LIST = [
     "info",
     "rag",
     "reg",
-    ".s"]
+    ".s",
+    ".names"]
 
 
 class Chatbot:
@@ -430,13 +431,7 @@ class Chatbot:
     def command_handler(self, prompt):
         assert prompt in COMMAND_LIST, "Invalid command"
         if prompt == "del":
-            if len(self.messages) < 2:
-                print('No messages to delete')
-                return
-            self.messages.pop()
-            self.messages.pop()
-            print('Deleted last exchange')
-            self.count -= 1
+            self._pop_last_exchange()
             return
         elif prompt == "quit" or prompt == "exit":
             print('Exiting.')
@@ -528,6 +523,14 @@ class Chatbot:
             self.count = 0
             print('System message updated and chat history cleared')
             return
+        elif prompt == ".names":
+            # Get collection names from database
+            db_method = self.rag_settings["method"]
+            print("Fetching collection names for method: ", db_method)
+            collection_names = get_db_collection_names(method = db_method)
+            print("Collection names:")
+            for name in collection_names:
+                print("-", name)
         else:
             print('Invalid command: ', prompt)
             return
@@ -640,6 +643,14 @@ class Chatbot:
             save_response_to_markdown_file(self.messages[-1].content)
             print('Saved response to response.md')
 
+    def _pop_last_exchange(self):
+        if len(self.messages) < 2:
+            print('No messages to delete')
+            return
+        self.messages.pop()
+        self.messages.pop()
+        print('Deleted last exchange')
+        self.count -= 1
 
 # Argparse implementation
 if __name__ == "__main__":
