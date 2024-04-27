@@ -128,7 +128,9 @@ def format_docs(
     if IS_ANTHROPIC_PROMPT_URL:
         if process_docs_fn:
             docs = process_docs_fn(docs)
+    excerpt_count = 0
     for doc in docs:
+        excerpt_count += 1
         # check if "Summary" is a key in the dict
         # print(doc.metadata.keys())
         # This block is the default for arxiv papers, but I can add these to
@@ -139,13 +141,19 @@ def format_docs(
             if summary not in summaries:
                 summaries.append(summary)
                 context_string += summary_string + "\n\n"
-        context_string += doc.page_content + "\n"
         # add source
         source_string = doc.metadata["source"] if "source" in doc.metadata else "Unknown source"
-        # add page string if available
-        if "page" in doc.metadata:
-            source_string += f" (Page {doc.metadata['page']})"
-        context_string += f"Source: {source_string}\n\n"
+        # in some cases having the page metadata is useful.
+        # i currently don't have good a use case aside from creating child docs
+        # if "page" in doc.metadata:
+        #     source_string += f" (Page {doc.metadata['page']})"
+        if "index" in doc.metadata:
+            source_string += f" (Index: {doc.metadata['index']})"
+        else:
+            print("Warning: No index found in metadata")
+        context_string += f"Source: {source_string}\n"
+        context_string += doc.page_content + "\n\n"
+        
     if save_excerpts:
         with open("excerpts.md", "w") as f:
             f.write(f"Context:\n{context_string}")
