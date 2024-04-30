@@ -7,12 +7,8 @@ from helpers import clean_docs, database_exists, format_docs
 from constants import get_rag_template, get_summary_template
 import embed
 
-EXPERIMENTAL_UNSTRUCTURED = False
-try:
-    from unstructured.cleaners.core import clean_extra_whitespace
-except BaseException:
-    print("Unstructured library not loaded")
-    assert EXPERIMENTAL_UNSTRUCTURED is False
+assert embed.EXPERIMENTAL_UNSTRUCTURED is False, "Uncomment this line in rag.py to continue using Unstructured"
+EXPERIMENTAL_UNSTRUCTURED = embed.EXPERIMENTAL_UNSTRUCTURED
 
 
 def get_summary_chain(llm):

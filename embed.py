@@ -12,13 +12,14 @@ from config import CHROMA_FOLDER, FAISS_FOLDER
 from helpers import database_exists
 from models import Embedder
 
-try:
-    from unstructured.cleaners.core import clean_extra_whitespace
-    from langchain_community.document_loaders import UnstructuredFileLoader
-except BaseException:
-    print("Unstructured functions in embed.py will not be accessible")
-    pass
-
+EXPERIMENTAL_UNSTRUCTURED = False
+if EXPERIMENTAL_UNSTRUCTURED:
+    try:
+        from unstructured.cleaners.core import clean_extra_whitespace
+        from langchain_community.document_loaders import UnstructuredFileLoader
+    except ImportError:
+        print("ImportError: Unstructured functions in embed.py not be accessible")
+        raise ValueError("Set EXPERIMENTAL_UNSTRUCTURED to False to continue")
 
 def loader_from_arxiv_url(url: str) -> list[Document]:
     """
