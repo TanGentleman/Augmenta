@@ -30,19 +30,20 @@ except ImportError:
 TERMINAL_WIDTH = get_terminal_size().columns
 
 
-def print_adjusted(text, end='\n', width=TERMINAL_WIDTH) -> None:
+def print_adjusted(text: str, end='\n', flush = False, width=TERMINAL_WIDTH) -> None:
     '''
     Prints text with adjusted line wrapping
     '''
-    if type(text) != str:
-        text = str(text)
-    lines = text.splitlines()
-    for line in lines:
-        # If line is longer than terminal width, wrap to fit
-        if len(line) > width:
-            wrapped_line = fill(line, width=width)
-            line = wrapped_line
-        print(line, end=end)
+    print(fill(text, width=width), end=end)
+    # lines = text.splitlines()
+    # for line in lines:
+    #     # If line is longer than terminal width, wrap to fit
+    #     if len(line) > width:
+    #         wrapped_line = fill(line, width=width)
+    #         line = wrapped_line
+    #     print(line, end=end, flush=flush)
+    # Easier method
+   
 
 
 PROCESSING_DOCS_FN = None
@@ -50,7 +51,7 @@ PROCESSING_DOCS_FN = None
 
 ID_KEY = "doc_id"
 
-REFORMATTING_PROMPTS = ["paste", "read", ".sr"]
+REFORMATTING_PROMPTS = ["paste", "read"]
 COMMAND_LIST = [
     "del",
     "quit",
@@ -63,7 +64,8 @@ COMMAND_LIST = [
     "rag",
     "reg",
     ".s",
-    ".names"]
+    ".names",
+    ".sr"]
 
 
 class Chatbot:
@@ -163,12 +165,14 @@ class Chatbot:
 
         # From this point forward, the rag_llm is of type LLM
         self.rag_settings["rag_llm"] = self.get_rag_model()
-        assert isinstance(
-            self.rag_settings["rag_llm"], LLM), "RAG LLM not initialized"
+        # assert isinstance(self.rag_settings["rag_llm"], LLM), "RAG LLM not initialized"
         self.rag_mode = True
         # get doc_ids
         if self.rag_settings["multivector_enabled"]:
-            self.doc_ids = get_doc_ids_from_manifest(self.rag_settings)
+            doc_ids = get_doc_ids_from_manifest(self.rag_settings)
+            if not doc_ids:
+                raise ValueError("Doc IDs not initialized")
+            self.doc_ids = doc_ids
         self.retriever = self.get_retriever()
         if self.rag_settings["collection_name"] in RAG_COLLECTION_TO_SYSTEM_MESSAGE:
             rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE[self.rag_settings["collection_name"]]
@@ -179,10 +183,7 @@ class Chatbot:
             self.rag_settings["rag_llm"].llm,
             system_message=rag_system_message)
 
-        self.set_starting_messages()
-        if self.rag_settings["multivector_enabled"]:
-            if not self.doc_ids:
-                raise ValueError("Doc IDs not initialized")
+        self.set_starting_messages()            
         update_manifest(self.rag_settings, self.doc_ids)
 
     def refresh_config(self, config: Config = None):
@@ -588,6 +589,14 @@ class Chatbot:
             print("Collection names:")
             for name in collection_names:
                 print("-", name)
+        elif prompt == ".sr":
+            # Save response to clipboard
+            if len(self.messages) < 2:
+                print('No responses to save')
+            else:
+                clipboard_text = self.messages[-1].content
+                self.set_clipboard(clipboard_text)
+            return
         else:
             print('Invalid command: ', prompt)
             return
@@ -600,6 +609,7 @@ class Chatbot:
             if stream:
                 response_string = ""
                 for chunk in self.chat_model.stream(self.messages):
+                    # print(chunk.content, end="", flush=True)
                     print(chunk.content, end="", flush=True)
                     response_string += chunk.content
                 print()
@@ -683,13 +693,6 @@ class Chatbot:
                     # TODO: Add some checks for string content of sample.txt
                     prompt = read_sample()
                 # Do not continue here
-                elif prompt == ".sr":
-                    # Save response to clipboard
-                    if len(self.messages) < 2:
-                        print('No responses to save')
-                        continue
-                    clipboard_text = self.messages[-1].content
-                    self.set_clipboard(clipboard_text)
 
             if not prompt.strip():
                 print('No input given, try again')
