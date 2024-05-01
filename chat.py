@@ -406,8 +406,46 @@ class Chatbot:
             assert vectorstore is not None, "Vectorstore not created properly"
             return vectorstore
 
+    def run_eval_tests_on_vectorstore(self, vectorstore):
+        # This function is for testing purposes
+        print('Running evaluation tests on vectorstore')
+        # This is a test for similarity search
+        docs = vectorstore.similarity_search("javascript", k=1)
+        print(docs[0])
+        # There should only be one document
+        assert len(docs) == 1, "There should be exactly one document"
+        print(len(docs), "documents found")
+        # Optional scan through documents
+        for doc in docs:
+            index, source, char_count = doc.metadata["index"], doc.metadata["source"], len(doc.page_content)
+            if char_count > 400:
+                print(f"Warning: Document {index} ({source}) is {char_count} chars long!")
+        # This is a test for evaluation
+        eval_chain = get_eval_chain(self.rag_settings["rag_llm"].llm)
+        eval_dict = {"excerpt": docs[0].page_content, "criteria": "The topic of this excerpt is dolphins."}
+        res = eval_chain.invoke(eval_dict)
+        print(res)
+        if res["meetsCriteria"] is True:
+            print("Now fetching related documents")
+            index = docs[0].metadata["index"]
+            if index > 0:
+                new_index = index + 1
+            else:
+                new_index = index + 1
+            temp_search_kwargs = {"k": 1, "filter": {"index": new_index}}
+            new_docs = vectorstore.similarity_search("", search_kwargs=temp_search_kwargs)
+            if new_docs:
+                print_adjusted(new_docs[0].page_content)
+                eval_dict["excerpt"] = new_docs[0].page_content
+                new_res = eval_chain.invoke(eval_dict)
+                print(new_res)
+        print('yay!')
+        raise SystemExit("Test complete")
+
+
     def get_retriever(self):
         vectorstore = self.get_vectorstore()
+        self.run_eval_tests_on_vectorstore(vectorstore)
         search_kwargs = {}
         search_kwargs["k"] = self.rag_settings["k_excerpts"]
         # search_kwargs["filter"] = {'page': 0}
@@ -541,6 +579,8 @@ class Chatbot:
             db_method = self.rag_settings["method"]
             print("Fetching collection names for method: ", db_method)
             collection_names = get_db_collection_names(method=db_method)
+            # sort collection names
+            collection_names.sort()
             print("Collection names:")
             for name in collection_names:
                 print("-", name)
