@@ -367,11 +367,8 @@ class LLM:
 
         self.model_name = llm_fn.model_name
         self.context_size = llm_fn.context_size
-        if hyperparameters is not None:
-            # replace the hyperparameters with the new ones
-            self.llm = llm_fn.get_llm(hyperparameters)
-        else:
-            self.llm = llm_fn.get_llm()
+        # replace the hyperparameters with the new ones
+        self.llm = llm_fn.get_llm(hyperparameters)
 
         self.confirm_model_name()
 

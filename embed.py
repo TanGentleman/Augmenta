@@ -12,7 +12,7 @@ from config import CHROMA_FOLDER, FAISS_FOLDER
 from helpers import database_exists
 from models import Embedder
 
-EXPERIMENTAL_UNSTRUCTURED = False
+EXPERIMENTAL_UNSTRUCTURED = True
 if EXPERIMENTAL_UNSTRUCTURED:
     try:
         from unstructured.cleaners.core import clean_extra_whitespace
@@ -41,13 +41,13 @@ def loader_from_file_unstructured(filepath: str) -> list[Document]:
     LOAD_ELEMENTS = False
     if LOAD_ELEMENTS:
         element_loader = UnstructuredFileLoader(
-            "documents/applied-teaching.docx",
+            filepath,
             mode="elements",
             post_processors=[clean_extra_whitespace])
         loader = element_loader
     else:
         loader = UnstructuredFileLoader(
-            "documents/applied-teaching.docx",
+            filepath,
             post_processors=[clean_extra_whitespace])
     return loader
 

@@ -98,6 +98,7 @@ def process_docs(docs: list[Document]) -> list[Document]:
     """
     left_string = "try it for yourself"
     right_string = "Example output"
+    res_docs = []
     for doc in docs:
         start_index = doc.page_content.find(left_string)
         end_index = doc.page_content.find(right_string)
@@ -105,10 +106,12 @@ def process_docs(docs: list[Document]) -> list[Document]:
             extracted_content = doc.page_content[start_index +
                                                  len(left_string):end_index]
             doc.page_content = extracted_content
-            print('trimmed content')
+            res_docs.append(doc)
+            if len(extracted_content) > 4000:
+                print("Warning: Document is really long, consider splitting it further.")
         else:
-            print("Role/example not found in document")
-    return docs
+            print("Role/example not found in document. NOT adding to docs.")
+    return res_docs
 
 
 def format_docs(
@@ -125,8 +128,8 @@ def format_docs(
     summaries = []
     # save documents here to excerpts.md
     context_string = ""
-    IS_ANTHROPIC_PROMPT_URL = False
-    if IS_ANTHROPIC_PROMPT_URL:
+    EXPERIMENTAL_PROCESSING = False
+    if EXPERIMENTAL_PROCESSING:
         if process_docs_fn:
             docs = process_docs_fn(docs)
     excerpt_count = 0
@@ -178,7 +181,7 @@ def get_current_time() -> str:
     return str(datetime.now().strftime("%Y-%m-%d"))
 
 
-def scan_manifest(rag_settings):
+def get_doc_ids_from_manifest(rag_settings):
     """
     Scan the manifest.json file for the collection name and return the doc_ids
     """
@@ -233,7 +236,6 @@ def update_manifest(rag_settings, doc_ids=[]):
             return
     # get unique id
     unique_id = str(uuid4())
-    print()  # Why do I need this again?
     # This is temporary since embedding model
     embedding_model_name = rag_settings["embedding_model"].model_name
     manifest = {
