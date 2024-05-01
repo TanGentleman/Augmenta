@@ -1,11 +1,11 @@
 from uuid import uuid4
 from langchain.schema import HumanMessage, SystemMessage
-from helpers import database_exists, get_db_collection_names, process_docs, scan_manifest, save_response_to_markdown_file, save_history_to_markdown_file, read_sample, update_manifest
-from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SUMMARY_TEMPLATE
+from helpers import database_exists, get_db_collection_names, process_docs, get_doc_ids_from_manifest, save_response_to_markdown_file, save_history_to_markdown_file, read_sample, update_manifest
+from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SUMMARY_TEMPLATE
 from config import MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, EXPLAIN_EXCERPT
 from classes import Config
 from models import LLM_FN, LLM
-from rag import get_summary_chain, input_to_docs, get_rag_chain
+from rag import get_summary_chain, input_to_docs, get_rag_chain, get_eval_chain
 from embed import chroma_vectorstore_from_docs, faiss_vectorstore_from_docs, load_faiss_vectorstore, load_chroma_vectorstore, split_documents
 from langchain_core.documents import Document
 from langchain.retrievers.multi_vector import MultiVectorRetriever
@@ -18,6 +18,14 @@ try:
     import gnureadline
 except ImportError:
     pass
+
+try:
+    from pyperclip import paste as clipboard_paste, copy as clipboard_copy
+    CLIPBOARD_ACCESS_ENABLED = True
+except ImportError:
+    print('pyperclip not installed, clipboard access disabled')
+    CLIPBOARD_ACCESS_ENABLED = False
+
 
 TERMINAL_WIDTH = get_terminal_size().columns
 
@@ -42,7 +50,7 @@ PROCESSING_DOCS_FN = None
 
 ID_KEY = "doc_id"
 
-REFORMATTING_PROMPTS = ["paste", "read"]
+REFORMATTING_PROMPTS = ["paste", "read", ".sr"]
 COMMAND_LIST = [
     "del",
     "quit",
@@ -106,7 +114,7 @@ class Chatbot:
             self.ingest_documents()
         else:
             self.chat_model = self.activate_chat_model()  # This activates the primary model
-            self.initialize_messages()
+            self.set_starting_messages()
 
     def activate_chat_model(self, backup=False) -> LLM:
         if backup:
@@ -115,7 +123,7 @@ class Chatbot:
             llm_fn = self.settings["primary_model"]
 
         if isinstance(llm_fn, LLM):
-            print('Model already initialized')
+            print('WARNING: Model already initialized')
             return llm_fn
         assert isinstance(llm_fn, LLM_FN)
         return LLM(llm_fn)
@@ -128,7 +136,7 @@ class Chatbot:
         assert isinstance(llm_fn, LLM_FN)
         return LLM(llm_fn)
 
-    def initialize_messages(self):
+    def set_starting_messages(self):
         messages = []
         if self.rag_mode:
             messages = []
@@ -160,7 +168,7 @@ class Chatbot:
         self.rag_mode = True
         # get doc_ids
         if self.rag_settings["multivector_enabled"]:
-            self.doc_ids = scan_manifest(self.rag_settings)
+            self.doc_ids = get_doc_ids_from_manifest(self.rag_settings)
         self.retriever = self.get_retriever()
         if self.rag_settings["collection_name"] in RAG_COLLECTION_TO_SYSTEM_MESSAGE:
             rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE[self.rag_settings["collection_name"]]
@@ -171,7 +179,7 @@ class Chatbot:
             self.rag_settings["rag_llm"].llm,
             system_message=rag_system_message)
 
-        self.initialize_messages()
+        self.set_starting_messages()
         if self.rag_settings["multivector_enabled"]:
             if not self.doc_ids:
                 raise ValueError("Doc IDs not initialized")
@@ -202,7 +210,7 @@ class Chatbot:
             self.ingest_documents()
         else:
             self.chat_model = self.activate_chat_model()
-            self.initialize_messages()
+            self.set_starting_messages()
             self.count = 0
 
     def get_chat_settings(self) -> dict[str, bool | str | LLM_FN]:
@@ -356,46 +364,47 @@ class Chatbot:
                     self.parent_docs) == len(
                     self.doc_ids), "Parent docs and doc IDs do not match length"
             return vectorstore
+        else:
+            # Ingest documents
+            print('No collection found, now ingesting documents')
+            for i in range(len(inputs)):
+                # In the future this can be parallelized
+                if not inputs[i]:
+                    print(f'Input {i} is empty, skipping')
+                    continue
+                print(inputs[i])
+                new_docs = input_to_docs(inputs[i])
+                if not new_docs:
+                    print(f'No documents found in input {i}')
+                    continue
+                docs.extend(new_docs)
 
-        # Ingest documents
-        for i in range(len(inputs)):
-            # In the future this can be parallelized
-            if not inputs[i]:
-                print(f'Input {i} is empty, skipping')
-                continue
-            print(inputs[i])
-            new_docs = input_to_docs(inputs[i])
-            if not new_docs:
-                print(f'No documents found in input {i}')
-                continue
-            docs.extend(new_docs)
+            assert docs, "No documents to create collection"
+            if processing_docs_fn:
+                docs = processing_docs_fn(docs)
+            docs = split_documents(docs,
+                                self.rag_settings["chunk_size"],
+                                self.rag_settings["chunk_overlap"])
+            if self.rag_settings["multivector_enabled"]:
+                # Make sure the parent docs aren't too wordy
+                for doc in docs:
+                    # This number is arbitrary for now
+                    if doc.metadata["char_count"] > 20000:
+                        raise ValueError(
+                            'Document too long, split before making child documents')
 
-        assert docs, "No documents to create collection"
-        if processing_docs_fn:
-            docs = processing_docs_fn(docs)
-        docs = split_documents(docs,
-                               self.rag_settings["chunk_size"],
-                               self.rag_settings["chunk_overlap"])
-        if self.rag_settings["multivector_enabled"]:
-            # Make sure the parent docs aren't too wordy
-            for doc in docs:
-                # This number is arbitrary for now
-                if doc.metadata["char_count"] > 20000:
-                    raise ValueError(
-                        'Document too long, split before making child documents')
-
-            self.parent_docs = docs
-            # Add child docs to vectorstore instead
-            self.set_doc_ids()
-            docs = self.get_child_docs()
-        if method == "chroma":
-            vectorstore = chroma_vectorstore_from_docs(
-                collection_name, embedder, docs)
-        elif method == "faiss":
-            vectorstore = faiss_vectorstore_from_docs(
-                collection_name, embedder, docs)
-        assert vectorstore is not None, "Vectorstore not created properly"
-        return vectorstore
+                self.parent_docs = docs
+                # Add child docs to vectorstore instead
+                self.set_doc_ids()
+                docs = self.get_child_docs()
+            if method == "chroma":
+                vectorstore = chroma_vectorstore_from_docs(
+                    collection_name, embedder, docs)
+            elif method == "faiss":
+                vectorstore = faiss_vectorstore_from_docs(
+                    collection_name, embedder, docs)
+            assert vectorstore is not None, "Vectorstore not created properly"
+            return vectorstore
 
     def get_retriever(self):
         vectorstore = self.get_vectorstore()
@@ -419,16 +428,20 @@ class Chatbot:
         messages = [msg.type.upper() + ": " + msg.content for msg in messages]
         return messages
 
-    def prompt_from_clipboard(self):
-        try:
-            from pyperclip import paste
-        except ImportError:
-            print('pyperclip not installed, try pip install pyperclip')
-            return None
-        prompt = paste().strip()
-        return prompt
+    def get_clipboard(self) -> str | None:
+        if CLIPBOARD_ACCESS_ENABLED:
+            prompt = clipboard_paste().strip()
+            return prompt
+        return None
+    
+    def set_clipboard(self, text: str) -> None:
+        if CLIPBOARD_ACCESS_ENABLED:
+            clipboard_copy(text)
+            print('Copied response to clipboard')
+        else:
+            print('Clipboard access disabled')
 
-    def command_handler(self, prompt):
+    def handle_command(self, prompt):
         assert prompt in COMMAND_LIST, "Invalid command"
         if prompt == "del":
             self._pop_last_exchange()
@@ -509,7 +522,7 @@ class Chatbot:
             self.rag_mode = False
             self.retriever = None
             self.rag_chain = None
-            self.initialize_messages()
+            self.set_starting_messages()
             return
         elif prompt == ".s":
             user_system_message = input('Enter a new system message: ')
@@ -545,6 +558,7 @@ class Chatbot:
                 for chunk in self.chat_model.stream(self.messages):
                     print(chunk.content, end="", flush=True)
                     response_string += chunk.content
+                print()
                 if not response_string:
                     raise ValueError('No response generated')
                 response = AIMessage(content=response_string)
@@ -572,6 +586,7 @@ class Chatbot:
                 for chunk in self.rag_chain.stream(prompt):
                     print(chunk.content, end="", flush=True)
                     response_string += chunk.content
+                print()
                 response = AIMessage(content=response_string)
             else:
                 response = self.rag_chain.invoke(prompt)
@@ -614,14 +629,24 @@ class Chatbot:
                 prompt = input("Enter your query: ")
             if prompt in REFORMATTING_PROMPTS:
                 if prompt == "paste":
-                    prompt = self.prompt_from_clipboard()
+                    # use clipboard content as prompt
+                    prompt = self.get_clipboard()
                     if not prompt:
                         print('No text in clipboard! Try again.')
                         continue
                 elif prompt == "read":
+                    # Read sample.txt as prompt
                     # TODO: Add some checks for string content of sample.txt
                     prompt = read_sample()
                 # Do not continue here
+                elif prompt == ".sr":
+                    # Save response to clipboard
+                    if len(self.messages) < 2:
+                        print('No responses to save')
+                        continue
+                    clipboard_text = self.messages[-1].content
+                    self.set_clipboard(clipboard_text)
+            
             if not prompt.strip():
                 print('No input given, try again')
                 continue
@@ -631,14 +656,13 @@ class Chatbot:
                 continue
 
             if prompt in COMMAND_LIST:
-                self.command_handler(prompt)
+                self.handle_command(prompt)
                 continue
             # Generate response
             if self.rag_mode:
                 self.get_rag_response(prompt, stream=True)
             else:
                 self.get_chat_response(prompt, stream=True)
-            print()
         if save_response:
             save_response_to_markdown_file(self.messages[-1].content)
             print('Saved response to response.md')
