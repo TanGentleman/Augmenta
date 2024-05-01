@@ -4,14 +4,11 @@ from langchain.schema import SystemMessage
 
 RAG_SYSTEM_MESSAGE = "You are a helpful AI. Use the document excerpts to respond to the best of your ability."
 PROMPT_CHOOSER_SYSTEM_MESSAGE = "Use the context from Anthropic's example prompting guides to create a sample system message and user message template for the given task."
-EVAL_EACH_EXCERPT_SYSTEM_MESSAGE = "You are an AI assistant that evaluates text excerpts to determine if they meet specified criteria. When given text excerpt(s) and criteria, respond only with valid JSON output containing a single boolean field for each excerpt indicating if the text meets the given criteria."
+EVAL_EXCERPT_SYSTEM_MESSAGE = "You are an AI assistant that evaluates text excerpts to determine if it meets specified criteria. Respond ONLY with a valid JSON output with 2 keys: index: int, and meetsCriteria: bool."
 RAG_COLLECTION_TO_SYSTEM_MESSAGE = {
     "default": RAG_SYSTEM_MESSAGE,
     "best_reference_prompt_collection": PROMPT_CHOOSER_SYSTEM_MESSAGE,
-    "hw18_collection": EVAL_EACH_EXCERPT_SYSTEM_MESSAGE,
-    "metacognition_collection": EVAL_EACH_EXCERPT_SYSTEM_MESSAGE,
-    "metacognition_nomic_collection": EVAL_EACH_EXCERPT_SYSTEM_MESSAGE,
-    "metacognition_together_collection": EVAL_EACH_EXCERPT_SYSTEM_MESSAGE,
+    "reference_prompt_collection": PROMPT_CHOOSER_SYSTEM_MESSAGE,
 }
 
 DEFAULT_QUERY = '''Name 5 strange vegetables that I am unlikely to see in Western countries.'''
@@ -38,6 +35,14 @@ SUMMARY_TEMPLATE = """Summarize the following text, retaining the main keywords:
 {excerpt}
 </excerpt>"""
 
+EVAL_TEMPLATE = """Evaluate the following text excerpt(s) based on the given criteria:
+<excerpt>
+{excerpt}
+</excerpt>
+
+Criteria: {criteria}
+
+AI: """
 
 def get_rag_template(system_message=None):
     """
@@ -64,3 +69,14 @@ def get_summary_template():
         0, SystemMessage(
             content="You are a helpful AI."))
     return summary_template
+
+def get_eval_template():
+    """
+    Fetches the template for evaluation.
+    """
+    system_message = EVAL_EXCERPT_SYSTEM_MESSAGE
+    template = EVAL_TEMPLATE
+    eval_template = ChatPromptTemplate.from_template(template)
+    eval_template.messages.insert(
+        0, SystemMessage(content=system_message))
+    return eval_template

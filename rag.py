@@ -2,12 +2,12 @@
 # vector db
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.documents import Document
-from langchain_core.output_parsers import StrOutputParser
+from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 from helpers import clean_docs, database_exists, format_docs
-from constants import get_rag_template, get_summary_template
+from constants import get_rag_template, get_summary_template, get_eval_template
 import embed
 
-assert embed.EXPERIMENTAL_UNSTRUCTURED is False, "Uncomment this line in rag.py to continue using Unstructured"
+# assert embed.EXPERIMENTAL_UNSTRUCTURED is False, "Uncomment this line in rag.py to continue using Unstructured"
 EXPERIMENTAL_UNSTRUCTURED = embed.EXPERIMENTAL_UNSTRUCTURED
 
 
@@ -24,6 +24,36 @@ def get_summary_chain(llm):
     )
     return chain
 
+def eval_output_handler(output):
+    """
+    A dummy output parser that returns the output as is.
+    """
+    def is_output_valid(output):
+        """
+        Checks if the output is valid.
+        """
+        return "index" in output and "meetsCriteria" in output
+    try:
+        response_object = JsonOutputParser().parse(output.content)
+        if not is_output_valid(response_object):
+            raise ValueError("JSON output does not contain the required keys")
+    except:
+        raise ValueError("Eval chain did not return valid JSON")
+    # print("Output:", output)
+    # Perform JSON validation here
+    # This function can also redirect to the next step in the pipeline
+    print("yay!")
+    return response_object
+
+def get_eval_chain(llm):
+    """
+    Returns a chain for evaluating a given excerpt. 
+    
+    This chain will NEED to be passed a dictionary with keys excerpt and criteria, not a string.
+    """
+    eval_prompt_template = get_eval_template()
+    chain = (eval_prompt_template | llm | eval_output_handler)
+    return chain
 
 def get_rag_chain(
         retriever,
