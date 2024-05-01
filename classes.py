@@ -1,5 +1,5 @@
 from config import LOCAL_MODEL_ONLY
-from helpers import adjust_rag_config, database_exists, read_settings
+from helpers import database_exists, read_settings
 # use pydantic to enforce Config schema
 from typing import Literal
 from pydantic import BaseModel, Field
@@ -116,14 +116,51 @@ class Config:
             self.rag_mode = True
             self.__check_rag_files()
         self.__check_context_max()
-
+    
     def __adjust_rag_config(self, metadata: dict):
         """
         Adjust the rag_config based on the metadata from manifest.json
         """
         assert self.rag_mode is True, "RAG mode must be enabled"
         # This step is potentially destructive! Be careful here.
-        self.rag_config = adjust_rag_config(self.rag_config, metadata)
+        if metadata["embedding_model"] != self.rag_config["embedding_model"].model_name:
+            embedder_fn = None
+            for model in MODEL_DICT.keys():
+                if MODEL_DICT[model]["model_name"] == metadata["embedding_model"]:
+                    embedder_fn = MODEL_DICT[model]["function"]
+                    embedder_fn = LLM_FN(embedder_fn)
+                    break
+            assert embedder_fn is not None, "Embedder not found"
+            self.rag_config["embedding_model"] = embedder_fn
+            print(
+                f"Warning: Embedding model in settings.json switched to {embedder_fn.model_name} from manifest.json.")
+        if metadata["method"] != self.rag_config["method"]:
+            self.rag_config["method"] = metadata["method"]
+            print(
+                f"Warning: Method in settings.json has been switched to {self.rag_config['method']} from manifest.json.")
+
+        manifest_chunk_size = int(metadata["chunk_size"])
+        if manifest_chunk_size != self.rag_config["chunk_size"]:
+            self.rag_config["chunk_size"] = manifest_chunk_size
+            print(
+                f"Warning: Chunk size in settings.json has been switched to {manifest_chunk_size} from manifest.json.")
+
+        manifest_chunk_overlap = int(metadata["chunk_overlap"])
+        if manifest_chunk_overlap != self.rag_config["chunk_overlap"]:
+            self.rag_config["chunk_overlap"] = manifest_chunk_overlap
+            print(
+                f"Warning: Chunk overlap in settings.json has been switched to {manifest_chunk_overlap} from manifest.json.")
+        if metadata["inputs"] != self.rag_config["inputs"]:
+            self.rag_config["inputs"] = metadata["inputs"]
+            print("Warning: Inputs loaded from manifest.json.")
+        if self.rag_config["multivector_enabled"] is True:
+            if not metadata["doc_ids"]:
+                raise ValueError("Multivector enabled but no doc_ids in manifest")
+        else:
+            if metadata["doc_ids"]:
+                print("Multivector disabled but doc_ids in manifest")
+                print("Warning: Enabling multivector.")
+                self.rag_config["multivector_enabled"] = True
 
     def __check_rag_files(self):
         """
