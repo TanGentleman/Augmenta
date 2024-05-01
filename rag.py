@@ -24,6 +24,7 @@ def get_summary_chain(llm):
     )
     return chain
 
+
 def eval_output_handler(output):
     """
     A dummy output parser that returns the output as is.
@@ -37,7 +38,7 @@ def eval_output_handler(output):
         response_object = JsonOutputParser().parse(output.content)
         if not is_output_valid(response_object):
             raise ValueError("JSON output does not contain the required keys")
-    except:
+    except BaseException:
         raise ValueError("Eval chain did not return valid JSON")
     # print("Output:", output)
     # Perform JSON validation here
@@ -45,15 +46,17 @@ def eval_output_handler(output):
     print("yay!")
     return response_object
 
+
 def get_eval_chain(llm):
     """
-    Returns a chain for evaluating a given excerpt. 
-    
+    Returns a chain for evaluating a given excerpt.
+
     This chain will NEED to be passed a dictionary with keys excerpt and criteria, not a string.
     """
     eval_prompt_template = get_eval_template()
     chain = (eval_prompt_template | llm | eval_output_handler)
     return chain
+
 
 def get_rag_chain(
         retriever,

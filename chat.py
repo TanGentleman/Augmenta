@@ -383,8 +383,8 @@ class Chatbot:
             if processing_docs_fn:
                 docs = processing_docs_fn(docs)
             docs = split_documents(docs,
-                                self.rag_settings["chunk_size"],
-                                self.rag_settings["chunk_overlap"])
+                                   self.rag_settings["chunk_size"],
+                                   self.rag_settings["chunk_overlap"])
             if self.rag_settings["multivector_enabled"]:
                 # Make sure the parent docs aren't too wordy
                 for doc in docs:
@@ -417,12 +417,16 @@ class Chatbot:
         print(len(docs), "documents found")
         # Optional scan through documents
         for doc in docs:
-            index, source, char_count = doc.metadata["index"], doc.metadata["source"], len(doc.page_content)
+            index, source, char_count = doc.metadata["index"], doc.metadata["source"], len(
+                doc.page_content)
             if char_count > 400:
-                print(f"Warning: Document {index} ({source}) is {char_count} chars long!")
+                print(
+                    f"Warning: Document {index} ({source}) is {char_count} chars long!")
         # This is a test for evaluation
         eval_chain = get_eval_chain(self.rag_settings["rag_llm"].llm)
-        eval_dict = {"excerpt": docs[0].page_content, "criteria": "The topic of this excerpt is dolphins."}
+        eval_dict = {
+            "excerpt": docs[0].page_content,
+            "criteria": "The topic of this excerpt is dolphins."}
         res = eval_chain.invoke(eval_dict)
         print(res)
         if res["meetsCriteria"] is True:
@@ -433,7 +437,8 @@ class Chatbot:
             else:
                 new_index = index + 1
             temp_search_kwargs = {"k": 1, "filter": {"index": new_index}}
-            new_docs = vectorstore.similarity_search("", search_kwargs=temp_search_kwargs)
+            new_docs = vectorstore.similarity_search(
+                "", search_kwargs=temp_search_kwargs)
             if new_docs:
                 print_adjusted(new_docs[0].page_content)
                 eval_dict["excerpt"] = new_docs[0].page_content
@@ -442,10 +447,9 @@ class Chatbot:
         print('yay!')
         raise SystemExit("Test complete")
 
-
     def get_retriever(self):
         vectorstore = self.get_vectorstore()
-        self.run_eval_tests_on_vectorstore(vectorstore)
+        # self.run_eval_tests_on_vectorstore(vectorstore)
         search_kwargs = {}
         search_kwargs["k"] = self.rag_settings["k_excerpts"]
         # search_kwargs["filter"] = {'page': 0}
@@ -471,7 +475,7 @@ class Chatbot:
             prompt = clipboard_paste().strip()
             return prompt
         return None
-    
+
     def set_clipboard(self, text: str) -> None:
         if CLIPBOARD_ACCESS_ENABLED:
             clipboard_copy(text)
@@ -686,7 +690,7 @@ class Chatbot:
                         continue
                     clipboard_text = self.messages[-1].content
                     self.set_clipboard(clipboard_text)
-            
+
             if not prompt.strip():
                 print('No input given, try again')
                 continue

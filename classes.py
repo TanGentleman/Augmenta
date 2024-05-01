@@ -116,7 +116,7 @@ class Config:
             self.rag_mode = True
             self.__check_rag_files()
         self.__check_context_max()
-    
+
     def __adjust_rag_config(self, metadata: dict):
         """
         Adjust the rag_config based on the metadata from manifest.json
@@ -155,7 +155,8 @@ class Config:
             print("Warning: Inputs loaded from manifest.json.")
         if self.rag_config["multivector_enabled"] is True:
             if not metadata["doc_ids"]:
-                raise ValueError("Multivector enabled but no doc_ids in manifest")
+                raise ValueError(
+                    "Multivector enabled but no doc_ids in manifest")
         else:
             if metadata["doc_ids"]:
                 print("Multivector disabled but doc_ids in manifest")

@@ -44,6 +44,7 @@ Criteria: {criteria}
 
 AI: """
 
+
 def get_rag_template(system_message=None):
     """
     Fetches the RAG template for the prompt.
@@ -69,6 +70,7 @@ def get_summary_template():
         0, SystemMessage(
             content="You are a helpful AI."))
     return summary_template
+
 
 def get_eval_template():
     """
