@@ -1,7 +1,7 @@
 from uuid import uuid4
 from langchain.schema import HumanMessage, SystemMessage
 from helpers import database_exists, get_db_collection_names, process_docs, get_doc_ids_from_manifest, save_response_to_markdown_file, save_history_to_markdown_file, read_sample, update_manifest
-from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SUMMARY_TEMPLATE
+from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SUMMARY_TEMPLATE
 from config import MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, EXPLAIN_EXCERPT
 from classes import Config
 from models import LLM_FN, LLM
@@ -46,8 +46,7 @@ def print_adjusted(text: str, end='\n', flush = False, width=TERMINAL_WIDTH) -> 
    
 
 
-PROCESSING_DOCS_FN = None
-# PROCESSING_DOCS_FN = process_docs
+PROCESSING_DOCS_FN = process_docs
 
 ID_KEY = "doc_id"
 
@@ -65,7 +64,8 @@ COMMAND_LIST = [
     "reg",
     ".s",
     ".names",
-    ".sr"]
+    ".sr",
+    ".rm"]
 
 
 class Chatbot:
@@ -381,8 +381,11 @@ class Chatbot:
                 docs.extend(new_docs)
 
             assert docs, "No documents to create collection"
-            if processing_docs_fn:
-                docs = processing_docs_fn(docs)
+            if RAG_COLLECTION_TO_SYSTEM_MESSAGE.get(collection_name) == PROMPT_CHOOSER_SYSTEM_MESSAGE:
+                # This is for indexing anthropic url prompt library data
+                if processing_docs_fn:
+                    print("Prompt chooser detected, processing documents...")
+                    docs = processing_docs_fn(docs)
             docs = split_documents(docs,
                                    self.rag_settings["chunk_size"],
                                    self.rag_settings["chunk_overlap"])
@@ -420,7 +423,7 @@ class Chatbot:
         for doc in docs:
             index, source, char_count = doc.metadata["index"], doc.metadata["source"], len(
                 doc.page_content)
-            if char_count > 400:
+            if char_count > 2000:
                 print(
                     f"Warning: Document {index} ({source}) is {char_count} chars long!")
         # This is a test for evaluation
@@ -597,6 +600,60 @@ class Chatbot:
                 clipboard_text = self.messages[-1].content
                 self.set_clipboard(clipboard_text)
             return
+        elif prompt == ".rm":
+            
+            # Allow user to choose which exchange to delete
+            if len(self.messages) < 2:
+                print('No messages to delete')
+                return
+            print('Choose an exchange to delete:')
+            exchange_count = 0
+            for i, message in enumerate(self.messages):
+                if self.config.chat_config["enable_system_message"]:
+                    if i % 2 == 1:
+                        exchange_count += 1
+                else:
+                    if i % 2 == 0:
+                        exchange_count += 1
+                print(exchange_count, message.content[:50])
+            try:
+                index = input('Enter the index of the exchange to delete: ')
+                if "-" in index:
+                    start, end = map(int, index.split("-"))
+                    if start <= 0 or end > len(self.messages)//2:
+                        print('Invalid index range')
+                        return
+                    # Adjust for exchange count 
+                    if self.config.chat_config["enable_system_message"]:
+                        start = (start*2-1)
+                        end = (end*2)
+                    else:
+                        start = (start*2-2)
+                        end = (end*2-1)
+                    for i in range(start, end+1):
+                        self.messages.pop(start)
+                        self.count -= 1
+                    print('Deleted exchanges')
+                    print(self.messages)
+                else:
+                    index = int(index)
+                    if index <= 0 or index > len(self.messages)//2:
+                        if index == 0:
+                            print('Cannot delete system message')
+                        print('Invalid index')
+                        return
+                    # Adjust for exchange count 
+                    if self.config.chat_config["enable_system_message"]:
+                        index_to_pop = (index*2-1)
+                    else:
+                        index_to_pop = (index*2-2) 
+                    self.messages.pop(index_to_pop)
+                    self.messages.pop(index_to_pop)
+                    self.count -= 1
+                    print('Deleted exchange')
+                    print(self.messages)
+            except ValueError:
+                print('Invalid input')
         else:
             print('Invalid command: ', prompt)
             return
@@ -709,7 +766,7 @@ class Chatbot:
             if self.rag_mode:
                 self.get_rag_response(prompt, stream=True)
             else:
-                self.get_chat_response(prompt, stream=True)
+                self.get_chat_response(prompt, stream=False)
         if save_response:
             save_response_to_markdown_file(self.messages[-1].content)
             print('Saved response to response.md')
