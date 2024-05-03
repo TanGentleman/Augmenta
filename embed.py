@@ -8,15 +8,15 @@ from chromadb.config import Settings
 from os.path import exists, join
 from langchain_community.document_loaders import PyPDFLoader, ArxivLoader
 from langchain_community.vectorstores import FAISS
-from config import CHROMA_FOLDER, FAISS_FOLDER
+from config import CHROMA_FOLDER, EXPERIMENTAL_UNSTRUCTURED, FAISS_FOLDER, METADATA_MAP
 from helpers import database_exists
 from models import Embedder
 
-EXPERIMENTAL_UNSTRUCTURED = False
 if EXPERIMENTAL_UNSTRUCTURED:
     try:
         from unstructured.cleaners.core import clean_extra_whitespace
-        from langchain_community.document_loaders import UnstructuredFileLoader
+        # from langchain_community.document_loaders import UnstructuredFileLoader
+        from langchain_community.document_loaders import UnstructuredPDFLoader
     except ImportError:
         print("ImportError: Unstructured functions in embed.py not be accessible")
         raise ValueError("Set EXPERIMENTAL_UNSTRUCTURED to False to continue")
@@ -39,15 +39,16 @@ def loader_from_file_unstructured(filepath: str) -> list[Document]:
     """
     Load documents from any file, return List[Document]
     """
+    assert filepath.endswith(".pdf"), "Make sure the file is a PDF"
     LOAD_ELEMENTS = False
     if LOAD_ELEMENTS:
-        element_loader = UnstructuredFileLoader(
+        element_loader = UnstructuredPDFLoader(
             filepath,
             mode="elements",
             post_processors=[clean_extra_whitespace])
         loader = element_loader
     else:
-        loader = UnstructuredFileLoader(
+        loader = UnstructuredPDFLoader(
             filepath,
             post_processors=[clean_extra_whitespace])
     return loader
@@ -163,6 +164,9 @@ def split_documents(
     # Add the char count as metadata to each document
     excerpt_count = 0
     for doc in chunked_docs:
+        source = doc.metadata.get("source")
+        if source in METADATA_MAP:
+            doc.metadata["topic"] = METADATA_MAP[source]
         excerpt_count += 1
         doc.metadata["index"] = excerpt_count
         char_count = len(doc.page_content)

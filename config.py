@@ -16,3 +16,18 @@ FAISS_FOLDER = "faiss" + VECTOR_DB_SUFFIX
 ### RAG ###
 MAX_PARENT_DOCS = 8  # This is only relevant for the multiretrieval mode with child docs
 MAX_CHARACTERS_IN_PARENT_DOC = 20000
+
+EXPERIMENTAL_UNSTRUCTURED = False
+METADATA_MAP = None
+FILTER_TOPIC = None
+
+# METADATA_MAP = {
+#     "example.pdf": "Examples",
+#     "example_1.txt": "Examples",
+
+#     "SciencePaper.pdf": "Papers",
+#     "https://arxiv.org/1234": "Papers",
+
+#     "RelevantFileForThisCollection.txt": "Misc",
+# }
+# FILTER_TOPIC = "Papers"
