@@ -102,7 +102,17 @@ def get_together_dbrx(hyperparameters=None) -> ChatOpenAI:
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
-
+def get_together_arctic(hyperparameters=None) -> ChatOpenAI:
+    assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
+    return ChatOpenAI(
+        base_url="https://api.together.xyz",
+        api_key=TOGETHER_API_KEY,
+        model="Snowflake/snowflake-arctic-instruct",
+        temperature=0.1,
+        max_tokens=1000,
+        streaming=True,
+        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+    )
 def get_together_fn_mix(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
@@ -253,6 +263,12 @@ MODEL_DICT = {
         "function": get_together_dbrx,
         "context_size": 32768,
         "model_name": "databricks/dbrx-instruct",
+        "type": "llm"
+    },
+    "get_together_arctic": {
+        "function": get_together_arctic,
+        "context_size": 4096,
+        "model_name": "Snowflake/snowflake-arctic-instruct",
         "type": "llm"
     },
     "get_together_deepseek_4k": {

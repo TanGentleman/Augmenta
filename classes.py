@@ -16,6 +16,7 @@ VALID_LLM = Literal[
     "get_together_fn_mix",
     "get_together_bigmix",
     "get_together_dbrx",
+    "get_together_arctic",
     "get_together_deepseek_4k",
     "get_together_deepseek_32k",
     "get_claude_opus",
