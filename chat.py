@@ -2,11 +2,11 @@ from uuid import uuid4
 from langchain.schema import HumanMessage, SystemMessage
 from helpers import database_exists, get_db_collection_names, process_docs, get_doc_ids_from_manifest, save_response_to_markdown_file, save_history_to_markdown_file, read_sample, update_manifest
 from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SUMMARY_TEMPLATE
-from config import MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, EXPLAIN_EXCERPT
+from config import MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, EXPLAIN_EXCERPT, FILTER_TOPIC
 from classes import Config
 from models import LLM_FN, LLM
 from rag import get_summary_chain, input_to_docs, get_rag_chain, get_eval_chain
-from embed import chroma_vectorstore_from_docs, faiss_vectorstore_from_docs, load_faiss_vectorstore, load_chroma_vectorstore, split_documents
+from embed import get_chroma_vectorstore_from_docs, get_faiss_vectorstore_from_docs, load_existing_faiss_vectorstore, load_existing_chroma_vectorstore, split_documents
 from langchain_core.documents import Document
 from langchain.retrievers.multi_vector import MultiVectorRetriever
 from langchain.storage import InMemoryByteStore
@@ -28,7 +28,6 @@ except ImportError:
 
 
 TERMINAL_WIDTH = get_terminal_size().columns
-
 
 def print_adjusted(text: str, end='\n', flush = False, width=TERMINAL_WIDTH) -> None:
     '''
@@ -97,6 +96,10 @@ class Chatbot:
     def __init__(self, config=None):
         if config is None:
             config = Config()
+        
+        # TODO: Migrate filter topic into rag_settings
+        self.filter_topic = FILTER_TOPIC
+        
         self.config = config
         self.settings = self.get_chat_settings()
         self.rag_settings = self.get_rag_settings()
@@ -108,11 +111,10 @@ class Chatbot:
         self.rag_chain = None
         self.retriever = None
         self.count = 0
-        self.rag_mode = self.settings["rag_mode"]
         self.exit = False
         self.messages = []
 
-        if self.rag_mode:
+        if self.settings["rag_mode"]:
             self.ingest_documents()
         else:
             self.chat_model = self.activate_chat_model()  # This activates the primary model
@@ -140,7 +142,7 @@ class Chatbot:
 
     def set_starting_messages(self):
         messages = []
-        if self.rag_mode:
+        if self.settings["rag_mode"]:
             messages = []
         else:
             if self.settings["enable_system_message"]:
@@ -162,11 +164,10 @@ class Chatbot:
         if self.retriever is not None:
             print('Retriever already exists. Use "refresh" to clear it first')
             return
-
+        assert self.settings["rag_mode"], "RAG mode not enabled"
         # From this point forward, the rag_llm is of type LLM
         self.rag_settings["rag_llm"] = self.get_rag_model()
         # assert isinstance(self.rag_settings["rag_llm"], LLM), "RAG LLM not initialized"
-        self.rag_mode = True
         # get doc_ids
         if self.rag_settings["multivector_enabled"]:
             doc_ids = get_doc_ids_from_manifest(self.rag_settings)
@@ -200,14 +201,13 @@ class Chatbot:
         self.settings = self.get_chat_settings()
         self.rag_settings = self.get_rag_settings()
 
-        self.rag_mode = self.settings["rag_mode"]
         self.backup_model = self.settings["backup_model"]
         self.retriever = None
         self.rag_chain = None
         self.doc_ids = []
         self.parent_docs = None
 
-        if self.rag_mode:
+        if self.settings["rag_mode"]:
             self.ingest_documents()
         else:
             self.chat_model = self.activate_chat_model()
@@ -328,7 +328,7 @@ class Chatbot:
             processing_docs_fn: callable = PROCESSING_DOCS_FN):
         # The processing_docs_fn can be used to format or clean up the
         # documents before indexing.
-        assert self.rag_mode, "RAG mode not enabled"
+        assert self.settings["rag_mode"], "RAG mode not enabled"
         collection_name = self.rag_settings["collection_name"]
         method = self.rag_settings["method"]
         embedding_model_fn = self.rag_settings["embedding_model"]
@@ -342,10 +342,10 @@ class Chatbot:
         if database_exists(collection_name, method):
             print(f"Collection {collection_name} exists, now loading")
             if method == "chroma":
-                vectorstore = load_chroma_vectorstore(
+                vectorstore = load_existing_chroma_vectorstore(
                     collection_name, embedder)
             elif method == "faiss":
-                vectorstore = load_faiss_vectorstore(
+                vectorstore = load_existing_faiss_vectorstore(
                     collection_name, embedder)
             assert vectorstore is not None, "Collection exists but not loaded properly"
             if self.rag_settings["multivector_enabled"]:
@@ -402,10 +402,10 @@ class Chatbot:
                 self.set_doc_ids()
                 docs = self.get_child_docs()
             if method == "chroma":
-                vectorstore = chroma_vectorstore_from_docs(
+                vectorstore = get_chroma_vectorstore_from_docs(
                     collection_name, embedder, docs)
             elif method == "faiss":
-                vectorstore = faiss_vectorstore_from_docs(
+                vectorstore = get_faiss_vectorstore_from_docs(
                     collection_name, embedder, docs)
             assert vectorstore is not None, "Vectorstore not created properly"
             return vectorstore
@@ -413,16 +413,27 @@ class Chatbot:
     def run_eval_tests_on_vectorstore(self, vectorstore):
         # This function is for testing purposes
         print('Running evaluation tests on vectorstore')
+        EVAL_QUERY = "What animal is this about?"
+        EVAL_K_EXCERPTS = 1
+        filter = {}
+        if self.filter_topic is not None:
+            filter = {"topic": self.filter_topic}
+            
         # This is a test for similarity search
-        docs = vectorstore.similarity_search("javascript", k=1)
-        print(docs[0])
+        docs = vectorstore.similarity_search(EVAL_QUERY, k = EVAL_K_EXCERPTS, filter=filter)
+        # print(docs[0])
         # There should only be one document
         assert len(docs) == 1, "There should be exactly one document"
         print(len(docs), "documents found")
         # Optional scan through documents
         for doc in docs:
-            index, source, char_count = doc.metadata["index"], doc.metadata["source"], len(
-                doc.page_content)
+            index = doc.metadata.get("index")
+            source = doc.metadata.get("source")
+            topic = doc.metadata.get("topic")
+            char_count = doc.metadata.get("char_count")
+            print(f"Document {index} ({source}) ({topic}) ({char_count} chars long)")
+            print_adjusted(doc.page_content)
+            print('\n\n')
             if char_count > 2000:
                 print(
                     f"Warning: Document {index} ({source}) is {char_count} chars long!")
@@ -456,6 +467,8 @@ class Chatbot:
         # self.run_eval_tests_on_vectorstore(vectorstore)
         search_kwargs = {}
         search_kwargs["k"] = self.rag_settings["k_excerpts"]
+        if self.filter_topic is not None:
+            search_kwargs["filter"] = {'topic': self.filter_topic}
         # search_kwargs["filter"] = {'page': 0}
         if self.rag_settings["multivector_enabled"]:
             assert self.parent_docs, "Parent docs not initialized"
@@ -497,7 +510,7 @@ class Chatbot:
             self.exit = True
             return
         elif prompt == "switch":
-            if self.rag_mode:
+            if self.settings["rag_mode"]:
                 print("Cannot switch models in RAG mode")
                 return
             self.backup_model = self.chat_model
@@ -528,8 +541,8 @@ class Chatbot:
                 print_adjusted(f"{message}\n\n")
             return
         elif prompt == "info":
-            print(f'RAG mode: {self.rag_mode}')
-            if self.rag_mode is False:
+            print(f'RAG mode: {self.settings["rag_mode"]}')
+            if self.settings["rag_mode"] is False:
                 print(f'Exchanges: {self.count}')
                 if self.settings["enable_system_message"]:
                     print(f'System message: {self.settings["system_message"]}')
@@ -560,12 +573,16 @@ class Chatbot:
                         f'Multivector enabled! Using method: {self.rag_settings["multivector_method"]}')
                 return
         elif prompt == "rag":
+            if self.settings["rag_mode"]:
+                print('Already in RAG mode. Type reg to switch back to chat mode, or refresh to reload the configuration')
+                return
+            self.settings["rag_mode"] = True
             self.ingest_documents()
             return
         elif prompt == "reg":
             # Activate chat model (cast to LLM) if needed
             self.chat_model = self.activate_chat_model()
-            self.rag_mode = False
+            self.settings["rag_mode"] = False
             self.retriever = None
             self.rag_chain = None
             self.set_starting_messages()
@@ -575,6 +592,11 @@ class Chatbot:
             if not user_system_message:
                 print('No input given, try again')
                 return
+            if self.settings["rag_mode"]:
+                print('Cannot set system message in RAG mode')
+                return
+            # TODO: Check if in RAG mode (this should be disabled in RAG mode)
+            # TODO: 
             self.settings["system_message"] = user_system_message
             self.messages = [
                 SystemMessage(
@@ -632,9 +654,8 @@ class Chatbot:
                         end = (end*2-1)
                     for i in range(start, end+1):
                         self.messages.pop(start)
-                        self.count -= 1
+                        self.count -= i%2
                     print('Deleted exchanges')
-                    print(self.messages)
                 else:
                     index = int(index)
                     if index <= 0 or index > len(self.messages)//2:
@@ -651,7 +672,6 @@ class Chatbot:
                     self.messages.pop(index_to_pop)
                     self.count -= 1
                     print('Deleted exchange')
-                    print(self.messages)
             except ValueError:
                 print('Invalid input')
         else:
@@ -763,10 +783,10 @@ class Chatbot:
                 self.handle_command(prompt)
                 continue
             # Generate response
-            if self.rag_mode:
+            if self.settings["rag_mode"]:
                 self.get_rag_response(prompt, stream=True)
             else:
-                self.get_chat_response(prompt, stream=False)
+                self.get_chat_response(prompt, stream=True)
         if save_response:
             save_response_to_markdown_file(self.messages[-1].content)
             print('Saved response to response.md')
