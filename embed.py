@@ -15,8 +15,7 @@ from models import Embedder
 if EXPERIMENTAL_UNSTRUCTURED:
     try:
         from unstructured.cleaners.core import clean_extra_whitespace
-        # from langchain_community.document_loaders import UnstructuredFileLoader
-        from langchain_community.document_loaders import UnstructuredPDFLoader
+        from langchain_community.document_loaders import UnstructuredFileLoader
     except ImportError:
         print("ImportError: Unstructured functions in embed.py not be accessible")
         raise ValueError("Set EXPERIMENTAL_UNSTRUCTURED to False to continue")
@@ -39,16 +38,15 @@ def loader_from_file_unstructured(filepath: str) -> list[Document]:
     """
     Load documents from any file, return List[Document]
     """
-    assert filepath.endswith(".pdf"), "Make sure the file is a PDF"
     LOAD_ELEMENTS = False
     if LOAD_ELEMENTS:
-        element_loader = UnstructuredPDFLoader(
+        element_loader = UnstructuredFileLoader(
             filepath,
             mode="elements",
             post_processors=[clean_extra_whitespace])
         loader = element_loader
     else:
-        loader = UnstructuredPDFLoader(
+        loader = UnstructuredFileLoader(
             filepath,
             post_processors=[clean_extra_whitespace])
     return loader
@@ -129,7 +127,7 @@ def documents_from_arbitrary_file(filepath: str) -> list[Document]:
     Returns List[Document]
     """
     filepath = join("documents", filepath)
-    assert exists(filepath), "Local PDF file not found"
+    assert exists(filepath), "Local file not found"
     element_loader = loader_from_file_unstructured(filepath)
     docs = element_loader.load()
     if not docs:
@@ -165,7 +163,7 @@ def split_documents(
     excerpt_count = 0
     for doc in chunked_docs:
         source = doc.metadata.get("source")
-        if source in METADATA_MAP:
+        if METADATA_MAP and source in METADATA_MAP:
             doc.metadata["topic"] = METADATA_MAP[source]
         excerpt_count += 1
         doc.metadata["index"] = excerpt_count
@@ -176,10 +174,13 @@ def split_documents(
     return chunked_docs
 
 
-def get_chroma_vectorstore(collection_name: str, embedder: Embedder):
+def get_chroma_vectorstore(collection_name: str, embedder: Embedder, exists=False):
     """
     Get a Chroma vectorstore from a collection name, folder is created if it doesn't exist
     """
+    if exists is False:
+        assert not database_exists(
+            collection_name, "chroma"), "Collection does not exist"
     filename = join(CHROMA_FOLDER, collection_name)
     vectorstore = Chroma(
         collection_name=collection_name,
@@ -192,7 +193,7 @@ def get_chroma_vectorstore(collection_name: str, embedder: Embedder):
     return vectorstore
 
 
-def chroma_vectorstore_from_docs(
+def get_chroma_vectorstore_from_docs(
         collection_name: str,
         embedder: Embedder,
         docs: list[Document]):
@@ -202,20 +203,20 @@ def chroma_vectorstore_from_docs(
         raise ValueError(
             "Collection not found. Provide documents to create a new collection")
     print('Indexing documents...')
-    vectorstore = get_chroma_vectorstore(collection_name, embedder)
+    vectorstore = get_chroma_vectorstore(collection_name, embedder, exists=False)
     vectorstore.add_documents(docs)
     return vectorstore
 
 
-def load_chroma_vectorstore(collection_name, embedder):
+def load_existing_chroma_vectorstore(collection_name, embedder):
     assert database_exists(
         collection_name, "chroma"), "Collection does not exist"
-    vectorstore = get_chroma_vectorstore(collection_name, embedder)
+    vectorstore = get_chroma_vectorstore(collection_name, embedder, exists=True)
     # assert there are documents present
     return vectorstore
 
 
-def faiss_vectorstore_from_docs(
+def get_faiss_vectorstore_from_docs(
         collection_name: str,
         embedder: Embedder,
         docs: list[Document]):
@@ -232,7 +233,7 @@ def faiss_vectorstore_from_docs(
     return vectorstore
 
 
-def load_faiss_vectorstore(collection_name: str, embedder: Embedder):
+def load_existing_faiss_vectorstore(collection_name: str, embedder: Embedder):
     assert database_exists(
         collection_name, "faiss"), "Collection does not exist"
     filename = join(FAISS_FOLDER, collection_name)
