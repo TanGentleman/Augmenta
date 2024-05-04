@@ -6,10 +6,7 @@ from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 from helpers import clean_docs, database_exists, format_docs
 from constants import get_rag_template, get_summary_template, get_eval_template
 import embed
-
-# assert embed.EXPERIMENTAL_UNSTRUCTURED is False, "Uncomment this line in rag.py to continue using Unstructured"
-EXPERIMENTAL_UNSTRUCTURED = embed.EXPERIMENTAL_UNSTRUCTURED
-
+from config import EXPERIMENTAL_UNSTRUCTURED
 
 def get_summary_chain(llm):
     """
@@ -132,10 +129,10 @@ def vectorstore_from_inputs(
     if database_exists(collection_name, method):
         print(f"Collection {collection_name} exists, now loading")
         if method == "chroma":
-            vectorstore = embed.load_chroma_vectorstore(
+            vectorstore = embed.load_existing_chroma_vectorstore(
                 collection_name, embedder)
         elif method == "faiss":
-            vectorstore = embed.load_faiss_vectorstore(
+            vectorstore = embed.load_existing_faiss_vectorstore(
                 collection_name, embedder)
         assert vectorstore is not None, "Collection exists but not loaded properly"
         return vectorstore
@@ -151,10 +148,10 @@ def vectorstore_from_inputs(
         docs = embed.split_documents(docs, chunk_size, chunk_overlap)
         if i == 0:
             if method == "chroma":
-                vectorstore = embed.chroma_vectorstore_from_docs(
+                vectorstore = embed.get_chroma_vectorstore_from_docs(
                     collection_name, embedder, docs)
             elif method == "faiss":
-                vectorstore = embed.faiss_vectorstore_from_docs(
+                vectorstore = embed.get_faiss_vectorstore_from_docs(
                     collection_name, embedder, docs)
         else:
             assert vectorstore is not None, "Vectorstore not initialized"
