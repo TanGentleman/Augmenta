@@ -1,4 +1,4 @@
-from config import LOCAL_MODEL_ONLY
+from config import LOCAL_MODEL_ONLY, SYSTEM_MSG_MAP
 from helpers import database_exists, read_settings
 # use pydantic to enforce Config schema
 from typing import Literal
@@ -108,7 +108,6 @@ class Config:
         if not path.exists("documents"):
             mkdir("documents")
         if not path.exists("manifest.json"):
-            self.database_exists = False
             with open("manifest.json", "w") as f:
                 # Make databases key
                 f.write('{"databases": []}')
@@ -222,6 +221,12 @@ class Config:
         self.rag_config["embedding_model"] = LLM_FN(embedder_fn)
 
         self.chat_config["primary_model"] = LLM_FN(primary_model_fn)
+        # Set system message based on primary model
+        if self.chat_config["enable_system_message"]:
+            model_name = self.chat_config["primary_model"].model_name
+            if model_name in SYSTEM_MSG_MAP:
+                self.chat_config["system_message"] = SYSTEM_MSG_MAP[model_name]
+                print(f"System message adjusted for model {model_name}.")
         self.chat_config["backup_model"] = LLM_FN(backup_model_fn)
 
         self.__validate_rag_config()
