@@ -2,14 +2,28 @@
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.schema import SystemMessage
 
+DEFAULT_SYSTEM_MESSAGE = "You are a helpful AI."
+CODE_SYSTEM_MESSAGE = "You are an expert programmer. Review the Python code and provide optimizations."
 RAG_SYSTEM_MESSAGE = "You are a helpful AI. Use the document excerpts to respond to the best of your ability."
 PROMPT_CHOOSER_SYSTEM_MESSAGE = "Use the context from Anthropic's example prompting guides to create a sample system message and user message template for the given task."
 EVAL_EXCERPT_SYSTEM_MESSAGE = "You are an AI assistant that evaluates text excerpts to determine if it meets specified criteria. Respond ONLY with a valid JSON output with 2 keys: index: int, and meetsCriteria: bool."
+
+SYSTEM_MESSAGE_CODES = {
+    "default": DEFAULT_SYSTEM_MESSAGE,
+    "code": CODE_SYSTEM_MESSAGE,
+    "eval": EVAL_EXCERPT_SYSTEM_MESSAGE,
+    "rag": RAG_SYSTEM_MESSAGE,
+    "prompting": PROMPT_CHOOSER_SYSTEM_MESSAGE,
+}
+
 RAG_COLLECTION_TO_SYSTEM_MESSAGE = {
     "default": RAG_SYSTEM_MESSAGE,
     "best_reference_prompt_collection": PROMPT_CHOOSER_SYSTEM_MESSAGE,
     "reference_prompt_collection": PROMPT_CHOOSER_SYSTEM_MESSAGE,
+    "fixed_reference_nomic_prompt_collection": PROMPT_CHOOSER_SYSTEM_MESSAGE,
 }
+
+
 
 DEFAULT_QUERY = '''Name 5 strange vegetables that I am unlikely to see in Western countries.'''
 # DEFAULT_SYSTEM_MESSAGE = "You are a domain expert AI for a graduate class. Be articulate, clear, and concise and your response."
@@ -17,17 +31,13 @@ DEFAULT_SYSTEM_MESSAGE = "You are a helpful AI."
 MAX_CHARS_IN_PROMPT = 200000
 MAX_CHAT_EXCHANGES = 20
 
-CODE_SYSTEM_MESSAGE = "You are an expert programmer that helps to review Python code and provide optimizations."
-
 # This is the template for the RAG prompt
 RAG_CONTEXT_TEMPLATE = """Use the following context to answer the question:
 <context>
 {context}
 </context>
 
-Question: {question}
-
-AI: """
+Question: {question}"""
 
 # This is a basic summary template
 SUMMARY_TEMPLATE = """Summarize the following text, retaining the main keywords:
@@ -40,10 +50,7 @@ EVAL_TEMPLATE = """Evaluate the following text excerpt(s) based on the given cri
 {excerpt}
 </excerpt>
 
-Criteria: {criteria}
-
-AI: """
-
+Criteria: {criteria}"""
 
 def get_rag_template(system_message=None):
     """
