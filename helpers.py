@@ -60,8 +60,8 @@ def read_settings(config_file="settings.json") -> dict:
         try:
             settings = json_load(file)
         except JSONDecodeError:
-            print("Error reading settings file")
-            exit(1)
+            print("CRITICAL: Error reading settings file")
+            raise JSONDecodeError
 
         assert isinstance(settings, dict), "Settings file is not a dictionary"
     return settings
@@ -181,7 +181,7 @@ def get_current_time() -> str:
     return str(datetime.now().strftime("%Y-%m-%d"))
 
 
-def get_doc_ids_from_manifest(rag_settings):
+def get_doc_ids_from_manifest(collection_name):
     """
     Scan the manifest.json file for the collection name and return the doc_ids
     """
@@ -192,7 +192,7 @@ def get_doc_ids_from_manifest(rag_settings):
             print("manifest.json is empty")
             return doc_ids
         for item in data["databases"]:
-            if item["collection_name"] == rag_settings["collection_name"]:
+            if item["collection_name"] == collection_name:
                 doc_ids = item["metadata"]["doc_ids"]
                 return doc_ids
     return doc_ids
@@ -212,7 +212,15 @@ def get_db_collection_names(method: str) -> list[str]:
     return collection_names
 
 
-def update_manifest(rag_settings, doc_ids=[]):
+def update_manifest(
+        embedding_model_name: str,
+        method: str,
+        chunk_size: int,
+        chunk_overlap: int,
+        inputs: list[str],
+        collection_name: str,
+        doc_ids: list[str] = []):
+    # rag_settings, doc_ids=[]):
     """
     Update the manifest.json file with the new collection
 
@@ -227,26 +235,27 @@ def update_manifest(rag_settings, doc_ids=[]):
     data = {}
     with open('manifest.json', 'r') as f:
         data = json_load(f)
+    if not data:
+        raise FileNotFoundError("manifest.json has no data")
     assert isinstance(data, dict), "manifest.json is not a dict"
     assert "databases" in data, "databases key not found in manifest.json"
     # assert that the id is unique
     for item in data["databases"]:
-        if item["collection_name"] == rag_settings["collection_name"]:
+        if item["collection_name"] == collection_name:
             # No need to update manifest.json
             return
     # get unique id
     unique_id = str(uuid4())
     # This is temporary since embedding model
-    embedding_model_name = rag_settings["embedding_model"].model_name
     manifest = {
         "id": unique_id,
-        "collection_name": rag_settings["collection_name"],
+        "collection_name": collection_name,
         "metadata": {
             "embedding_model": embedding_model_name,
-            "method": rag_settings["method"],
-            "chunk_size": str(rag_settings["chunk_size"]),
-            "chunk_overlap": str(rag_settings["chunk_overlap"]),
-            "inputs": rag_settings["inputs"],
+            "method": method,
+            "chunk_size": str(chunk_size),
+            "chunk_overlap": str(chunk_overlap),
+            "inputs": inputs,
             "timestamp": get_current_time(),
             "doc_ids": doc_ids
         }
