@@ -36,20 +36,23 @@ RAG_CONTEXT_TEMPLATE = """Use the following context to answer the question:
 {context}
 </context>
 
-Question: {question}"""
+Question: {question}
+"""
 
 # This is a basic summary template
 SUMMARY_TEMPLATE = """Summarize the following text, retaining the main keywords:
 <excerpt>
 {excerpt}
-</excerpt>"""
+</excerpt>
+"""
 
 EVAL_TEMPLATE = """Evaluate the following text excerpt(s) based on the given criteria:
 <excerpt>
 {excerpt}
 </excerpt>
 
-Criteria: {criteria}"""
+Criteria: {criteria}
+"""
 
 
 def get_rag_template(system_message=None):

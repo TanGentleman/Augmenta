@@ -8,6 +8,7 @@ from constants import get_rag_template, get_summary_template, get_eval_template
 import embed
 from config import EXPERIMENTAL_UNSTRUCTURED
 
+
 def get_summary_chain(llm):
     """
     Returns a chain for summarization only.
@@ -58,8 +59,8 @@ def get_eval_chain(llm):
 def get_rag_chain(
         retriever,
         llm,
-        format_fn: callable = format_docs,
-        system_message: str = None):
+        format_fn=format_docs,
+        system_message: str | None = None):
     """
     Returns a chain for the RAG pipeline.
 
@@ -140,6 +141,7 @@ def vectorstore_from_inputs(
         # In the future this can be parallelized
         input = inputs[i]
         if not input:
+            print(f'Input {i} is empty, skipping')
             continue
         docs = input_to_docs(input)
         if not docs:
