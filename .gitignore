@@ -13,3 +13,4 @@ chroma-vector-dbs/
 download_agent_files.py
 *.json
 *.png
+!documents/paper.txt

@@ -1,24 +1,24 @@
 {
     "rag_config": {
-        "collection_name": "12_angry_men_collection",
+        "rag_mode": false,
+        "collection_name": "sample_paper_collection",
         "embedding_model": "get_openai_embedder_large",
         "method": "faiss",
         "chunk_size": 256,
         "chunk_overlap": 50,
-        "k_excerpts": 2,
-        "rag_llm": "get_together_bigmix",
+        "k_excerpts": 4,
+        "rag_llm": "get_together_llama3",
         "inputs": [
-            "12AngryMen.pdf"
+            "paper.txt"
         ],
         "multivector_enabled": false,
         "multivector_method": "summary"
     },
     "chat_config": {
-        "primary_model": "get_claude_opus",
-        "backup_model": "get_openai_gpt4",
+        "primary_model": "get_together_llama3",
+        "backup_model": "get_ollama_local_model",
         "enable_system_message": true,
-        "system_message": "You are a helpful AI.",
-        "rag_mode": false
+        "system_message": "You are a helpful AI."
     },
     "hyperparameters": {
         "max_tokens": 1000,
