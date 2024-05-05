@@ -3,6 +3,7 @@
 # TODO: Implement embedding model context size checks, potentially issues
 # during vectorstore steps?
 
+from typing import Union
 from langchain_openai import OpenAIEmbeddings
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain.callbacks.manager import CallbackManager
@@ -13,6 +14,7 @@ from os.path import join, dirname
 from dotenv import load_dotenv
 from langchain_together import TogetherEmbeddings
 from langchain_community.embeddings import OllamaEmbeddings
+from langchain_community.llms import Ollama
 dotenv_path = join(dirname(__file__), '.env')
 load_dotenv(dotenv_path)
 
@@ -113,6 +115,20 @@ def get_together_arctic(hyperparameters=None) -> ChatOpenAI:
         streaming=True,
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
+
+def get_together_llama3(hyperparameters=None) -> ChatOpenAI:
+    assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
+    return ChatOpenAI(
+        base_url="https://api.together.xyz",
+        api_key=TOGETHER_API_KEY,
+        model="meta-llama/Llama-3-70b-chat-hf",
+        temperature=0.1,
+        max_tokens=1000,
+        streaming=True,
+        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+    )
+
+
 def get_together_fn_mix(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
@@ -146,7 +162,7 @@ def get_together_deepseek_4k(hyperparameters=None) -> ChatOpenAI:
         api_key=TOGETHER_API_KEY,
         model="deepseek-ai/deepseek-llm-67b-chat",
         temperature=0,
-        max_tokens=2000,
+        max_tokens=800,
         streaming=True,
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
@@ -214,6 +230,10 @@ def get_local_model(hyperparameters=None) -> ChatOpenAI:
         streaming=True,
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
+def get_ollama_local_model(hyperparameters=None) -> Ollama:
+    return Ollama(
+        model="llama3",
+    )
 
 
 def get_nomic_local_embedder(hyperparameters=None) -> OllamaEmbeddings:
@@ -221,104 +241,128 @@ def get_nomic_local_embedder(hyperparameters=None) -> OllamaEmbeddings:
         model="nomic-embed-text"
     )
 
+def get_lmstudio_local_embedder(hyperparameters=None) -> OpenAIEmbeddings:
+    return OpenAIEmbeddings(
+        base_url="http://localhost:1234/v1",
+        model="local-embedding-model",
+        api_key="lm-studio"
+    )
 
 MODEL_DICT = {
     "get_openai_gpt4": {
         "function": get_openai_gpt4,
         "context_size": 128000,
         "model_name": "gpt-4-turbo-2024-04-09",
-        "type": "llm"
+        "model_type": "llm"
     },
     "get_together_dolphin": {
         "function": get_together_dolphin,
         "context_size": 32768,
         "model_name": "cognitivecomputations/dolphin-2.5-mixtral-8x7b",
-        "type": "llm"
+        "model_type": "llm"
     },
     "get_together_quen": {
         "function": get_together_quen,
         "context_size": 4096,
         "model_name": "Qwen/Qwen1.5-72B-Chat",
-        "type": "llm"
+        "model_type": "llm"
     },
     "get_together_nous_mix": {
         "function": get_together_nous_mix,
         "context_size": 32768,
         "model_name": "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
-        "type": "llm"
+        "model_type": "llm"
     },
     "get_together_fn_mix": {
         "function": get_together_fn_mix,
         "context_size": 32768,
         "model_name": "mistralai/Mixtral-8x7B-Instruct-v0.1",
-        "type": "llm"
+        "model_type": "llm"
     },
     "get_together_bigmix": {
         "function": get_together_bigmix,
         "context_size": 65536,
         "model_name": "mistralai/Mixtral-8x22B-Instruct-v0.1",
-        "type": "llm"
+        "model_type": "llm"
     },
     "get_together_dbrx": {
         "function": get_together_dbrx,
         "context_size": 32768,
         "model_name": "databricks/dbrx-instruct",
-        "type": "llm"
+        "model_type": "llm"
     },
     "get_together_arctic": {
         "function": get_together_arctic,
         "context_size": 4096,
         "model_name": "Snowflake/snowflake-arctic-instruct",
-        "type": "llm"
+        "model_type": "llm"
+    },
+    "get_together_llama3": {
+        "function": get_together_llama3,
+        "context_size": 4096,
+        "model_name": "meta-llama/Llama-3-70b-chat-hf",
+        "model_type": "llm"
     },
     "get_together_deepseek_4k": {
         "function": get_together_deepseek_4k,
         "context_size": 4096,
         "model_name": "deepseek-ai/deepseek-llm-67b-chat",
-        "type": "llm"
+        "model_type": "llm"
     },
     "get_together_deepseek_32k": {
         "function": get_together_deepseek_32k,
         "context_size": 32768,
         "model_name": "deepseek-ai/deepseek-coder-33b-instruct",
-        "type": "llm"
+        "model_type": "llm"
     },
     "get_claude_sonnet": {
         "function": get_claude_sonnet,
         "context_size": 200000,
         "model_name": "claude-3-sonnet-20240229",
-        "type": "llm"
+        "model_type": "llm"
     },
     "get_claude_opus": {
         "function": get_claude_opus,
         "context_size": 200000,
         "model_name": "claude-3-opus-20240229",
-        "type": "llm"
+        "model_type": "llm"
     },
     # Note: Local model has an undefined context size
     "get_local_model": {
         "function": get_local_model,
         "context_size": 32768,
         "model_name": "local-model",
-        "type": "llm"
+        "model_type": "llm"
+    },
+    "get_ollama_local_model": {
+        "function": get_ollama_local_model,
+        "context_size": 4096,
+        "model_name": "local-ollama3", # Should this be llama3?
+        "model_type": "llm"
     },
     "get_openai_embedder_large": {
         "function": get_openai_embedder_large,
         "context_size": 128000,
         "model_name": "text-embedding-3-large",
-        "type": "embedder"
+        "model_type": "embedder"
     },
     "get_together_embedder_large": {
         "function": get_together_embedder_large,
         "context_size": 8192,
         "model_name": "BAAI/bge-large-en-v1.5",
-        "type": "embedder"
+        "model_type": "embedder"
     },
     "get_nomic_local_embedder": {
         "function": get_nomic_local_embedder,
         "context_size": 8192,
         "model_name": "nomic-embed-text",
-        "type": "embedder"
+        "model_type": "embedder"
+    },
+    "get_lmstudio_local_embedder": {
+        "function": get_lmstudio_local_embedder,
+        "context_size": 8192,
+        "model_name": "local-embedding-model",
+        "model_type": "embedder"
     }
 }
 
@@ -336,21 +380,19 @@ class LLM_FN:
         # This means embedding models pass here (for now)
         self.model_name = ""
         self.context_size = 0
-        found = False
         for model in MODEL_DICT.values():
             if model["function"] == model_fn:
-                self.model_name = model["model_name"]
-                self.context_size = model["context_size"]
+                self.model_name = str(model["model_name"])
+                self.context_size = int(model["context_size"])
 
-                assert len(
-                    self.model_name) > 0, "Model name must be a non-empty string"
-                assert isinstance(self.model_name, str)
-                assert self.context_size > 0, "Context size must be greater than 0"
-                assert isinstance(self.context_size, int)
-                found = True
+                if not self.model_name:
+                    raise ValueError("Model name not found")
+                if self.context_size <= 0:
+                    raise ValueError(
+                        "Context size must be a positive integer")
                 break
-        assert found, "Model function not found in MODEL_DICT"
-
+        else:
+            raise ValueError("Model function not found in MODEL_DICT")
         self.model_fn = model_fn
         self.hyperparameters = None
         if hyperparameters is not None:
@@ -393,14 +435,18 @@ class LLM:
         Get the name of the model
         """
         if hasattr(self.llm, 'model_name'):
-            name = self.llm.model_name
+            model_name = self.llm.model_name
         elif hasattr(self.llm, 'model'):
-            name = self.llm.model
+            model_name = self.llm.model
         else:
             raise ValueError("Model name not found in model object")
-        if name != self.model_name:
+        
+        if model_name == "llama3":
+            model_name = "local-ollama3"
+        if model_name != self.model_name:
             raise ValueError(
-                f"Model name from API: {name} does not match expected model name: {self.model_name}")
+                f"Model name from API: {model_name} does not match expected model name: {self.model_name}")
+        return model_name
     pass
 
     def invoke(self, query):
@@ -423,5 +469,4 @@ class LLM:
         return f"LLM(model_name={self.model_name}, context_size={self.context_size})"
 
 
-class Embedder(OpenAIEmbeddings, TogetherEmbeddings, OllamaEmbeddings):
-    pass
+Embedder = Union[OpenAIEmbeddings, TogetherEmbeddings, OllamaEmbeddings]
