@@ -410,17 +410,15 @@ class ChatSettings:
             primary_model,
             backup_model,
             enable_system_message,
-            system_message,
-            rag_mode):
+            system_message):
         self.primary_model = primary_model
         self.backup_model = backup_model
         self.enable_system_message = enable_system_message
         self.system_message = system_message
-        self.rag_mode = rag_mode
 
-        assert self.primary_model is not None, "ChatSettings.primary_model exists must be set"
-        assert self.backup_model is not None, "ChatSettings.backup_model exists must be set"
-        assert self.system_message is not None, "ChatSettings.system_message exists must be set"
+        assert self.primary_model, "ChatSettings.primary_model exists must be set"
+        assert self.backup_model, "ChatSettings.backup_model exists must be set"
+        assert self.system_message, "ChatSettings.system_message exists must be set"
 
     @property
     def primary_model(self):
