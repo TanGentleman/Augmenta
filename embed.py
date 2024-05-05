@@ -15,13 +15,13 @@ from models import Embedder
 if EXPERIMENTAL_UNSTRUCTURED:
     try:
         from unstructured.cleaners.core import clean_extra_whitespace
-        from langchain_community.document_loaders import UnstructuredFileLoader
+        from langchain_community.document_loaders import UnstructuredPDFLoader
     except ImportError:
         print("ImportError: Unstructured functions in embed.py not be accessible")
         raise ValueError("Set EXPERIMENTAL_UNSTRUCTURED to False to continue")
 
 
-def loader_from_arxiv_url(url: str) -> list[Document]:
+def loader_from_arxiv_url(url: str) -> ArxivLoader:
     """
     Load documents from an arXiv URL, return List[Document]
     """
@@ -34,25 +34,26 @@ def loader_from_arxiv_url(url: str) -> list[Document]:
     return loader
 
 
-def loader_from_file_unstructured(filepath: str) -> list[Document]:
+def loader_from_file_unstructured(filepath: str):
     """
     Load documents from any file, return List[Document]
     """
+    assert filepath.endswith(".pdf"), "Unstructured temporarily only supports PDFs"
     LOAD_ELEMENTS = False
     if LOAD_ELEMENTS:
-        element_loader = UnstructuredFileLoader(
+        element_loader = UnstructuredPDFLoader(
             filepath,
             mode="elements",
             post_processors=[clean_extra_whitespace])
         loader = element_loader
     else:
-        loader = UnstructuredFileLoader(
+        loader = UnstructuredPDFLoader(
             filepath,
             post_processors=[clean_extra_whitespace])
     return loader
 
 
-def loader_from_notebook_url(url: str):
+def loader_from_notebook_url(url: str) -> NotebookLoader:
     """
     Return a NotebookLoader from a url to a raw .ipynb file
     """
