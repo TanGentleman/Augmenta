@@ -430,12 +430,12 @@ class Chatbot:
                 if not inputs[i]:
                     print(f'Input {i} is empty, skipping')
                     continue
-                print(inputs[i])
                 new_docs = input_to_docs(inputs[i])
                 if not new_docs:
                     print(f'No documents found in input {i}')
                     continue
                 docs.extend(new_docs)
+                print("Indexed", inputs[i])
 
             assert docs, "No documents to create collection"
             if RAG_COLLECTION_TO_SYSTEM_MESSAGE.get(
@@ -861,7 +861,7 @@ class Chatbot:
             if stream:
                 response_string = ""
                 if self.rag_model.model_name == "local-ollama3":
-                    for chunk in self.rag_chain.stream(self.messages):
+                    for chunk in self.rag_chain.stream(prompt):
                         print(chunk, end="", flush=True)
                         response_string += chunk
                 else:
