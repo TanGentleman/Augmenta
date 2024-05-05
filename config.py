@@ -14,9 +14,8 @@ EXPLAIN_EXCERPT = False  # if true, -np will format sample.txt
 #     "code": "You are an expert programmer that helps to review Python code and provide optimizations.",
 #     "chat": "You are a helpful AI."
 # }
-SYSTEM_MSG_MAP = {
-    "deepseek-ai/deepseek-llm-67b-chat": "You are an expert programmer. Review the Python code and provide optimizations.",
-}
+SYSTEM_MSG_MAP = {"deepseek-ai/deepseek-llm-67b-chat":
+                  "You are an expert programmer. Review the Python code and provide optimizations.", }
 # Formatted using constants.SUMMARY_TEMPLATE
 
 ### MISC ###

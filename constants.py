@@ -24,7 +24,6 @@ RAG_COLLECTION_TO_SYSTEM_MESSAGE = {
 }
 
 
-
 DEFAULT_QUERY = '''Name 5 strange vegetables that I am unlikely to see in Western countries.'''
 # DEFAULT_SYSTEM_MESSAGE = "You are a domain expert AI for a graduate class. Be articulate, clear, and concise and your response."
 DEFAULT_SYSTEM_MESSAGE = "You are a helpful AI."
@@ -51,6 +50,7 @@ EVAL_TEMPLATE = """Evaluate the following text excerpt(s) based on the given cri
 </excerpt>
 
 Criteria: {criteria}"""
+
 
 def get_rag_template(system_message=None):
     """

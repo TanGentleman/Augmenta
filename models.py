@@ -104,6 +104,7 @@ def get_together_dbrx(hyperparameters=None) -> ChatOpenAI:
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
+
 def get_together_arctic(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
@@ -115,6 +116,7 @@ def get_together_arctic(hyperparameters=None) -> ChatOpenAI:
         streaming=True,
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
+
 
 def get_together_llama3(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
@@ -230,6 +232,8 @@ def get_local_model(hyperparameters=None) -> ChatOpenAI:
         streaming=True,
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
+
+
 def get_ollama_local_model(hyperparameters=None) -> Ollama:
     return Ollama(
         model="llama3",
@@ -241,12 +245,14 @@ def get_nomic_local_embedder(hyperparameters=None) -> OllamaEmbeddings:
         model="nomic-embed-text"
     )
 
+
 def get_lmstudio_local_embedder(hyperparameters=None) -> OpenAIEmbeddings:
     return OpenAIEmbeddings(
         base_url="http://localhost:1234/v1",
         model="local-embedding-model",
         api_key="lm-studio"
     )
+
 
 MODEL_DICT = {
     "get_openai_gpt4": {
@@ -337,7 +343,7 @@ MODEL_DICT = {
     "get_ollama_local_model": {
         "function": get_ollama_local_model,
         "context_size": 4096,
-        "model_name": "local-ollama3", # Should this be llama3?
+        "model_name": "local-ollama3",  # Should this be llama3?
         "model_type": "llm"
     },
     "get_openai_embedder_large": {
@@ -440,7 +446,7 @@ class LLM:
             model_name = self.llm.model
         else:
             raise ValueError("Model name not found in model object")
-        
+
         if model_name == "llama3":
             model_name = "local-ollama3"
         if model_name != self.model_name:

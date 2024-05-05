@@ -32,6 +32,7 @@ VALID_EMBEDDER = Literal["get_openai_embedder_large",
                          "get_nomic_local_embedder",
                          "get_lmstudio_local_embedder"]
 
+
 class ManifestSchema(BaseModel):
     """
     Manifest schema
@@ -42,6 +43,7 @@ class ManifestSchema(BaseModel):
     chunk_overlap: int
     inputs: list[str]
     doc_ids: list[str]
+
 
 class ChatSchema(BaseModel):
     """
@@ -60,6 +62,7 @@ class HyperparameterSchema(BaseModel):
     max_tokens: int
     temperature: float
 
+
 class RagSchema(BaseModel):
     """
     Configuration for RAG
@@ -75,11 +78,13 @@ class RagSchema(BaseModel):
     inputs: list[str]
     multivector_enabled: bool
     multivector_method: Literal["summary", "qa"]
-    
+
+
 class RagSettings:
     """
     Configuration for RAG
     """
+
     def __init__(self, **kwargs):
         self.__config = RagSchema(**kwargs)
         self._rag_mode = False
@@ -99,13 +104,24 @@ class RagSettings:
                 self.__config.multivector_enabled,
                 self.__config.multivector_method)
 
-    def __enable_rag_mode(self, collection_name, embedding_model, method, chunk_size, chunk_overlap, k_excerpts, rag_llm, inputs, multivector_enabled, multivector_method):
+    def __enable_rag_mode(
+            self,
+            collection_name,
+            embedding_model,
+            method,
+            chunk_size,
+            chunk_overlap,
+            k_excerpts,
+            rag_llm,
+            inputs,
+            multivector_enabled,
+            multivector_method):
         """
         Enable RAG mode
         """
         assert self.rag_mode, "RAG mode must be enabled"
         self.database_exists = database_exists(collection_name, method)
-        
+
         self.collection_name = collection_name
         self.embedding_model = embedding_model
         self.method = method
@@ -116,7 +132,6 @@ class RagSettings:
         self.inputs = inputs
         self.multivector_enabled = multivector_enabled
         self.multivector_method = multivector_method
-
 
     def adjust_rag_settings(self, metadata: dict):
         """
@@ -144,7 +159,8 @@ class RagSettings:
         metadata["embedding_model"] = model["model_name"]
         if metadata["embedding_model"] != self.embedding_model.model_name:
             self.embedding_model = metadata["embedding_model"]
-            assert isinstance(self.embedding_model, LLM_FN), "Embedding model must be type LLM_FN"
+            assert isinstance(
+                self.embedding_model, LLM_FN), "Embedding model must be type LLM_FN"
             print(
                 f"Warning: Embedding model in settings.json switched to {self.embedding_model.model_name} from manifest.json.")
         if metadata["method"] != self.method:
@@ -179,7 +195,7 @@ class RagSettings:
     @property
     def rag_mode(self):
         return self.__rag_mode
-    
+
     @rag_mode.setter
     def rag_mode(self, value):
         if not isinstance(value, bool):
@@ -213,7 +229,7 @@ class RagSettings:
     @property
     def collection_name(self):
         return self.__collection_name
-    
+
     @collection_name.setter
     def collection_name(self, value):
         if not value:
@@ -223,11 +239,11 @@ class RagSettings:
         self.__collection_name = value
         # TODO: Check if collection exists in manifest.json
         # TODO: Check if collection exists as vector DB
-    
+
     @property
     def embedding_model(self) -> LLM_FN:
         return self.__embedding_model
-    
+
     @embedding_model.setter
     def embedding_model(self, value):
         if not value:
@@ -240,7 +256,8 @@ class RagSettings:
                     raise ValueError("Embedding model must be type embedder")
                 embedding_fn = MODEL_DICT[embedder_fn_name]["function"]
                 self.__embedding_model = LLM_FN(embedding_fn)
-                print(f"Embedding model set to {self.__embedding_model.model_name}")
+                print(
+                    f"Embedding model set to {self.__embedding_model.model_name}")
                 break
         else:
             raise ValueError("Embedding model not found")
@@ -255,7 +272,7 @@ class RagSettings:
     @property
     def method(self):
         return self.__method
-    
+
     @method.setter
     def method(self, value):
         if value not in ["faiss", "chroma"]:
@@ -265,7 +282,7 @@ class RagSettings:
     @property
     def chunk_size(self):
         return self.__chunk_size
-    
+
     @chunk_size.setter
     def chunk_size(self, value):
         if not isinstance(value, int):
@@ -277,7 +294,7 @@ class RagSettings:
     @property
     def chunk_overlap(self):
         return self.__chunk_overlap
-    
+
     @chunk_overlap.setter
     def chunk_overlap(self, value):
         if not isinstance(value, int):
@@ -289,7 +306,7 @@ class RagSettings:
     @property
     def k_excerpts(self):
         return self.__k_excerpts
-    
+
     @k_excerpts.setter
     def k_excerpts(self, value):
         if not isinstance(value, int):
@@ -301,7 +318,7 @@ class RagSettings:
     @property
     def rag_llm(self):
         return self.__rag_llm
-    
+
     @rag_llm.setter
     def rag_llm(self, value):
         if not value:
@@ -323,21 +340,21 @@ class RagSettings:
                 break
         else:
             raise ValueError("RAG LLM not found")
-        
+
         if LOCAL_MODEL_ONLY:
             if self.__rag_llm.model_name != "local-model":
                 raise ValueError(
                     f"LOCAL_MODEL_ONLY is set to True. {self.__rag_llm.model_name}, is non-local.")
-        
+
     @property
     def inputs(self):
         return self.__inputs
-    
+
     @inputs.setter
     def inputs(self, value):
         if not isinstance(value, list):
             raise ValueError("Inputs must be a list")
-        
+
         if self.database_exists:
             print("Claiming that db exists!")
             print("Skipping input validation")
@@ -345,7 +362,7 @@ class RagSettings:
             print("Claiming that db does not exist!")
             if not any(i for i in value):
                 raise ValueError("RAG mode requires valid string inputs")
-        
+
         if LOCAL_MODEL_ONLY and self.database_exists is False:
             for input in value:
                 if input.startswith("http"):
@@ -356,7 +373,7 @@ class RagSettings:
     @property
     def multivector_enabled(self):
         return self.__multivector_enabled
-    
+
     @multivector_enabled.setter
     def multivector_enabled(self, value):
         if not isinstance(value, bool):
@@ -366,7 +383,7 @@ class RagSettings:
     @property
     def multivector_method(self):
         return self.__multivector_method
-    
+
     @multivector_method.setter
     def multivector_method(self, value):
         if value not in ["summary", "qa"]:
@@ -375,18 +392,26 @@ class RagSettings:
 
     def props(self):
         return self.__dict__
-    
+
     def __str__(self):
         return str(self.props())
-    
+
     def __repr__(self):
         return str(self.props())
-    
+
+
 class ChatSettings:
     """
     Configuration for Chat
     """
-    def __init__(self, primary_model, backup_model, enable_system_message, system_message, rag_mode):
+
+    def __init__(
+            self,
+            primary_model,
+            backup_model,
+            enable_system_message,
+            system_message,
+            rag_mode):
         self.primary_model = primary_model
         self.backup_model = backup_model
         self.enable_system_message = enable_system_message
@@ -396,11 +421,11 @@ class ChatSettings:
         assert self.primary_model is not None, "ChatSettings.primary_model exists must be set"
         assert self.backup_model is not None, "ChatSettings.backup_model exists must be set"
         assert self.system_message is not None, "ChatSettings.system_message exists must be set"
-    
+
     @property
     def primary_model(self):
         return self.__primary_model
-    
+
     @primary_model.setter
     def primary_model(self, value):
         if not value:
@@ -411,21 +436,23 @@ class ChatSettings:
             if value == primary_model_fn_name:
                 if MODEL_DICT[primary_model_fn_name]["model_type"] != "llm":
                     raise ValueError("Primary model must be type llm")
-                self.__primary_model = LLM_FN(MODEL_DICT[primary_model_fn_name]["function"])
-                print(f"Primary model set to {self.__primary_model.model_name}")
+                self.__primary_model = LLM_FN(
+                    MODEL_DICT[primary_model_fn_name]["function"])
+                print(
+                    f"Primary model set to {self.__primary_model.model_name}")
                 break
         else:
             raise ValueError("Primary model not found")
-        
+
         if LOCAL_MODEL_ONLY:
             if self.__primary_model.model_name != "local-model":
                 raise ValueError(
                     f"LOCAL_MODEL_ONLY is set to True. {self.__primary_model.model_name}, is non-local.")
-    
+
     @property
     def backup_model(self):
         return self.__backup_model
-    
+
     @backup_model.setter
     def backup_model(self, value):
         if not value:
@@ -436,21 +463,22 @@ class ChatSettings:
             if value == backup_model_fn_name:
                 if MODEL_DICT[backup_model_fn_name]["model_type"] != "llm":
                     raise ValueError("Backup model must be type llm")
-                self.__backup_model = LLM_FN(MODEL_DICT[backup_model_fn_name]["function"])
+                self.__backup_model = LLM_FN(
+                    MODEL_DICT[backup_model_fn_name]["function"])
                 print(f"Backup model set to {self.__backup_model.model_name}")
                 break
         else:
             raise ValueError("Backup model not found")
-        
+
         if LOCAL_MODEL_ONLY:
             if self.__backup_model.model_name != "local-model":
                 raise ValueError(
                     f"LOCAL_MODEL_ONLY is set to True. {self.__backup_model.model_name}, is non-local.")
-    
+
     @property
     def enable_system_message(self):
         return self.__enable_system_message
-    
+
     @enable_system_message.setter
     def enable_system_message(self, value):
         if not isinstance(value, bool):
@@ -460,7 +488,7 @@ class ChatSettings:
     @property
     def system_message(self):
         return self.__system_message
-    
+
     @system_message.setter
     def system_message(self, value):
         if not value:
@@ -474,22 +502,26 @@ class ChatSettings:
 
     def props(self):
         return self.__dict__
-    
+
     def __str__(self):
         return str(self.props())
-    
+
     def __repr__(self):
         return str(self.props())
-    
+
+
 class Config:
     """
     Configuration class
     """
 
-    def __init__(self, config_file="settings.json", rag_mode: bool | None = None):
+    def __init__(
+            self,
+            config_file="settings.json",
+            rag_mode: bool | None = None):
         config = read_settings(config_file)
 
-        ### NEW IMPLEMENTATION
+        # NEW IMPLEMENTATION
         self.rag_settings = RagSettings(**config["rag_config"])
         self.chat_settings = ChatSettings(**config["chat_config"])
         ###
@@ -521,10 +553,10 @@ class Config:
     #     if chunk_size * k > max_chars:
     #         print(
     #             "Warning: Chunk size * k exceeds model limit. This is expected to cause errors.")
-            # # In the future, throw an error here.
-            # raise ValueError(
-            # f"Chunk size * k exceeds model limit: {chunk_size * k} >
-            # {max_chars}")
+        # # In the future, throw an error here.
+        # raise ValueError(
+        # f"Chunk size * k exceeds model limit: {chunk_size * k} >
+        # {max_chars}")
 
     def __validate_rag_config(self):
         """
@@ -565,13 +597,15 @@ class Config:
     #     if metadata["method"] != self.rag_config["method"]:
     #         self.rag_config["method"] = metadata["method"]
     #         print(
-    #             f"Warning: Method in settings.json has been switched to {self.rag_config['method']} from manifest.json.")
+    # f"Warning: Method in settings.json has been switched to
+    # {self.rag_config['method']} from manifest.json.")
 
     #     manifest_chunk_size = int(metadata["chunk_size"])
     #     if manifest_chunk_size != self.rag_config["chunk_size"]:
     #         self.rag_config["chunk_size"] = manifest_chunk_size
     #         print(
-    #             f"Warning: Chunk size in settings.json has been switched to {manifest_chunk_size} from manifest.json.")
+    # f"Warning: Chunk size in settings.json has been switched to
+    # {manifest_chunk_size} from manifest.json.")
 
     #     manifest_chunk_overlap = int(metadata["chunk_overlap"])
     #     if manifest_chunk_overlap != self.rag_config["chunk_overlap"]:
@@ -605,7 +639,8 @@ class Config:
             # if self.rag_config["rag_mode"]:
             if self.rag_settings.rag_mode:
                 for item in data["databases"]:
-                    # if item["collection_name"] == self.rag_config["collection_name"]:
+                    # if item["collection_name"] ==
+                    # self.rag_config["collection_name"]:
                     if item["collection_name"] == self.rag_settings.collection_name:
                         collection_in_manifest = True
                 # print("Deprecation Warning, database existence is checked in RagSettings")
@@ -623,7 +658,7 @@ class Config:
                 #         self.rag_settings.collection_name,
                 #         self.rag_settings.method):
                 #     self.database_exists = True
-                #     # 
+                #     #
                 #     if collection_in_manifest:
                 #         print("Collection found in vector DB")
                 #         # Adjust rag config to match the collection
@@ -640,8 +675,9 @@ class Config:
                     if collection_in_manifest:
                         print("Vector DB does not exist, removing from manifest.json")
                         data["databases"] = [item for item in data["databases"]
-                                            #  if item["collection_name"] != self.rag_config["collection_name"]]
-                                                if item["collection_name"] != self.rag_settings.collection_name]
+                                             # if item["collection_name"] !=
+                                             # self.rag_config["collection_name"]]
+                                             if item["collection_name"] != self.rag_settings.collection_name]
                         with open("manifest.json", "w") as f:
                             json_dump(data, f, indent=2)
 
@@ -676,29 +712,29 @@ class Config:
 
         self.__validate_rag_config()
         # if LOCAL_MODEL_ONLY:
-            # if self.rag_config["rag_mode"]:
-            #     if self.rag_config["rag_llm"].model_name != "local-model":
-                    # raise ValueError(
-                    #     # f"LOCAL_MODEL_ONLY is set to True. {self.rag_config['rag_llm'].model_name}, is non-local.")
-                    #     f"LOCAL_MODEL_ONLY is set to True. {self.rag_settings.rag_llm.model_name}, is non-local.")
-                # ALLOWED_EMBEDDERS = ["nomic-embed-text", "local-embedding-model"]
-                # if self.rag_config["embedding_model"].model_name not in ALLOWED_EMBEDDERS:
-                #     print(self.rag_config["embedding_model"].model_name)
-            #         raise ValueError(
-            #             "Only local embedder supported is get_nomic_local_embedder (or lmstudio)")
-            # else:
-            #     for model in [
-            #             self.chat_config["primary_model"],
-            #             self.chat_config["backup_model"]]:
-            #         if model.model_name != "local-model":
-            #             raise ValueError(
-            #                 f"LOCAL_MODEL_ONLY is set to True. {model.model_name}, is non-local.")
-            # if self.rag_config["rag_mode"] and self.database_exists is False:
-                # for input in self.rag_config["inputs"]:
-                # for input in self.rag_settings.inputs:
-                #     if input.startswith("http"):
-                #         raise ValueError(
-                #             f"LOCAL_MODEL_ONLY is set to True. '{input}' is non-local.")
+        # if self.rag_config["rag_mode"]:
+        #     if self.rag_config["rag_llm"].model_name != "local-model":
+        # raise ValueError(
+        #     # f"LOCAL_MODEL_ONLY is set to True. {self.rag_config['rag_llm'].model_name}, is non-local.")
+        #     f"LOCAL_MODEL_ONLY is set to True. {self.rag_settings.rag_llm.model_name}, is non-local.")
+        # ALLOWED_EMBEDDERS = ["nomic-embed-text", "local-embedding-model"]
+        # if self.rag_config["embedding_model"].model_name not in ALLOWED_EMBEDDERS:
+        #     print(self.rag_config["embedding_model"].model_name)
+        #         raise ValueError(
+        #             "Only local embedder supported is get_nomic_local_embedder (or lmstudio)")
+        # else:
+        #     for model in [
+        #             self.chat_config["primary_model"],
+        #             self.chat_config["backup_model"]]:
+        #         if model.model_name != "local-model":
+        #             raise ValueError(
+        #                 f"LOCAL_MODEL_ONLY is set to True. {model.model_name}, is non-local.")
+        # if self.rag_config["rag_mode"] and self.database_exists is False:
+        # for input in self.rag_config["inputs"]:
+        # for input in self.rag_settings.inputs:
+        #     if input.startswith("http"):
+        #         raise ValueError(
+        # f"LOCAL_MODEL_ONLY is set to True. '{input}' is non-local.")
 
     def __str__(self):
         return self.props()

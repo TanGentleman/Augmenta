@@ -38,7 +38,8 @@ def loader_from_file_unstructured(filepath: str):
     """
     Load documents from any file, return List[Document]
     """
-    assert filepath.endswith(".pdf"), "Unstructured temporarily only supports PDFs"
+    assert filepath.endswith(
+        ".pdf"), "Unstructured temporarily only supports PDFs"
     LOAD_ELEMENTS = False
     if LOAD_ELEMENTS:
         element_loader = UnstructuredPDFLoader(
@@ -175,7 +176,10 @@ def split_documents(
     return chunked_docs
 
 
-def get_chroma_vectorstore(collection_name: str, embedder: Embedder, exists=False):
+def get_chroma_vectorstore(
+        collection_name: str,
+        embedder: Embedder,
+        exists=False):
     """
     Get a Chroma vectorstore from a collection name, folder is created if it doesn't exist
     """
@@ -204,7 +208,8 @@ def get_chroma_vectorstore_from_docs(
         raise ValueError(
             "Collection not found. Provide documents to create a new collection")
     print('Indexing documents...')
-    vectorstore = get_chroma_vectorstore(collection_name, embedder, exists=False)
+    vectorstore = get_chroma_vectorstore(
+        collection_name, embedder, exists=False)
     vectorstore.add_documents(docs)
     return vectorstore
 
@@ -212,7 +217,8 @@ def get_chroma_vectorstore_from_docs(
 def load_existing_chroma_vectorstore(collection_name, embedder):
     assert database_exists(
         collection_name, "chroma"), "Collection does not exist"
-    vectorstore = get_chroma_vectorstore(collection_name, embedder, exists=True)
+    vectorstore = get_chroma_vectorstore(
+        collection_name, embedder, exists=True)
     # assert there are documents present
     return vectorstore
 

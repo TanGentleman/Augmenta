@@ -32,7 +32,12 @@ except ImportError:
 
 TERMINAL_WIDTH = get_terminal_size().columns
 
-def print_adjusted(text: str, end='\n', flush = False, width=TERMINAL_WIDTH) -> None:
+
+def print_adjusted(
+        text: str,
+        end='\n',
+        flush=False,
+        width=TERMINAL_WIDTH) -> None:
     '''
     Prints text with adjusted line wrapping
     '''
@@ -45,7 +50,6 @@ def print_adjusted(text: str, end='\n', flush = False, width=TERMINAL_WIDTH) -> 
     #         line = wrapped_line
     #     print(line, end=end, flush=flush)
     # Easier method
-   
 
 
 PROCESSING_DOCS_FN = process_docs
@@ -99,10 +103,10 @@ class Chatbot:
     def __init__(self, config=None):
         if config is None:
             config = Config()
-        
+
         # TODO: Migrate filter topic into rag_settings
         self.filter_topic = FILTER_TOPIC
-        
+
         self.config = config
         # self.settings = self.get_chat_settings()
         # self.rag_settings = self.get_rag_settings()
@@ -123,7 +127,8 @@ class Chatbot:
         if self.config.rag_settings.rag_mode:
             self.ingest_documents()
         else:
-            # self.chat_model = self.activate_chat_model()  # This activates the primary model
+            # self.chat_model = self.activate_chat_model()  # This activates
+            # the primary model
             self.chat_model = LLM(self.config.chat_settings.primary_model)
             self.set_starting_messages()
 
@@ -184,7 +189,8 @@ class Chatbot:
         # if self.rag_settings["multivector_enabled"]:
         if self.config.rag_settings.multivector_enabled:
             # doc_ids = get_doc_ids_from_manifest(self.rag_settings["collection_name"])
-            doc_ids = get_doc_ids_from_manifest(self.config.rag_settings.collection_name)
+            doc_ids = get_doc_ids_from_manifest(
+                self.config.rag_settings.collection_name)
             if not doc_ids:
                 raise ValueError("Doc IDs not initialized")
             self.doc_ids = doc_ids
@@ -193,7 +199,8 @@ class Chatbot:
         #     rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE[self.rag_settings["collection_name"]]
         # else:
         #     rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE["default"]
-        collection_code = RAG_COLLECTION_TO_SYSTEM_MESSAGE.get(self.config.rag_settings.collection_name)
+        collection_code = RAG_COLLECTION_TO_SYSTEM_MESSAGE.get(
+            self.config.rag_settings.collection_name)
         if collection_code is None:
             collection_code = "default"
         rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE[collection_code]
@@ -203,7 +210,7 @@ class Chatbot:
             self.rag_model.llm,
             system_message=rag_system_message)
 
-        self.set_starting_messages()            
+        self.set_starting_messages()
         update_manifest(
             embedding_model_name=self.config.rag_settings.embedding_model.model_name,
             method=self.config.rag_settings.method,
@@ -238,7 +245,8 @@ class Chatbot:
 
         # if self.rag_settings["rag_mode"]:
         if self.config.rag_settings.rag_mode:
-            # NOTE: I may have to set self.chat_model = None here. Not sure if it's necessary.
+            # NOTE: I may have to set self.chat_model = None here. Not sure if
+            # it's necessary.
             self.ingest_documents()
         else:
             # self.chat_model = self.activate_chat_model()
@@ -364,7 +372,7 @@ class Chatbot:
 
     def get_vectorstore(
             self,
-            processing_docs_fn = PROCESSING_DOCS_FN) -> Chroma | FAISS:
+            processing_docs_fn=PROCESSING_DOCS_FN) -> Chroma | FAISS:
         # The processing_docs_fn can be used to format or clean up the
         # documents before indexing.
         # assert self.rag_settings["rag_mode"], "RAG mode not enabled"
@@ -376,7 +384,8 @@ class Chatbot:
         method = self.config.rag_settings.method
         embedding_model_fn = self.config.rag_settings.embedding_model
         assert isinstance(embedding_model_fn, LLM_FN)
-        embedder = embedding_model_fn.get_llm() # This is used instead of the LLM object
+        # This is used instead of the LLM object
+        embedder = embedding_model_fn.get_llm()
 
         vectorstore = None
         # inputs = self.rag_settings["inputs"]
@@ -402,10 +411,10 @@ class Chatbot:
                     docs.extend(input_to_docs(inputs[i]))
                 assert docs, "No documents to make parent docs"
                 docs = split_documents(docs,
-                                    #    self.rag_settings["chunk_size"],
-                                    #    self.rag_settings["chunk_overlap"])
-                                        self.config.rag_settings.chunk_size,
-                                        self.config.rag_settings.chunk_overlap)
+                                       #    self.rag_settings["chunk_size"],
+                                       #    self.rag_settings["chunk_overlap"])
+                                       self.config.rag_settings.chunk_size,
+                                       self.config.rag_settings.chunk_overlap)
                 # TODO: assertion to make sure parent docs are
                 # correctly formed
                 self.parent_docs = docs
@@ -429,16 +438,17 @@ class Chatbot:
                 docs.extend(new_docs)
 
             assert docs, "No documents to create collection"
-            if RAG_COLLECTION_TO_SYSTEM_MESSAGE.get(collection_name) == PROMPT_CHOOSER_SYSTEM_MESSAGE:
+            if RAG_COLLECTION_TO_SYSTEM_MESSAGE.get(
+                    collection_name) == PROMPT_CHOOSER_SYSTEM_MESSAGE:
                 # This is for indexing anthropic url prompt library data
                 if processing_docs_fn:
                     print("Prompt chooser detected, processing documents...")
                     docs = processing_docs_fn(docs)
             docs = split_documents(docs,
-                                #    self.rag_settings["chunk_size"],
-                                #    self.rag_settings["chunk_overlap"])
-                                    self.config.rag_settings.chunk_size,
-                                    self.config.rag_settings.chunk_overlap)
+                                   #    self.rag_settings["chunk_size"],
+                                   #    self.rag_settings["chunk_overlap"])
+                                   self.config.rag_settings.chunk_size,
+                                   self.config.rag_settings.chunk_overlap)
             # if self.rag_settings["multivector_enabled"]:
             if self.config.rag_settings.multivector_enabled:
                 # Make sure the parent docs aren't too wordy
@@ -469,9 +479,10 @@ class Chatbot:
         filter = {}
         if self.filter_topic is not None:
             filter = {"topic": self.filter_topic}
-            
+
         # This is a test for similarity search
-        docs = vectorstore.similarity_search(EVAL_QUERY, k = EVAL_K_EXCERPTS, filter=filter)
+        docs = vectorstore.similarity_search(
+            EVAL_QUERY, k=EVAL_K_EXCERPTS, filter=filter)
         # print(docs[0])
         # There should only be one document
         assert len(docs) == 1, "There should be exactly one document"
@@ -482,7 +493,8 @@ class Chatbot:
             source = doc.metadata.get("source")
             topic = doc.metadata.get("topic")
             char_count = doc.metadata.get("char_count")
-            print(f"Document {index} ({source}) ({topic}) ({char_count} chars long)")
+            print(
+                f"Document {index} ({source}) ({topic}) ({char_count} chars long)")
             print_adjusted(doc.page_content)
             print('\n\n')
             if char_count > 2000:
@@ -533,7 +545,8 @@ class Chatbot:
                 byte_store=InMemoryByteStore(),
                 id_key=ID_KEY,
             )
-            multi_retriever.docstore.mset(list(zip(self.doc_ids, self.parent_docs)))
+            multi_retriever.docstore.mset(
+                list(zip(self.doc_ids, self.parent_docs)))
             return multi_retriever
         else:
             retriever = vectorstore.as_retriever(search_kwargs=search_kwargs)
@@ -570,14 +583,16 @@ class Chatbot:
             if self.config.rag_settings.rag_mode:
                 print("Cannot switch models in RAG mode")
                 return
-            assert isinstance(self.chat_model, LLM), "Chat model not initialized"
+            assert isinstance(
+                self.chat_model, LLM), "Chat model not initialized"
             if isinstance(self.backup_model, LLM):
                 self.chat_model, self.backup_model = self.backup_model, self.chat_model
             elif self.backup_model is None:
                 self.backup_model = self.chat_model
                 try:
                     # self.chat_model = self.activate_chat_model(backup=True)
-                    self.chat_model = LLM(self.config.chat_settings.backup_model)
+                    self.chat_model = LLM(
+                        self.config.chat_settings.backup_model)
                     print(
                         f'Switching to backup model {self.chat_model.model_name}')
                     return
@@ -609,15 +624,17 @@ class Chatbot:
             if self.config.rag_settings.rag_mode is False:
                 print(f'Exchanges: {self.count}')
                 if self.config.chat_settings.enable_system_message:
-                    print(f'System message: {self.config.chat_settings.system_message}')
+                    print(
+                        f'System message: {self.config.chat_settings.system_message}')
                 print(f'LLM: {self.chat_model.model_name}')
                 return
             else:
                 # TODO: Make sure important fields are consistent with manifest
                 assert isinstance(
                     self.rag_model, LLM), "RAG LLM not initialized"
-                
-                collection_code = RAG_COLLECTION_TO_SYSTEM_MESSAGE.get(self.config.rag_settings.collection_name)
+
+                collection_code = RAG_COLLECTION_TO_SYSTEM_MESSAGE.get(
+                    self.config.rag_settings.collection_name)
                 if collection_code is None:
                     collection_code = "default"
                 rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE[collection_code]
@@ -629,7 +646,8 @@ class Chatbot:
                     f'Embedding model: {self.config.rag_settings.embedding_model.model_name}')
                 print(f'Method: {self.config.rag_settings.method}')
                 print(f'Chunk size: {self.config.rag_settings.chunk_size}')
-                print(f'Chunk overlap: {self.config.rag_settings.chunk_overlap}')
+                print(
+                    f'Chunk overlap: {self.config.rag_settings.chunk_overlap}')
                 print(
                     f'Excerpts in context: {self.config.rag_settings.k_excerpts}')
                 if self.config.rag_settings.multivector_enabled:
@@ -671,7 +689,8 @@ class Chatbot:
         elif prompt == "rag":
             # if self.rag_settings["rag_mode"]:
             if self.config.rag_settings.rag_mode:
-                print('Already in RAG mode. Type reg to switch back to chat mode, or refresh to reload the configuration')
+                print(
+                    'Already in RAG mode. Type reg to switch back to chat mode, or refresh to reload the configuration')
                 return
             # self.rag_settings["rag_mode"] = True
             self.config.rag_settings.rag_mode = True
@@ -692,7 +711,8 @@ class Chatbot:
             # if self.rag_settings["rag_mode"]:
             if self.config.rag_settings.rag_mode:
                 print('Cannot set system message in RAG mode')
-                # TODO: Implement rag chain with custom system message. Maybe re-make the rag chain?
+                # TODO: Implement rag chain with custom system message. Maybe
+                # re-make the rag chain?
                 return
             user_system_message = input('Enter a new system message: ')
             if not user_system_message:
@@ -753,34 +773,34 @@ class Chatbot:
                 index = input('Enter the index of the exchange to delete: ')
                 if "-" in index:
                     start, end = map(int, index.split("-"))
-                    if start <= 0 or end > len(self.messages)//2:
+                    if start <= 0 or end > len(self.messages) // 2:
                         print('Invalid index range')
                         return
-                    # Adjust for exchange count 
+                    # Adjust for exchange count
                     # if self.settings["enable_system_message"]:
                     if self.config.chat_settings.enable_system_message:
-                        start = (start*2-1)
-                        end = (end*2)
+                        start = (start * 2 - 1)
+                        end = (end * 2)
                     else:
-                        start = (start*2-2)
-                        end = (end*2-1)
-                    for i in range(start, end+1):
+                        start = (start * 2 - 2)
+                        end = (end * 2 - 1)
+                    for i in range(start, end + 1):
                         self.messages.pop(start)
-                        self.count -= i%2
+                        self.count -= i % 2
                     print('Deleted exchanges')
                 else:
                     index = int(index)
-                    if index <= 0 or index > len(self.messages)//2:
+                    if index <= 0 or index > len(self.messages) // 2:
                         if index == 0:
                             print('Cannot delete system message')
                         print('Invalid index')
                         return
-                    # Adjust for exchange count 
+                    # Adjust for exchange count
                     # if self.settings["enable_system_message"]:
                     if self.config.chat_settings.enable_system_message:
-                        index_to_pop = (index*2-1)
+                        index_to_pop = (index * 2 - 1)
                     else:
-                        index_to_pop = (index*2-2) 
+                        index_to_pop = (index * 2 - 2)
                     self.messages.pop(index_to_pop)
                     self.messages.pop(index_to_pop)
                     self.count -= 1
@@ -817,7 +837,8 @@ class Chatbot:
                     print_adjusted(response)
                     response = AIMessage(content=response)
                 else:
-                    assert isinstance(response, AIMessage), "Response not AIMessage"
+                    assert isinstance(
+                        response, AIMessage), "Response not AIMessage"
                     print_adjusted(response.content)
         except KeyboardInterrupt:
             print('Keyboard interrupt, aborting generation.')
@@ -856,7 +877,8 @@ class Chatbot:
                     print_adjusted(response)
                     response = AIMessage(content=response)
                 else:
-                    assert isinstance(response, AIMessage), "Response not AIMessage"
+                    assert isinstance(
+                        response, AIMessage), "Response not AIMessage"
                     print_adjusted(response.content)
 
         except KeyboardInterrupt:
