@@ -104,7 +104,24 @@ $ pip install -r requirements.txt
 
 ### Usage
 
-#### From Source
+#### Setting up the .env file
+
+To run Augmenta, you'll need to set up a `.env` file with the following variables:
+
+* `VECTOR_DB_URL`: the URL of your vector database
+* `LLM_API_KEY`: your API key for the language model
+* `EMBEDDING_MODEL`: the name of the embedding model to use
+
+Create a new file named `.env` in the root of the project directory. Use example-env.env or add the following contents:
+```txt
+OPENAI_API_KEY=""
+TOGETHER_API_KEY=""
+ANTHROPIC_API_KEY=""
+LANGCHAIN_API_KEY=""
+LANGCHAIN_TRACING_V2="true"
+LANGCHAIN_PROJECT="Augmenta"
+```
+Replace the placeholders with your own values. Models set in settings.json will require an API key to authorize with the respective provider, but none are required, as the project can run fully locally using LMStudio or Ollama as a backend inference server.
 
 Run Augmenta using the command below:
 ```console
