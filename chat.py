@@ -1,26 +1,28 @@
 from uuid import uuid4
-from langchain.schema import HumanMessage, SystemMessage
+from langchain.schema import SystemMessage, AIMessage, HumanMessage
 from langchain_community.vectorstores.chroma import Chroma
 from langchain_community.vectorstores.faiss import FAISS
 from langchain_core.vectorstores import VectorStoreRetriever
 from helpers import database_exists, get_db_collection_names, process_docs, get_doc_ids_from_manifest, save_response_to_markdown_file, save_history_to_markdown_file, read_sample, update_manifest
 from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SUMMARY_TEMPLATE, SYSTEM_MESSAGE_CODES
-from config import MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, EXPLAIN_EXCERPT, FILTER_TOPIC
+from config import MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, EXPLAIN_EXCERPT, FILTER_TOPIC, ALLOW_MULTI_VECTOR
 from classes import Config
 from models import LLM_FN, LLM
 from rag import get_summary_chain, input_to_docs, get_rag_chain, get_eval_chain
 from embed import get_chroma_vectorstore_from_docs, get_faiss_vectorstore_from_docs, load_existing_faiss_vectorstore, load_existing_chroma_vectorstore, split_documents
 from langchain_core.documents import Document
-from langchain.retrievers.multi_vector import MultiVectorRetriever
 from langchain.storage import InMemoryByteStore
-from langchain.schema import AIMessage
-
 from os import get_terminal_size
 from textwrap import fill
 try:
     import gnureadline
 except ImportError:
     pass
+
+if ALLOW_MULTI_VECTOR:
+    from langchain.retrievers.multi_vector import MultiVectorRetriever
+else:
+    MultiVectorRetriever = None
 
 try:
     from pyperclip import paste as clipboard_paste, copy as clipboard_copy
@@ -191,7 +193,7 @@ class Chatbot:
             # doc_ids = get_doc_ids_from_manifest(self.rag_settings["collection_name"])
             doc_ids = get_doc_ids_from_manifest(
                 self.config.rag_settings.collection_name)
-            if not doc_ids:
+            if self.config.rag_settings.database_exists and not doc_ids:
                 raise ValueError("Doc IDs not initialized")
             self.doc_ids = doc_ids
         self.retriever = self.get_retriever()
@@ -231,7 +233,10 @@ class Chatbot:
         """
         if config is None:
             # Reload config from settings.json
-            config = Config(rag_mode=self.config.rag_settings.rag_mode)
+            config_override = {}
+            # Use the current rag_mode setting
+            config_override["rag_mode"] = self.config.rag_settings.rag_mode
+            config = Config(config_override=config_override)
         self.config = config
         # self.settings = self.get_chat_settings()
         # self.rag_settings = self.get_rag_settings()
@@ -979,12 +984,32 @@ if __name__ == "__main__":
         '--rag-mode',
         action='store_true',
         help='Enable RAG mode')
+    
+    # Add -i flag for making inputs in the form of a list[str]
+    parser.add_argument(
+        '-i',
+        '--inputs',
+        nargs='+',
+        help='List of inputs for RAG mode')
     args = parser.parse_args()
 
     config_override = {}
     config_override["rag_mode"] = args.rag_mode
-
+    # How can I make sure this typechecks correctly?
+    if args.inputs:
+        config_override["rag_mode"] = True
+        print('Found inputs. RAG mode enabled')
+        assert isinstance(args.inputs, list)
+        assert all(isinstance(i, str) for i in args.inputs)
+        config_override["inputs"] = args.inputs
+    else:
+        config_override["rag_mode"] = args.rag_mode
+    
     config = Config(config_override=config_override)
+    if config.rag_settings.multivector_enabled is True:
+        if MultiVectorRetriever is None:
+            print('MultiVectorRetriever not supported. Check config.py and chat.py.')
+            raise SystemExit
     prompt = args.prompt
 
     persistence_enabled = not args.not_persistent
