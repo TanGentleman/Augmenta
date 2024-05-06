@@ -32,7 +32,6 @@ VALID_EMBEDDER = Literal["get_openai_embedder_large",
                          "get_nomic_local_embedder",
                          "get_lmstudio_local_embedder"]
 
-
 class ManifestSchema(BaseModel):
     """
     Manifest schema
@@ -516,23 +515,51 @@ class Config:
     def __init__(
             self,
             config_file="settings.json",
-            rag_mode: bool | None = None):
+            config_override=None | dict):
+        # assert config file exists
+        assert path.exists(config_file), "Config file not found"
         config = read_settings(config_file)
+
+        rag_mode = None
+        if config_override is not None:
+            override_rag_mode = config_override.get("rag_mode")
+            if override_rag_mode is not None:
+                assert isinstance(override_rag_mode, bool), "rag_mode must be a boolean"
+                rag_mode = override_rag_mode
+                print(f"Rag mode overridden to {rag_mode}")
+            ### Not yet implemented
+            override_rag = config_override.get("rag_config")
+            if override_rag is not None:
+                RagSchema(**override_rag)
+                config["rag_config"] = override_rag
+            override_chat = config_override.get("chat_config")
+            if override_chat is not None:
+                ChatSchema(**override_chat)
+                config["chat_config"] = override_chat
 
         # NEW IMPLEMENTATION
         self.rag_settings = RagSettings(**config["rag_config"])
         self.chat_settings = ChatSettings(**config["chat_config"])
+        
+        HyperparameterSchema(**config["hyperparameters"])
+        self.hyperparameters = config["hyperparameters"]
         ###
 
         # self.database_exists = None
         # self.rag_config = config["rag_config"]
         # self.chat_config = config["chat_config"]
-        self.hyperparameters = config["hyperparameters"]
+        
         if rag_mode is not None:
-            # self.rag_config["rag_mode"] = rag_mode # DEPRECATED
-            # print("deprecation warning: rag_mode should be set in rag_settings")
             self.rag_settings.rag_mode = rag_mode
-        self.__validate_configs()
+            
+        if self.chat_settings.enable_system_message:
+            model_name = self.chat_settings.primary_model.model_name
+            if model_name in SYSTEM_MSG_MAP:
+                self.chat_settings.system_message = SYSTEM_MSG_MAP[model_name]
+                print(f"System message adjusted for model {model_name}.")
+        # self.chat_config["backup_model"] = LLM_FN(backup_model_fn)
+
+        self.__validate_rag_config()
         print("Config initialized.")
 
     ### DEPRECATED ###
@@ -685,7 +712,6 @@ class Config:
         """
         # RagSchema(**self.rag_config)
         # ChatSchema(**self.chat_config)
-        HyperparameterSchema(**self.hyperparameters)
         # Set LLMs
         # rag_llm_fn = MODEL_DICT[self.rag_config["rag_llm"]]["function"]
         # embedder_fn = MODEL_DICT[self.rag_config["embedding_model"]]["function"]

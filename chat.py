@@ -980,7 +980,11 @@ if __name__ == "__main__":
         action='store_true',
         help='Enable RAG mode')
     args = parser.parse_args()
-    config = Config(rag_mode=args.rag_mode)
+
+    config_override = {}
+    config_override["rag_mode"] = args.rag_mode
+
+    config = Config(config_override=config_override)
     prompt = args.prompt
 
     persistence_enabled = not args.not_persistent
@@ -991,10 +995,6 @@ if __name__ == "__main__":
                 excerpt_as_prompt = SUMMARY_TEMPLATE.format(
                     excerpt=excerpt_as_prompt)
             prompt = excerpt_as_prompt
-
-    if args.rag_mode:
-        # config.chat_config["rag_mode"] = True
-        config.chat_settings.rag_mode = True
 
     try:
         chatbot = Chatbot(config)
