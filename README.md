@@ -22,7 +22,9 @@
 
 ## Overview
 
-Augmenta aims to deconstruct RAG (Retrieval-Augmented Generation) tasks. It's quite simple to get started, while being flexible, powerful, and continuously growing with tools that support my daily workflows. This project supports multiple vector databases, numerous LLM and Embedding providers, and includes a fully-offline mode that runs the models locally. For developers, I will continue heading towards minimal useful abstractions to make it easy to scale your chains in complexity and add steps to any workflow to suit your needs.
+Augmenta: Unlock the power of Retrieval-Augmented Generation (RAG) tasks with a flexible, scalable, and easy-to-use framework. Say goodbye to tedious workflows and hello to streamlined productivity.
+
+Under the hood, this project supports multiple vector databases, numerous LLM and Embedding providers, and includes a fully-offline mode that runs the models locally. For developers, I will continue heading towards minimal useful abstractions to make it easy to scale your chains in complexity and add steps to any workflow to suit your needs.
 
 ## Repository Structure
 
@@ -77,17 +79,25 @@ Augmenta aims to deconstruct RAG (Retrieval-Augmented Generation) tasks. It's qu
 
 ### System Requirements:
 
-* **Tested on my Mac on Python**: `version 3.11.7`
+* **Tested on Python**: `version 3.11.7`
 
 ### Installation
 
-#### Install Homebrew
-```console
-/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-```
+Get started with Augmenta in <3 minutes:
 
+1. Clone the repository: `git clone https://github.com/TanGentleman/Augmenta.git`
+2. Install dependencies: `pip install -r requirements.txt`
+3. Create a `.env` file with your API keys
+4. Run Augmenta: `python3 chat.py`
 
-#### From Source
+That's it! You're now ready to start exploring Augmenta's features and capabilities.
+
+#### From Source (Detailed)
+Prequisites:
+1. Python3: This is a pure Python project, so you need to have Python installed on your system. If you don't have Python installed, you can install it your preferred way. For MacOS, I recommend using using Homebrew.
+  - Install Homebrew for MacOS: `/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"`
+  - Install Python3: `brew install python`
+  - Install git: `brew install git`
 
 1. Clone the Augmenta repository:
 ```bash
