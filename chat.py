@@ -327,7 +327,7 @@ class Chatbot:
     #     return rag_settings
 
     def set_doc_ids(self):
-        # assert self.rag_settings["multivector_enabled"], "Multivector not enabled"
+        assert self.config.rag_settings.rag_mode, "RAG mode must be on"
         assert self.config.rag_settings.multivector_enabled, "Multivector not enabled"
         assert self.parent_docs, "Parent docs not initialized"
 
@@ -532,7 +532,7 @@ class Chatbot:
         print('yay!')
         raise SystemExit("Test complete")
 
-    def get_retriever(self) -> MultiVectorRetriever | VectorStoreRetriever:
+    def get_retriever(self) -> MultiVectorRetriever | VectorStoreRetriever: # type: ignore
         vectorstore = self.get_vectorstore()
         # self.run_eval_tests_on_vectorstore(vectorstore)
         search_kwargs = {}
@@ -719,11 +719,15 @@ class Chatbot:
                 # TODO: Implement rag chain with custom system message. Maybe
                 # re-make the rag chain?
                 return
-            user_system_message = input('Enter a new system message: ')
+            # Print the current codes
+            print(f"Available codes:")
+            for k, v in SYSTEM_MESSAGE_CODES.items():
+                print(f"- {k}: {v[:50]}[...]")
+            user_system_message = input('Enter a code or type a system message: ')
             if not user_system_message:
                 print('No input given, try again')
                 return
-            # TODO: Check against SYSTEM_MESSAGE_CODES
+            # Check against SYSTEM_MESSAGE_CODES
             if user_system_message in SYSTEM_MESSAGE_CODES:
                 print("System message code detected")
                 user_system_message = SYSTEM_MESSAGE_CODES[user_system_message]
@@ -739,7 +743,7 @@ class Chatbot:
             # Get collection names from database
             # db_method = self.rag_settings["method"]
             db_method = self.config.rag_settings.method
-            print("Fetching collection names for method: ", db_method)
+            print("Fetching collection names for method:", db_method)
             collection_names = get_db_collection_names(method=db_method)
             # sort collection names
             collection_names.sort()
@@ -1006,7 +1010,7 @@ if __name__ == "__main__":
         config_override["rag_mode"] = args.rag_mode
     
     config = Config(config_override=config_override)
-    if config.rag_settings.multivector_enabled is True:
+    if args.rag_mode and config.rag_settings.multivector_enabled is True:
         if MultiVectorRetriever is None:
             print('MultiVectorRetriever not supported. Check config.py and chat.py.')
             raise SystemExit
