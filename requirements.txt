@@ -3,20 +3,14 @@ langchain_together
 langchain_openai
 langchain-anthropic
 
-pypdf
 faiss-cpu
+chromadb
+
+pypdf
+bs4
+arxiv
+pymupdf
 
 python-dotenv
 pyperclip
 
-bs4
-
-duckduckgo-search
-
-gradio
-chromadb
-
-arxiv
-pymupdf
-
-unstructured[all-docs]
