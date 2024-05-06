@@ -22,7 +22,7 @@
 
 ## Overview
 
-Augmenta is a project that aims to deconstruct RAG (Retrieval-Augmented Generation) tasks. It's flexible, powerful, and packed with cool features under the hood, yet simple to get started. It supports multiple vector databases, numerous LLM and Embedding providers, and includes a fully-offline mode that runs the models locally. Abstractions make it easy to scale your chains in complexity and add steps to any workflow to suit your needs.
+Augmenta aims to deconstruct RAG (Retrieval-Augmented Generation) tasks. It's quite simple to get started, while being flexible, powerful, and continuously growing with tools that support my daily workflows. This project supports multiple vector databases, numerous LLM and Embedding providers, and includes a fully-offline mode that runs the models locally. For developers, I will continue heading towards minimal useful abstractions to make it easy to scale your chains in complexity and add steps to any workflow to suit your needs.
 
 ## Repository Structure
 
@@ -77,40 +77,40 @@ Augmenta is a project that aims to deconstruct RAG (Retrieval-Augmented Generati
 
 ### System Requirements:
 
-* **Tested on Python**: `version 3.11.7`
+* **Tested on my Mac on Python**: `version 3.11.7`
 
 ### Installation
+
+#### Install Homebrew
+```console
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+```
+
 
 #### From Source
 
 1. Clone the Augmenta repository:
-```console
-$ git clone https://github.com/TanGentleman/Augmenta.git
+```bash
+git clone https://github.com/TanGentleman/Augmenta.git
 ```
 2. Enter the project directory (venv activation for Linux/MacOS):
-```console
-$ cd Augmenta
-$ python -m venv .venv
-$ source .venv/bin/activate
+```bash
+cd Augmenta
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 3. If on Windows, activate the venv using:
-```console
-$ .venv\Scripts\activate.bat
+```bash
+.venv\Scripts\activate.bat
 ```
 4. Install the dependencies:
-```console
-$ pip install -r requirements.txt
+```bash
+pip install -r requirements.txt
 ```
 
 ### Usage
 
 #### Setting up the .env file
-
-To run Augmenta, you'll need to set up a `.env` file with the following variables:
-
-* `VECTOR_DB_URL`: the URL of your vector database
-* `LLM_API_KEY`: your API key for the language model
-* `EMBEDDING_MODEL`: the name of the embedding model to use
 
 Create a new file named `.env` in the root of the project directory. Use example-env.env or add the following contents:
 ```txt
@@ -125,18 +125,20 @@ Replace the placeholders with your own values. Models set in settings.json will 
 
 Run Augmenta using the command below:
 ```console
-$ python chat.py
+$ python3 chat.py
 ```
 Optional flags: `-np` (non-persistent), `-rag` (rag mode). Append a prompt to the command to start the chat with a specific prompt. For example, if loading inputs that contain hundreds of receipes, you can quickly get a response saved to response.md without having a persistent chat:
 ```console
-$ python chat.py -rag -np "What are the ingredients I would need for the tacos and enchiladas? Can I get all the ingredients from the local ALDI?"
+$ python3 chat.py -rag -np "What are the ingredients I would need for the tacos and enchiladas? Can I get all the ingredients from the local ALDI?"
 ```
 
 ## Project Roadmap
 
 - [X] `Finally make this README!`
-- [ ] `YAML implementation for settings.json`
-- [ ] `Integration with document ingestion APIs (Vectara, AI21Labs, local Cohere server)`
+- [X] `Implement MultiVectorRetriever workflow from TODO.md`
+- [ ] `Clearer instructions for first-time user` [HIGH]
+- [ ] `YAML implementation for settings.json` [MED]
+- [ ] `Integration with document ingestion APIs (Vectara, AI21Labs, local Cohere server)` [LOW]
 
 ## Contributing
 
