@@ -234,9 +234,9 @@ def get_faiss_vectorstore_from_docs(
     if docs is None:
         raise ValueError(
             "Collection not found. Provide documents to create a new collection")
-    print('Indexing documents...')
     vectorstore = FAISS.from_documents(docs, embedder)
     vectorstore.save_local(filename)
+    print('Vector database saved locally')
     return vectorstore
 
 

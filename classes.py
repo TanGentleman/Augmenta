@@ -258,7 +258,6 @@ class RagSettings:
             if value not in LOCAL_MODELS:
                 raise ValueError(
                     "LOCAL_MODEL_ONLY is set to True. Only local embedders are supported.")
-        # TODO: Check if embedding model matches loaded collection
 
     @property
     def method(self):
@@ -316,21 +315,6 @@ class RagSettings:
             raise ValueError("RAG LLM cannot be empty")
         if not isinstance(value, str):
             raise ValueError("RAG LLM must be a string")
-        # for llm_fn_name in MODEL_DICT.keys():
-        #     if value == llm_fn_name:
-        #         if MODEL_DICT[llm_fn_name]["model_type"] != "llm":
-        #             raise ValueError("RAG LLM must be type llm")
-        #         rag_llm_fn = MODEL_DICT[llm_fn_name]["function"]
-        #         self.__rag_llm = LLM_FN(rag_llm_fn)
-        #         print(f"RAG LLM set to {self.__rag_llm.model_name}")
-        #         # Check context max
-        #         context_max = self.__rag_llm.context_size
-        #         max_chars = context_max * 4
-        #         if self.chunk_size * self.k_excerpts > max_chars:
-        #             print("Warning: Chunk size * k exceeds model limit.")
-        #         break
-        # else:
-        #     raise ValueError("RAG LLM not found")
         if value in MODEL_DICT.keys():
             if MODEL_DICT[value]["model_type"] != "llm":
                 raise ValueError("RAG LLM must be type llm")
@@ -559,7 +543,7 @@ class Config:
             config["chat_config"]["backup_model"] = MODEL_CODES[config["chat_config"]["backup_model"]]
         if config["rag_config"]["rag_llm"] in MODEL_CODES:
             config["rag_config"]["rag_llm"] = MODEL_CODES[config["rag_config"]["rag_llm"]]
-            
+
         self.rag_settings = RagSettings(**config["rag_config"])
         self.chat_settings = ChatSettings(**config["chat_config"])
 
@@ -615,12 +599,12 @@ class Config:
                         print(
                             "Collection found in vector DB, but not in manifest.json")
                 else:
-                    # NOTE: Above is already handled in RagSettings
                     if collection_in_manifest:
+                        # This is when DB is deleted but collection is in
+                        # manifest
                         print("Vector DB does not exist, removing from manifest.json")
+                        # Remove by collection name
                         data["databases"] = [item for item in data["databases"]
-                                             # if item["collection_name"] !=
-                                             # self.rag_config["collection_name"]]
                                              if item["collection_name"] != self.rag_settings.collection_name]
                         with open("manifest.json", "w") as f:
                             json_dump(data, f, indent=2)
@@ -632,7 +616,6 @@ class Config:
         data = {
             "rag_config": self.rag_settings.to_dict(),
             "chat_config": self.chat_settings.to_dict(),
-            "hyperparameters": self.hyperparameters
         }
         with open(filename, "w") as f:
             json_dump(data, f, indent=2)

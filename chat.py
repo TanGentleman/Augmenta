@@ -831,7 +831,7 @@ if __name__ == "__main__":
 
     config_override = {}
     # How can I make sure this typechecks correctly?
-    
+
     config_override["rag_config"] = {}
     config_override["chat_config"] = {}
 
@@ -841,9 +841,10 @@ if __name__ == "__main__":
         # assert all(isinstance(i, str) for i in args.inputs)
         args.rag_mode = True
         config_override["rag_config"]["inputs"] = args.inputs
-    
+
     if args.rag_mode:
-        # This means there is no way to disable rag mode from CLI if set in settings.json
+        # This means there is no way to disable rag mode from CLI if set in
+        # settings.json
         config_override["rag_config"]["rag_mode"] = args.rag_mode
 
     if args.model:
@@ -851,7 +852,6 @@ if __name__ == "__main__":
             config_override["rag_config"]["rag_llm"] = args.model
         else:
             config_override["chat_config"]["primary_model"] = args.model
-
 
     config = Config(config_override=config_override)
     if config.rag_settings.rag_mode and config.rag_settings.multivector_enabled is True:

@@ -34,7 +34,11 @@ RAG_COLLECTION_TO_SYSTEM_MESSAGE = {
     "fixed_reference_nomic_prompt_collection": PROMPT_CHOOSER_SYSTEM_MESSAGE,
 }
 
-LOCAL_MODELS = ["get_ollama_local_model", "get_local_model", "get_ollama_local_embedder", "get_lmstudio_local_embedder"]
+LOCAL_MODELS = [
+    "get_ollama_local_model",
+    "get_local_model",
+    "get_ollama_local_embedder",
+    "get_lmstudio_local_embedder"]
 
 
 DEFAULT_QUERY = '''Name 5 strange vegetables that I am unlikely to see in Western countries.'''

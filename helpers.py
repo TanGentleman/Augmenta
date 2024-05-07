@@ -147,6 +147,7 @@ def format_docs(
                 context_string += summary_string + "\n\n"
         # add source
         source_string = doc.metadata["source"] if "source" in doc.metadata else "Unknown source"
+        # TODO: Websites with gross urls can be snipped
         # in some cases having the page metadata is useful.
         # i currently don't have good a use case aside from creating child docs
         if "page" in doc.metadata:
