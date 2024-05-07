@@ -81,20 +81,18 @@ class Chatbot:
     This class is an interactive RAG-capable chatbot.
 
     Parameters:
-    - config (Config, optional): The configuration object. Defaults to None.
+    - config (Config, optional): The configuration object. Holds ChatSettings and RagSettings.
 
     Attributes:
     - config (Config): The configuration object.
-    - settings (dict): The chat settings. See classes.ChatSchema
-    - rag_settings (dict): The RAG settings. See classes.RAGSchema
     - chat_model (LLM): The chat model.
+    - rag_model (LLM): The RAG model.
     - backup_model (LLM): The backup model.
     - parent_docs (list[Document]): The parent documents.
     - doc_ids (list[str]): The document IDs.
     - rag_chain (Runnable): The RAG chain.
     - retriever (MultiVectorRetriever): The retriever.
     - count (int): How many exchanges (back and forth messages) in history.
-    - rag_mode (bool): If RAG mode is enabled.
     - exit (bool): The exit flag for the chat loop.
     - messages: The message history used in context for non-RAG chat.
 
@@ -110,11 +108,8 @@ class Chatbot:
         self.filter_topic = FILTER_TOPIC
 
         self.config = config
-        # self.settings = self.get_chat_settings()
-        # self.rag_settings = self.get_rag_settings()
         self.chat_model = None
         self.rag_model = None
-        # self.backup_model = self.settings["backup_model"]
         self.backup_model = None
 
         self.parent_docs = None
@@ -125,46 +120,20 @@ class Chatbot:
         self.exit = False
         self.messages = []
 
-        # if self.rag_settings["rag_mode"]:
         if self.config.rag_settings.rag_mode:
             self.ingest_documents()
         else:
-            # self.chat_model = self.activate_chat_model()  # This activates
-            # the primary model
             self.chat_model = LLM(self.config.chat_settings.primary_model)
             self.set_starting_messages()
 
-    # def activate_chat_model(self, backup=False) -> LLM:
-    #     if backup:
-    #         llm_fn = self.settings["backup_model"]
-    #     else:
-    #         llm_fn = self.settings["primary_model"]
-
-    #     if isinstance(llm_fn, LLM):
-    #         print('WARNING: Model already initialized')
-    #         return llm_fn
-    #     assert isinstance(llm_fn, LLM_FN)
-    #     return LLM(llm_fn)
-
-    # def get_rag_model(self) -> LLM:
-    #     if isinstance(self.rag_settings["rag_llm"], LLM):
-    #         print('RAG LLM already initialized')
-    #         return self.rag_settings["rag_llm"]
-    #     llm_fn = self.rag_settings["rag_llm"]
-    #     assert isinstance(llm_fn, LLM_FN)
-    #     return LLM(llm_fn)
-
     def set_starting_messages(self):
         messages = []
-        # if self.rag_settings["rag_mode"]:
         if self.config.rag_settings.rag_mode:
             messages = []
         else:
-            # if self.settings["enable_system_message"]:
             if self.config.chat_settings.enable_system_message:
                 messages.append(
                     SystemMessage(
-                        # content=self.settings["system_message"]))
                         content=self.config.chat_settings.system_message))
             else:
                 print('System message is disabled')
@@ -181,34 +150,21 @@ class Chatbot:
         if self.retriever is not None:
             print('Retriever already exists. Use "refresh" to clear it first')
             return
-        # assert self.rag_settings["rag_mode"], "RAG mode not enabled"
         assert self.config.rag_settings.rag_mode, "RAG mode not enabled"
-        # From this point forward, the rag_llm is of type LLM
-        # self.rag_settings["rag_llm"] = self.get_rag_model()
         self.rag_model = LLM(self.config.rag_settings.rag_llm)
-        # assert isinstance(self.rag_settings["rag_llm"], LLM), "RAG LLM not initialized"
         # get doc_ids
-        # if self.rag_settings["multivector_enabled"]:
         if self.config.rag_settings.multivector_enabled:
-            # doc_ids = get_doc_ids_from_manifest(self.rag_settings["collection_name"])
             doc_ids = get_doc_ids_from_manifest(
                 self.config.rag_settings.collection_name)
             if self.config.rag_settings.database_exists and not doc_ids:
                 raise ValueError("Doc IDs not initialized")
             self.doc_ids = doc_ids
         self.retriever = self.get_retriever()
-        # if self.rag_settings["collection_name"] in RAG_COLLECTION_TO_SYSTEM_MESSAGE:
-        #     rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE[self.rag_settings["collection_name"]]
-        # else:
-        #     rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE["default"]
         collection_code = RAG_COLLECTION_TO_SYSTEM_MESSAGE.get(
-            self.config.rag_settings.collection_name)
-        if collection_code is None:
-            collection_code = "default"
+            self.config.rag_settings.collection_name, "default")
         rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE[collection_code]
         self.rag_chain = get_rag_chain(
             self.retriever,
-            # self.rag_settings["rag_llm"].llm,
             self.rag_model.llm,
             system_message=rag_system_message)
 
@@ -223,6 +179,8 @@ class Chatbot:
             # Afaik, there's no decent way to solve this, but it wouldn't affect a stable version
             collection_name=self.config.rag_settings.collection_name,
             doc_ids=self.doc_ids)
+        # Update active json file
+        self.config.save_to_json()
 
     def refresh_config(self, config: Config | None = None):
         """
@@ -233,98 +191,28 @@ class Chatbot:
         """
         if config is None:
             # Reload config from settings.json
+            # Override with the current rag_mode setting
             config_override = {}
-            # Use the current rag_mode setting
             config_override["rag_mode"] = self.config.rag_settings.rag_mode
             config = Config(config_override=config_override)
         self.config = config
-        # self.settings = self.get_chat_settings()
-        # self.rag_settings = self.get_rag_settings()
-
-        # self.backup_model = self.settings["backup_model"]
         self.backup_model = None
         self.retriever = None
         self.rag_chain = None
         self.doc_ids = []
         self.parent_docs = None
 
-        # if self.rag_settings["rag_mode"]:
         if self.config.rag_settings.rag_mode:
             # NOTE: I may have to set self.chat_model = None here. Not sure if
             # it's necessary.
             self.ingest_documents()
+            self.chat_model = None
+            self.backup_model = None
         else:
-            # self.chat_model = self.activate_chat_model()
             self.chat_model = LLM(self.config.chat_settings.primary_model)
+            self.backup_model = None
             self.set_starting_messages()
             self.count = 0
-
-    ### DEPRECATED ###
-    # def get_chat_settings(self) -> dict[str, bool | str | LLM_FN]:
-    #     """
-    #     Gets the chat settings from the config object.
-
-    #     Returns:
-    #         dict[str, bool | str | LLM_FN]: The chat settings.
-    #     """
-    #     primary_model = self.config.chat_config["primary_model"]
-    #     backup_model = self.config.chat_config["backup_model"]
-    #     enable_system_message = self.config.chat_config["enable_system_message"]
-    #     system_message = self.config.chat_config["system_message"]
-
-    #     assert isinstance(primary_model, LLM_FN)
-    #     assert isinstance(backup_model, LLM_FN)
-    #     assert isinstance(enable_system_message, bool)
-    #     assert isinstance(system_message, str)
-
-    #     chat_settings = {
-    #         "primary_model": primary_model,
-    #         "backup_model": backup_model,
-    #         "enable_system_message": enable_system_message,
-    #         "system_message": system_message
-    #     }
-    #     return chat_settings
-
-    # def get_rag_settings(self):
-    #     rag_mode = self.config.rag_config["rag_mode"]
-    #     collection_name = self.config.rag_config["collection_name"]
-    #     method = self.config.rag_config["method"]
-    #     chunk_size = self.config.rag_config["chunk_size"]
-    #     chunk_overlap = self.config.rag_config["chunk_overlap"]
-    #     k_excerpts = self.config.rag_config["k_excerpts"]
-    #     rag_llm = self.config.rag_config["rag_llm"]
-    #     inputs = self.config.rag_config["inputs"]
-    #     multivector_enabled = self.config.rag_config["multivector_enabled"]
-    #     multivector_method = self.config.rag_config["multivector_method"]
-
-    #     # TODO: Add doc_ids to rag_settings. This will be used for multivector.
-    #     embedding_model = self.config.rag_config["embedding_model"]
-    #     assert isinstance(rag_mode, bool)
-    #     assert isinstance(collection_name, str)
-    #     assert isinstance(embedding_model, LLM_FN)
-    #     assert isinstance(method, str)
-    #     assert isinstance(chunk_size, int)
-    #     assert isinstance(chunk_overlap, int)
-    #     assert isinstance(k_excerpts, int)
-    #     assert isinstance(rag_llm, LLM_FN), "RAG LLM not initialized"
-    #     assert isinstance(inputs, list)
-    #     assert isinstance(multivector_enabled, bool)
-    #     assert isinstance(multivector_method, str)
-
-    #     rag_settings = {
-    #         "rag_mode": rag_mode,
-    #         "collection_name": collection_name,
-    #         "embedding_model": embedding_model,
-    #         "method": method,
-    #         "chunk_size": chunk_size,
-    #         "chunk_overlap": chunk_overlap,
-    #         "k_excerpts": k_excerpts,
-    #         "rag_llm": rag_llm,
-    #         "inputs": inputs,
-    #         "multivector_enabled": multivector_enabled,
-    #         "multivector_method": multivector_method
-    #     }
-    #     return rag_settings
 
     def set_doc_ids(self):
         assert self.config.rag_settings.rag_mode, "RAG mode must be on"
@@ -339,13 +227,10 @@ class Chatbot:
 
     def get_child_docs(self):
         # This function has limits for doc count/size set in constants.py
-        # assert self.rag_settings["multivector_enabled"], "Multivector not enabled"
         assert self.config.rag_settings.multivector_enabled, "Multivector not enabled"
         assert isinstance(
-            # self.rag_settings["rag_llm"], LLM), "RAG LLM not initialized"
             self.rag_model, LLM), "RAG LLM not initialized"
-        # When qa is supported, this will check
-        # self.rag_settings["multivector_method"]
+        # When qa is supported, this will check method
         assert self.parent_docs and len(
             self.parent_docs) < MAX_PARENT_DOCS, "Temporary limit of 8 parent Documents"
         print('Now estimating token usage for child documents')
@@ -358,7 +243,6 @@ class Chatbot:
                     'Document too long, split before making child documents')
         parent_texts = [doc.page_content + '\nsource: ' +
                         doc.metadata["source"] for doc in self.parent_docs]
-        # summarize_chain = get_summary_chain(self.rag_settings["rag_llm"].llm)
         summarize_chain = get_summary_chain(self.rag_model.llm)
         child_texts = summarize_chain.batch(
             parent_texts, {"max_concurrency": 5})
@@ -380,10 +264,6 @@ class Chatbot:
             processing_docs_fn=PROCESSING_DOCS_FN) -> Chroma | FAISS:
         # The processing_docs_fn can be used to format or clean up the
         # documents before indexing.
-        # assert self.rag_settings["rag_mode"], "RAG mode not enabled"
-        # collection_name = self.rag_settings["collection_name"]
-        # method = self.rag_settings["method"]
-        # embedding_model_fn = self.rag_settings["embedding_model"]
         assert self.config.rag_settings.rag_mode, "RAG mode not enabled"
         collection_name = self.config.rag_settings.collection_name
         method = self.config.rag_settings.method
@@ -393,7 +273,6 @@ class Chatbot:
         embedder = embedding_model_fn.get_llm()
 
         vectorstore = None
-        # inputs = self.rag_settings["inputs"]
         inputs = self.config.rag_settings.inputs
         docs = []
         # If collection exists, load it
@@ -406,18 +285,14 @@ class Chatbot:
                 vectorstore = load_existing_faiss_vectorstore(
                     collection_name, embedder)
             assert vectorstore is not None, "Collection exists but not loaded properly"
-            # if self.rag_settings["multivector_enabled"]:
             if self.config.rag_settings.multivector_enabled:
                 for i in range(len(inputs)):
                     if not inputs[i]:
                         print(f'Input {i} is empty, skipping')
                         continue
-                    # docs.extend(input_to_docs(self.rag_settings["inputs"][i]))
                     docs.extend(input_to_docs(inputs[i]))
                 assert docs, "No documents to make parent docs"
                 docs = split_documents(docs,
-                                       #    self.rag_settings["chunk_size"],
-                                       #    self.rag_settings["chunk_overlap"])
                                        self.config.rag_settings.chunk_size,
                                        self.config.rag_settings.chunk_overlap)
                 # TODO: assertion to make sure parent docs are
@@ -450,11 +325,8 @@ class Chatbot:
                     print("Prompt chooser detected, processing documents...")
                     docs = processing_docs_fn(docs)
             docs = split_documents(docs,
-                                   #    self.rag_settings["chunk_size"],
-                                   #    self.rag_settings["chunk_overlap"])
                                    self.config.rag_settings.chunk_size,
                                    self.config.rag_settings.chunk_overlap)
-            # if self.rag_settings["multivector_enabled"]:
             if self.config.rag_settings.multivector_enabled:
                 # Make sure the parent docs aren't too wordy
                 for doc in docs:
@@ -506,7 +378,6 @@ class Chatbot:
                 print(
                     f"Warning: Document {index} ({source}) is {char_count} chars long!")
         # This is a test for evaluation
-        # eval_chain = get_eval_chain(self.rag_settings["rag_llm"].llm)
         assert isinstance(self.rag_model, LLM), "RAG LLM not initialized"
         eval_chain = get_eval_chain(self.rag_model.llm)
         eval_dict = {
@@ -536,12 +407,10 @@ class Chatbot:
         vectorstore = self.get_vectorstore()
         # self.run_eval_tests_on_vectorstore(vectorstore)
         search_kwargs = {}
-        # search_kwargs["k"] = self.rag_settings["k_excerpts"]
         search_kwargs["k"] = self.config.rag_settings.k_excerpts
         if self.filter_topic is not None:
             search_kwargs["filter"] = {'topic': self.filter_topic}
         # search_kwargs["filter"] = {'page': 0}
-        # if self.rag_settings["multivector_enabled"]:
         if self.config.rag_settings.multivector_enabled:
             assert self.parent_docs, "Parent docs not initialized"
             assert self.doc_ids, "Doc IDs not initialized"
@@ -584,7 +453,6 @@ class Chatbot:
             self.exit = True
             return
         elif prompt == "switch":
-            # if self.rag_settings["rag_mode"]:
             if self.config.rag_settings.rag_mode:
                 print("Cannot switch models in RAG mode")
                 return
@@ -595,7 +463,6 @@ class Chatbot:
             elif self.backup_model is None:
                 self.backup_model = self.chat_model
                 try:
-                    # self.chat_model = self.activate_chat_model(backup=True)
                     self.chat_model = LLM(
                         self.config.chat_settings.backup_model)
                     print(
@@ -659,65 +526,31 @@ class Chatbot:
                     print(
                         f'Multivector enabled! Using method: {self.config.rag_settings.multivector_method}')
                 return
-            ### DEPRECATED ###
-            # print(f'RAG mode: {self.rag_settings["rag_mode"]}')
-            # if self.rag_settings["rag_mode"] is False:
-            #     print(f'Exchanges: {self.count}')
-            #     if self.settings["enable_system_message"]:
-            #         print(f'System message: {self.settings["system_message"]}')
-            #     print(f'LLM: {self.chat_model.model_name}')
-            #     return
-            # else:
-            #     # TODO: Make sure important fields are consistent with manifest
-            #     assert isinstance(
-            #         self.rag_settings["rag_llm"], LLM), "RAG LLM not initialized"
-            #     if self.rag_settings["collection_name"] in RAG_COLLECTION_TO_SYSTEM_MESSAGE:
-            #         rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE[
-            #             self.rag_settings["collection_name"]]
-            #     else:
-            #         rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE["default"]
-            #     print(f'System message: {rag_system_message}')
-            #     print(f'RAG LLM: {self.rag_settings["rag_llm"].model_name}')
-            #     print(
-            #         f'Using vectorstore: {self.rag_settings["collection_name"]}')
-            #     print(
-            #         f'Embedding model: {self.rag_settings["embedding_model"].model_name}')
-            #     print(f'Method: {self.rag_settings["method"]}')
-            #     print(f'Chunk size: {self.rag_settings["chunk_size"]}')
-            #     print(f'Chunk overlap: {self.rag_settings["chunk_overlap"]}')
-            #     print(
-            #         f'Excerpts in context: {self.rag_settings["k_excerpts"]}')
-            #     if self.rag_settings["multivector_enabled"]:
-            #         print(
-            #             f'Multivector enabled! Using method: {self.rag_settings["multivector_method"]}')
-            #     return
         elif prompt == "rag":
-            # if self.rag_settings["rag_mode"]:
             if self.config.rag_settings.rag_mode:
                 print(
                     'Already in RAG mode. Type reg to switch back to chat mode, or refresh to reload the configuration')
                 return
-            # self.rag_settings["rag_mode"] = True
             self.config.rag_settings.rag_mode = True
             self.ingest_documents()
             return
         elif prompt == "reg":
-            # Activate chat model (cast to LLM) if needed
-            # self.chat_model = self.activate_chat_model()
-            self.chat_model = LLM(self.config.chat_settings.primary_model)
-            # self.rag_settings["rag_mode"] = False
+            if not self.config.rag_settings.rag_mode:
+                print(
+                    'Already in chat mode. Type rag to switch to RAG mode, or refresh to reload the configuration')
+                return
             self.config.rag_settings.rag_mode = False
+            # NOTE: Reload chat model from settings
+            self.chat_model = LLM(self.config.chat_settings.primary_model)
             # TODO: Check if side effects are necessary here
             self.retriever = None
             self.rag_chain = None
             self.set_starting_messages()
             return
         elif prompt == ".s":
-            # if self.rag_settings["rag_mode"]:
             if self.config.rag_settings.rag_mode:
                 print('Cannot set system message in RAG mode')
-                # TODO: Implement rag chain with custom system message. Maybe
-                # re-make the rag chain?
+                # TODO: Maybe: Implement rag chain with custom system message.
                 return
             # Print the current codes
             print(f"Available codes:")
@@ -731,7 +564,6 @@ class Chatbot:
             if user_system_message in SYSTEM_MESSAGE_CODES:
                 print("System message code detected")
                 user_system_message = SYSTEM_MESSAGE_CODES[user_system_message]
-            # self.settings["system_message"] = user_system_message
             self.config.chat_settings.system_message = user_system_message
             self.messages = [
                 SystemMessage(
@@ -741,7 +573,6 @@ class Chatbot:
             return
         elif prompt == ".names":
             # Get collection names from database
-            # db_method = self.rag_settings["method"]
             db_method = self.config.rag_settings.method
             print("Fetching collection names for method:", db_method)
             collection_names = get_db_collection_names(method=db_method)
@@ -759,7 +590,6 @@ class Chatbot:
                 self.set_clipboard(clipboard_text)
             return
         elif prompt == ".rm":
-            # if self.rag_settings["rag_mode"]:
             if self.config.rag_settings.rag_mode:
                 print('Cannot remove messages in RAG mode')
                 return
@@ -770,7 +600,6 @@ class Chatbot:
             print('Choose an exchange to delete:')
             exchange_count = 0
             for i, message in enumerate(self.messages):
-                # if self.settings["enable_system_message"]:
                 if self.config.chat_settings.enable_system_message:
                     if i % 2 == 1:
                         exchange_count += 1
@@ -786,7 +615,6 @@ class Chatbot:
                         print('Invalid index range')
                         return
                     # Adjust for exchange count
-                    # if self.settings["enable_system_message"]:
                     if self.config.chat_settings.enable_system_message:
                         start = (start * 2 - 1)
                         end = (end * 2)
@@ -805,7 +633,6 @@ class Chatbot:
                         print('Invalid index')
                         return
                     # Adjust for exchange count
-                    # if self.settings["enable_system_message"]:
                     if self.config.chat_settings.enable_system_message:
                         index_to_pop = (index * 2 - 1)
                     else:
@@ -950,7 +777,6 @@ class Chatbot:
                 self.handle_command(prompt)
                 continue
             # Generate response
-            # if self.rag_settings["rag_mode"]:
             if self.config.rag_settings.rag_mode:
                 self.get_rag_response(prompt, stream=True)
             else:
