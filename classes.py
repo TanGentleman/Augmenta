@@ -395,9 +395,6 @@ class RagSettings:
     def __str__(self):
         return str(self.props())
 
-    def __repr__(self):
-        return str(self.props())
-
 
 class ChatSettings:
     """
@@ -503,10 +500,6 @@ class ChatSettings:
     def __str__(self):
         return str(self.props())
 
-    def __repr__(self):
-        return str(self.props())
-
-
 class Config:
     """
     Configuration class
@@ -527,27 +520,26 @@ class Config:
                 assert isinstance(override_rag_mode, bool), "rag_mode must be a boolean"
                 rag_mode = override_rag_mode
                 # print(f"Rag mode overridden to {rag_mode}")
+            override_inputs = config_override.get("inputs")
+            if override_inputs is not None:
+                assert isinstance(override_inputs, list), "inputs must be a list"
+                config["rag_config"]["inputs"] = override_inputs
+                # print(f"Inputs overridden to {override_inputs}")
             ### Not yet implemented
-            override_rag = config_override.get("rag_config")
-            if override_rag is not None:
-                RagSchema(**override_rag)
-                config["rag_config"] = override_rag
-            override_chat = config_override.get("chat_config")
-            if override_chat is not None:
-                ChatSchema(**override_chat)
-                config["chat_config"] = override_chat
+            # override_rag = config_override.get("rag_config")
+            # if override_rag is not None:
+            #     RagSchema(**override_rag)
+            #     config["rag_config"] = override_rag
+            # override_chat = config_override.get("chat_config")
+            # if override_chat is not None:
+            #     ChatSchema(**override_chat)
+            #     config["chat_config"] = override_chat
 
-        # NEW IMPLEMENTATION
         self.rag_settings = RagSettings(**config["rag_config"])
         self.chat_settings = ChatSettings(**config["chat_config"])
         
         HyperparameterSchema(**config["hyperparameters"])
         self.hyperparameters = config["hyperparameters"]
-        ###
-
-        # self.database_exists = None
-        # self.rag_config = config["rag_config"]
-        # self.chat_config = config["chat_config"]
         
         if rag_mode is not None:
             self.rag_settings.rag_mode = rag_mode
@@ -557,31 +549,9 @@ class Config:
             if model_name in SYSTEM_MSG_MAP:
                 self.chat_settings.system_message = SYSTEM_MSG_MAP[model_name]
                 print(f"System message adjusted for model {model_name}.")
-        # self.chat_config["backup_model"] = LLM_FN(backup_model_fn)
 
         self.__validate_rag_config()
         print("Config initialized.")
-
-    ### DEPRECATED ###
-    # def __check_context_max(self):
-    #     """
-    #     Validate the context maxes
-    #     """
-    #     print("DEPRECATED: __check_context_max. RagSettings now handles this.")
-    #     rag_llm = self.rag_config["rag_llm"]
-    #     assert isinstance(rag_llm, LLM_FN), "Rag LLM must be type LLM_FN"
-    #     context_max = rag_llm.context_size
-    #     chunk_size = self.rag_config["chunk_size"]
-    #     k = self.rag_config["k_excerpts"]
-    #     # get context length of the model. For now, 128K to not throw errors
-    #     max_chars = context_max * 4
-    #     if chunk_size * k > max_chars:
-    #         print(
-    #             "Warning: Chunk size * k exceeds model limit. This is expected to cause errors.")
-        # # In the future, throw an error here.
-        # raise ValueError(
-        # f"Chunk size * k exceeds model limit: {chunk_size * k} >
-        # {max_chars}")
 
     def __validate_rag_config(self):
         """
@@ -594,61 +564,8 @@ class Config:
                 # Make databases key
                 f.write('{"databases": []}')
 
-        # if self.rag_config["rag_mode"]:
-        #     self.__check_rag_files()
         if self.rag_settings.rag_mode:
             self.__check_rag_files()
-        # self.__check_context_max()
-
-    # def __adjust_rag_config(self, metadata: dict):
-    #     """
-    #     Adjust the rag_config based on the metadata from manifest.json
-    #     """
-    #     # assert self.rag_config["rag_mode"] is True, "RAG mode must be enabled"
-    #     assert self.rag_settings.rag_mode, "RAG mode must be enabled"
-    #     # This step is potentially destructive! Be careful here.
-    #     # if metadata["embedding_model"] != self.rag_config["embedding_model"].model_name:
-    #     if metadata["embedding_model"] != self.rag_settings.embedding_model.model_name:
-    #         embedder_fn = None
-    #         for model in MODEL_DICT.keys():
-    #             if MODEL_DICT[model]["model_name"] == metadata["embedding_model"]:
-    #                 embedder_fn = MODEL_DICT[model]["function"]
-    #                 embedder_fn = LLM_FN(embedder_fn)
-    #                 break
-    #         assert embedder_fn is not None, "Embedder not found"
-    #         self.rag_config["embedding_model"] = embedder_fn
-    #         print(
-    #             f"Warning: Embedding model in settings.json switched to {embedder_fn.model_name} from manifest.json.")
-    #     if metadata["method"] != self.rag_config["method"]:
-    #         self.rag_config["method"] = metadata["method"]
-    #         print(
-    # f"Warning: Method in settings.json has been switched to
-    # {self.rag_config['method']} from manifest.json.")
-
-    #     manifest_chunk_size = int(metadata["chunk_size"])
-    #     if manifest_chunk_size != self.rag_config["chunk_size"]:
-    #         self.rag_config["chunk_size"] = manifest_chunk_size
-    #         print(
-    # f"Warning: Chunk size in settings.json has been switched to
-    # {manifest_chunk_size} from manifest.json.")
-
-    #     manifest_chunk_overlap = int(metadata["chunk_overlap"])
-    #     if manifest_chunk_overlap != self.rag_config["chunk_overlap"]:
-    #         self.rag_config["chunk_overlap"] = manifest_chunk_overlap
-    #         print(
-    #             f"Warning: Chunk overlap in settings.json has been switched to {manifest_chunk_overlap} from manifest.json.")
-    #     if metadata["inputs"] != self.rag_config["inputs"]:
-    #         self.rag_config["inputs"] = metadata["inputs"]
-    #         print("Warning: Inputs loaded from manifest.json.")
-    #     if self.rag_config["multivector_enabled"] is True:
-    #         if not metadata["doc_ids"]:
-    #             raise ValueError(
-    #                 "Multivector enabled but no doc_ids in manifest")
-    #     else:
-    #         if metadata["doc_ids"]:
-    #             print("Multivector disabled but doc_ids in manifest")
-    #             print("Warning: Enabling multivector.")
-    #             self.rag_config["multivector_enabled"] = True
 
     def __check_rag_files(self):
         """
@@ -661,14 +578,10 @@ class Config:
             data = json_load(f)
             assert "databases" in data, "databases key not found in manifest.json"
             collection_in_manifest = False
-            # if self.rag_config["rag_mode"]:
             if self.rag_settings.rag_mode:
                 for item in data["databases"]:
-                    # if item["collection_name"] ==
-                    # self.rag_config["collection_name"]:
                     if item["collection_name"] == self.rag_settings.collection_name:
                         collection_in_manifest = True
-                # print("Deprecation Warning, database existence is checked in RagSettings")
                 if self.rag_settings.database_exists:
                     if collection_in_manifest:
                         print("Collection found in vector DB")
@@ -677,25 +590,7 @@ class Config:
                     else:
                         print(
                             "Collection found in vector DB, but not in manifest.json")
-                # if database_exists(
-                #         # self.rag_config["collection_name"],
-                #         # self.rag_config["method"]):
-                #         self.rag_settings.collection_name,
-                #         self.rag_settings.method):
-                #     self.database_exists = True
-                #     #
-                #     if collection_in_manifest:
-                #         print("Collection found in vector DB")
-                #         # Adjust rag config to match the collection
-                #         self.__adjust_rag_config(item["metadata"])
-
-                #     else:
-                #         print(
-                #             "Collection found in vector DB, but not in manifest.json")
                 else:
-                    # if not any(i for i in self.rag_config["inputs"]):
-                    #     raise ValueError("RAG mode requires inputs")
-                    # self.database_exists = False
                     # NOTE: Above is already handled in RagSettings
                     if collection_in_manifest:
                         print("Vector DB does not exist, removing from manifest.json")
@@ -705,60 +600,6 @@ class Config:
                                              if item["collection_name"] != self.rag_settings.collection_name]
                         with open("manifest.json", "w") as f:
                             json_dump(data, f, indent=2)
-
-    def __validate_configs(self):
-        """
-        Validate the configuration
-        """
-        # RagSchema(**self.rag_config)
-        # ChatSchema(**self.chat_config)
-        # Set LLMs
-        # rag_llm_fn = MODEL_DICT[self.rag_config["rag_llm"]]["function"]
-        # embedder_fn = MODEL_DICT[self.rag_config["embedding_model"]]["function"]
-
-        # primary_model_fn = MODEL_DICT[self.chat_config["primary_model"]]["function"]
-        # backup_model_fn = MODEL_DICT[self.chat_config["backup_model"]]["function"]
-
-        # self.rag_config["rag_llm"] = LLM_FN(rag_llm_fn)
-        # self.rag_config["embedding_model"] = LLM_FN(embedder_fn)
-
-        # self.chat_config["primary_model"] = LLM_FN(primary_model_fn)
-        # Set system message based on primary model
-        # if self.chat_config["enable_system_message"]:
-        if self.chat_settings.enable_system_message:
-            # model_name = self.chat_config["primary_model"].model_name
-            model_name = self.chat_settings.primary_model.model_name
-            if model_name in SYSTEM_MSG_MAP:
-                # self.chat_config["system_message"] = SYSTEM_MSG_MAP[model_name]
-                self.chat_settings.system_message = SYSTEM_MSG_MAP[model_name]
-                print(f"System message adjusted for model {model_name}.")
-        # self.chat_config["backup_model"] = LLM_FN(backup_model_fn)
-
-        self.__validate_rag_config()
-        # if LOCAL_MODEL_ONLY:
-        # if self.rag_config["rag_mode"]:
-        #     if self.rag_config["rag_llm"].model_name != "local-model":
-        # raise ValueError(
-        #     # f"LOCAL_MODEL_ONLY is set to True. {self.rag_config['rag_llm'].model_name}, is non-local.")
-        #     f"LOCAL_MODEL_ONLY is set to True. {self.rag_settings.rag_llm.model_name}, is non-local.")
-        # ALLOWED_EMBEDDERS = ["nomic-embed-text", "local-embedding-model"]
-        # if self.rag_config["embedding_model"].model_name not in ALLOWED_EMBEDDERS:
-        #     print(self.rag_config["embedding_model"].model_name)
-        #         raise ValueError(
-        #             "Only local embedder supported is get_ollama_local_embedder (or lmstudio)")
-        # else:
-        #     for model in [
-        #             self.chat_config["primary_model"],
-        #             self.chat_config["backup_model"]]:
-        #         if model.model_name != "local-model":
-        #             raise ValueError(
-        #                 f"LOCAL_MODEL_ONLY is set to True. {model.model_name}, is non-local.")
-        # if self.rag_config["rag_mode"] and self.database_exists is False:
-        # for input in self.rag_config["inputs"]:
-        # for input in self.rag_settings.inputs:
-        #     if input.startswith("http"):
-        #         raise ValueError(
-        # f"LOCAL_MODEL_ONLY is set to True. '{input}' is non-local.")
 
     def __str__(self):
         return self.props()
@@ -772,13 +613,10 @@ class Config:
         """
         rag_config_str = "\n".join(
             f"{k}: {v}" for k,
-            # v in self.rag_config.items())
             v in self.rag_settings.props().items())
         chat_config_str = "\n".join(
             f"{k}: {v}" for k,
-            # v in self.chat_config.items())
             v in self.chat_settings.props().items())
         hyperparameters_str = "\n".join(
             f"{k}: {v}" for k, v in self.hyperparameters.items())
-
         return f"Rag Config:\n{rag_config_str}\n\nChat Config:\n{chat_config_str}\n\nHyperparameters:\n{hyperparameters_str}"
