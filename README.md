@@ -22,9 +22,11 @@
 
 ## Overview
 
-Augmenta: Unlock the power of Retrieval-Augmented Generation (RAG) tasks with a flexible, scalable, and easy-to-use framework. Say goodbye to tedious workflows and hello to streamlined productivity.
+Augmenta is a powerful and flexible framework that simplifies the process of building Retrieval-Augmented Generation (RAG) workflows. The configuration supports multiple vector databases, LLM providers, and embedding models into your projects, enabling you to create sophisticated and efficient RAG tasks with minimal effort.
 
-Under the hood, this project supports multiple vector databases, numerous LLM and Embedding providers, and includes a fully-offline mode that runs the models locally. For developers, I will continue heading towards minimal useful abstractions to make it easy to scale your chains in complexity and add steps to any workflow to suit your needs.
+One of the key features of Augmenta is its fully-offline mode, which allows you to run the models locally without relying on external services. This is huge for developers who prioritize data privacy and control over their workflows.
+
+Augmenta provides a set of minimal yet useful abstractions that make it easy to scale your chains in complexity and add custom steps to any workflow. For a quick chatbot, a question-answering system for your documents, or scaled up applications that require retrieval and generation capabilities, Augmenta has you covered.
 
 ## Repository Structure
 
@@ -134,12 +136,12 @@ LANGCHAIN_PROJECT="Augmenta"
 Replace the placeholders with your own values. Models set in settings.json will require an API key to authorize with the respective provider, but none are required, as the project can run fully locally using LMStudio or Ollama as a backend inference server.
 
 Run Augmenta using the command below:
-```console
-$ python3 chat.py
+```bash
+python3 chat.py
 ```
 Optional flags: `-np` (non-persistent), `-rag` (rag mode). Append a prompt to the command to start the chat with a specific prompt. For example, if loading inputs that contain hundreds of receipes, you can quickly get a response saved to response.md without having a persistent chat:
-```console
-$ python3 chat.py -rag -np "What are the ingredients I would need for the tacos and enchiladas? Can I get all the ingredients from the local ALDI?"
+```bash
+python3 chat.py -rag -np "What are the ingredients I would need for the tacos and enchiladas? Can I get all the ingredients from the local ALDI?"
 ```
 
 ## Project Roadmap
