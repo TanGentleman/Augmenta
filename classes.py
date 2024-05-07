@@ -9,6 +9,8 @@ from models import LLM_FN, MODEL_DICT
 from os import path, mkdir
 from json import load as json_load, dump as json_dump
 
+ACTIVE_JSON_FILE = "active.json"
+
 VALID_LLM = Literal[
     "get_openai_gpt4",
     "get_together_dolphin",
@@ -389,8 +391,26 @@ class RagSettings:
             raise ValueError("Multivector method must be 'summary' or 'qa'")
         self.__multivector_method = value
 
+    def to_dict(self):
+        if not self.rag_mode:
+            return {"rag_mode": False}
+        data = {
+            "rag_mode": self.rag_mode,
+            "collection_name": self.collection_name,
+            "embedding_model": self.embedding_model.model_name,
+            "method": self.method,
+            "chunk_size": self.chunk_size,
+            "chunk_overlap": self.chunk_overlap,
+            "k_excerpts": self.k_excerpts,
+            "rag_llm": self.rag_llm.model_name,
+            "inputs": self.inputs,
+            "multivector_enabled": self.multivector_enabled,
+            "multivector_method": self.multivector_method
+        }
+        return data
+
     def props(self):
-        return self.__dict__
+        return self.to_dict()
 
     def __str__(self):
         return str(self.props())
@@ -494,8 +514,17 @@ class ChatSettings:
         print(f"Config INFO: System message set to {value}")
         self.__system_message = value
 
+    def to_dict(self):
+        data = {
+            "primary_model": self.primary_model.model_name,
+            "backup_model": self.backup_model.model_name,
+            "enable_system_message": self.enable_system_message,
+            "system_message": self.system_message
+        }
+        return data
+
     def props(self):
-        return self.__dict__
+        return self.to_dict()
 
     def __str__(self):
         return str(self.props())
@@ -551,7 +580,9 @@ class Config:
                 print(f"System message adjusted for model {model_name}.")
 
         self.__validate_rag_config()
-        print("Config initialized.")
+        # print(self)
+        self.save_to_json()
+        print(f"Config initialized and set in {ACTIVE_JSON_FILE}.")
 
     def __validate_rag_config(self):
         """
@@ -600,6 +631,18 @@ class Config:
                                              if item["collection_name"] != self.rag_settings.collection_name]
                         with open("manifest.json", "w") as f:
                             json_dump(data, f, indent=2)
+
+    def save_to_json(self, filename=ACTIVE_JSON_FILE):
+        """
+        Save the current config to a JSON file
+        """
+        data = {
+                "rag_config": self.rag_settings.to_dict(),
+                "chat_config": self.chat_settings.to_dict(),
+                "hyperparameters": self.hyperparameters
+        }
+        with open (filename, "w") as f:
+            json_dump(data, f, indent=2)
 
     def __str__(self):
         return self.props()
