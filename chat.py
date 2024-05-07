@@ -403,7 +403,7 @@ class Chatbot:
         print('yay!')
         raise SystemExit("Test complete")
 
-    def get_retriever(self) -> MultiVectorRetriever | VectorStoreRetriever: # type: ignore
+    def get_retriever(self) -> MultiVectorRetriever | VectorStoreRetriever:  # type: ignore
         vectorstore = self.get_vectorstore()
         # self.run_eval_tests_on_vectorstore(vectorstore)
         search_kwargs = {}
@@ -556,7 +556,8 @@ class Chatbot:
             print(f"Available codes:")
             for k, v in SYSTEM_MESSAGE_CODES.items():
                 print(f"- {k}: {v[:50]}[...]")
-            user_system_message = input('Enter a code or type a system message: ')
+            user_system_message = input(
+                'Enter a code or type a system message: ')
             if not user_system_message:
                 print('No input given, try again')
                 return
@@ -814,7 +815,7 @@ if __name__ == "__main__":
         '--rag-mode',
         action='store_true',
         help='Enable RAG mode')
-    
+
     # Add -i flag for making inputs in the form of a list[str]
     parser.add_argument(
         '-i',
@@ -834,7 +835,7 @@ if __name__ == "__main__":
         config_override["inputs"] = args.inputs
     else:
         config_override["rag_mode"] = args.rag_mode
-    
+
     config = Config(config_override=config_override)
     if args.rag_mode and config.rag_settings.multivector_enabled is True:
         if MultiVectorRetriever is None:

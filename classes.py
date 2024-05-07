@@ -34,6 +34,7 @@ VALID_EMBEDDER = Literal["get_openai_embedder_large",
                          "get_ollama_local_embedder",
                          "get_lmstudio_local_embedder"]
 
+
 class ManifestSchema(BaseModel):
     """
     Manifest schema
@@ -529,6 +530,7 @@ class ChatSettings:
     def __str__(self):
         return str(self.props())
 
+
 class Config:
     """
     Configuration class
@@ -546,15 +548,17 @@ class Config:
         if config_override is not None:
             override_rag_mode = config_override.get("rag_mode")
             if override_rag_mode is not None:
-                assert isinstance(override_rag_mode, bool), "rag_mode must be a boolean"
+                assert isinstance(
+                    override_rag_mode, bool), "rag_mode must be a boolean"
                 rag_mode = override_rag_mode
                 # print(f"Rag mode overridden to {rag_mode}")
             override_inputs = config_override.get("inputs")
             if override_inputs is not None:
-                assert isinstance(override_inputs, list), "inputs must be a list"
+                assert isinstance(
+                    override_inputs, list), "inputs must be a list"
                 config["rag_config"]["inputs"] = override_inputs
                 # print(f"Inputs overridden to {override_inputs}")
-            ### Not yet implemented
+            # Not yet implemented
             # override_rag = config_override.get("rag_config")
             # if override_rag is not None:
             #     RagSchema(**override_rag)
@@ -566,13 +570,13 @@ class Config:
 
         self.rag_settings = RagSettings(**config["rag_config"])
         self.chat_settings = ChatSettings(**config["chat_config"])
-        
+
         HyperparameterSchema(**config["hyperparameters"])
         self.hyperparameters = config["hyperparameters"]
-        
+
         if rag_mode is not None:
             self.rag_settings.rag_mode = rag_mode
-            
+
         if self.chat_settings.enable_system_message:
             model_name = self.chat_settings.primary_model.model_name
             if model_name in SYSTEM_MSG_MAP:
@@ -637,11 +641,11 @@ class Config:
         Save the current config to a JSON file
         """
         data = {
-                "rag_config": self.rag_settings.to_dict(),
-                "chat_config": self.chat_settings.to_dict(),
-                "hyperparameters": self.hyperparameters
+            "rag_config": self.rag_settings.to_dict(),
+            "chat_config": self.chat_settings.to_dict(),
+            "hyperparameters": self.hyperparameters
         }
-        with open (filename, "w") as f:
+        with open(filename, "w") as f:
             json_dump(data, f, indent=2)
 
     def __str__(self):
