@@ -1,5 +1,5 @@
 from config import LOCAL_MODEL_ONLY, SYSTEM_MSG_MAP
-from constants import SYSTEM_MESSAGE_CODES
+from constants import LOCAL_MODELS, MODEL_CODES, SYSTEM_MESSAGE_CODES
 from helpers import database_exists, read_settings
 # use pydantic to enforce Config schema
 from typing import Literal
@@ -89,22 +89,12 @@ class RagSettings:
 
     def __init__(self, **kwargs):
         self.__config = RagSchema(**kwargs)
-        self._rag_mode = False
         # TODO: Expose more attributes
-
         if self.__config.rag_mode:
-            self.__rag_mode = True
-            self.__enable_rag_mode(
-                self.__config.collection_name,
-                self.__config.embedding_model,
-                self.__config.method,
-                self.__config.chunk_size,
-                self.__config.chunk_overlap,
-                self.__config.k_excerpts,
-                self.__config.rag_llm,
-                self.__config.inputs,
-                self.__config.multivector_enabled,
-                self.__config.multivector_method)
+            self.rag_mode = True
+            # The other attributes are ONLY set if RAG mode is enabled
+        else:
+            self.rag_mode = False
 
     def __enable_rag_mode(
             self,
@@ -265,8 +255,7 @@ class RagSettings:
             raise ValueError("Embedding model not found")
 
         if LOCAL_MODEL_ONLY:
-            ALLOWED_EMBEDDERS = ["nomic-embed-text", "local-embedding-model"]
-            if self.__embedding_model.model_name not in ALLOWED_EMBEDDERS:
+            if value not in LOCAL_MODELS:
                 raise ValueError(
                     "LOCAL_MODEL_ONLY is set to True. Only local embedders are supported.")
         # TODO: Check if embedding model matches loaded collection
@@ -327,24 +316,36 @@ class RagSettings:
             raise ValueError("RAG LLM cannot be empty")
         if not isinstance(value, str):
             raise ValueError("RAG LLM must be a string")
-        for llm_fn_name in MODEL_DICT.keys():
-            if value == llm_fn_name:
-                if MODEL_DICT[llm_fn_name]["model_type"] != "llm":
-                    raise ValueError("RAG LLM must be type llm")
-                rag_llm_fn = MODEL_DICT[llm_fn_name]["function"]
-                self.__rag_llm = LLM_FN(rag_llm_fn)
-                print(f"RAG LLM set to {self.__rag_llm.model_name}")
-                # Check context max
-                context_max = self.__rag_llm.context_size
-                max_chars = context_max * 4
-                if self.chunk_size * self.k_excerpts > max_chars:
-                    print("Warning: Chunk size * k exceeds model limit.")
-                break
+        # for llm_fn_name in MODEL_DICT.keys():
+        #     if value == llm_fn_name:
+        #         if MODEL_DICT[llm_fn_name]["model_type"] != "llm":
+        #             raise ValueError("RAG LLM must be type llm")
+        #         rag_llm_fn = MODEL_DICT[llm_fn_name]["function"]
+        #         self.__rag_llm = LLM_FN(rag_llm_fn)
+        #         print(f"RAG LLM set to {self.__rag_llm.model_name}")
+        #         # Check context max
+        #         context_max = self.__rag_llm.context_size
+        #         max_chars = context_max * 4
+        #         if self.chunk_size * self.k_excerpts > max_chars:
+        #             print("Warning: Chunk size * k exceeds model limit.")
+        #         break
+        # else:
+        #     raise ValueError("RAG LLM not found")
+        if value in MODEL_DICT.keys():
+            if MODEL_DICT[value]["model_type"] != "llm":
+                raise ValueError("RAG LLM must be type llm")
+            self.__rag_llm = LLM_FN(MODEL_DICT[value]["function"])
+            print(f"RAG LLM set to {self.__rag_llm.model_name}")
         else:
             raise ValueError("RAG LLM not found")
+        # Check context max
+        context_max = self.__rag_llm.context_size
+        max_chars = context_max * 4
+        if self.chunk_size * self.k_excerpts > max_chars:
+            print("Warning: Chunk size * k exceeds model limit.")
 
         if LOCAL_MODEL_ONLY:
-            if self.__rag_llm.model_name != "local-model":
+            if value not in LOCAL_MODELS:
                 raise ValueError(
                     f"LOCAL_MODEL_ONLY is set to True. {self.__rag_llm.model_name}, is non-local.")
 
@@ -358,10 +359,9 @@ class RagSettings:
             raise ValueError("Inputs must be a list")
 
         if self.database_exists:
-            print("Claiming that db exists!")
-            print("Skipping input validation")
+            print("Vector DB exists, not validating inputs!")
         else:
-            print("Claiming that db does not exist!")
+            print("Vector DB does not exist!")
             if not any(i for i in value):
                 raise ValueError("RAG mode requires valid string inputs")
 
@@ -447,20 +447,17 @@ class ChatSettings:
             raise ValueError("Primary model cannot be empty")
         if not isinstance(value, str):
             raise ValueError("Primary model must be a string")
-        for primary_model_fn_name in MODEL_DICT.keys():
-            if value == primary_model_fn_name:
-                if MODEL_DICT[primary_model_fn_name]["model_type"] != "llm":
-                    raise ValueError("Primary model must be type llm")
-                self.__primary_model = LLM_FN(
-                    MODEL_DICT[primary_model_fn_name]["function"])
-                print(
-                    f"Primary model set to {self.__primary_model.model_name}")
-                break
+        if value in MODEL_DICT.keys():
+            if MODEL_DICT[value]["model_type"] != "llm":
+                raise ValueError("Primary model must be type llm")
+            self.__primary_model = LLM_FN(MODEL_DICT[value]["function"])
+            print(
+                f"Primary model set to {self.__primary_model.model_name}")
         else:
             raise ValueError("Primary model not found")
 
         if LOCAL_MODEL_ONLY:
-            if self.__primary_model.model_name != "local-model":
+            if value not in LOCAL_MODELS:
                 raise ValueError(
                     f"LOCAL_MODEL_ONLY is set to True. {self.__primary_model.model_name}, is non-local.")
 
@@ -474,19 +471,15 @@ class ChatSettings:
             raise ValueError("Backup model cannot be empty")
         if not isinstance(value, str):
             raise ValueError("Backup model must be a string")
-        for backup_model_fn_name in MODEL_DICT.keys():
-            if value == backup_model_fn_name:
-                if MODEL_DICT[backup_model_fn_name]["model_type"] != "llm":
-                    raise ValueError("Backup model must be type llm")
-                self.__backup_model = LLM_FN(
-                    MODEL_DICT[backup_model_fn_name]["function"])
-                print(f"Backup model set to {self.__backup_model.model_name}")
-                break
-        else:
-            raise ValueError("Backup model not found")
+        if value in MODEL_DICT.keys():
+            if MODEL_DICT[value]["model_type"] != "llm":
+                raise ValueError("Backup model must be type llm")
+            self.__backup_model = LLM_FN(MODEL_DICT[value]["function"])
+            print(
+                f"Backup model set to {self.__backup_model.model_name}")
 
         if LOCAL_MODEL_ONLY:
-            if self.__backup_model.model_name != "local-model":
+            if value not in LOCAL_MODELS:
                 raise ValueError(
                     f"LOCAL_MODEL_ONLY is set to True. {self.__backup_model.model_name}, is non-local.")
 
@@ -544,38 +537,34 @@ class Config:
         assert path.exists(config_file), "Config file not found"
         config = read_settings(config_file)
 
-        rag_mode = None
         if config_override is not None:
-            override_rag_mode = config_override.get("rag_mode")
-            if override_rag_mode is not None:
-                assert isinstance(
-                    override_rag_mode, bool), "rag_mode must be a boolean"
-                rag_mode = override_rag_mode
-                # print(f"Rag mode overridden to {rag_mode}")
-            override_inputs = config_override.get("inputs")
-            if override_inputs is not None:
-                assert isinstance(
-                    override_inputs, list), "inputs must be a list"
-                config["rag_config"]["inputs"] = override_inputs
-                # print(f"Inputs overridden to {override_inputs}")
-            # Not yet implemented
-            # override_rag = config_override.get("rag_config")
-            # if override_rag is not None:
-            #     RagSchema(**override_rag)
-            #     config["rag_config"] = override_rag
-            # override_chat = config_override.get("chat_config")
-            # if override_chat is not None:
-            #     ChatSchema(**override_chat)
-            #     config["chat_config"] = override_chat
-
+            if "rag_config" in config_override:
+                for key in config_override["rag_config"]:
+                    if key in config["rag_config"]:
+                        config["rag_config"][key] = config_override["rag_config"][key]
+                        print(f"Rag config key {key} overridden")
+                    else:
+                        raise ValueError(f"Key {key} not found in rag_config")
+            if "chat_config" in config_override:
+                for key in config_override["chat_config"]:
+                    if key in config["chat_config"]:
+                        config["chat_config"][key] = config_override["chat_config"][key]
+                        print(f"Chat config key {key} overridden")
+                    else:
+                        raise ValueError(f"Key {key} not found in chat_config")
+        # Replace the LLM codes with the function name
+        if config["chat_config"]["primary_model"] in MODEL_CODES:
+            config["chat_config"]["primary_model"] = MODEL_CODES[config["chat_config"]["primary_model"]]
+        if config["chat_config"]["backup_model"] in MODEL_CODES:
+            config["chat_config"]["backup_model"] = MODEL_CODES[config["chat_config"]["backup_model"]]
+        if config["rag_config"]["rag_llm"] in MODEL_CODES:
+            config["rag_config"]["rag_llm"] = MODEL_CODES[config["rag_config"]["rag_llm"]]
+            
         self.rag_settings = RagSettings(**config["rag_config"])
         self.chat_settings = ChatSettings(**config["chat_config"])
 
         HyperparameterSchema(**config["hyperparameters"])
         self.hyperparameters = config["hyperparameters"]
-
-        if rag_mode is not None:
-            self.rag_settings.rag_mode = rag_mode
 
         if self.chat_settings.enable_system_message:
             model_name = self.chat_settings.primary_model.model_name

@@ -8,6 +8,17 @@ RAG_SYSTEM_MESSAGE = "You are a helpful AI. Use the document excerpts to respond
 PROMPT_CHOOSER_SYSTEM_MESSAGE = "Use the context from Anthropic's example prompting guides to create a sample system message and user message template for the given task."
 EVAL_EXCERPT_SYSTEM_MESSAGE = "You are an AI assistant that evaluates text excerpts to determine if it meets specified criteria. Respond ONLY with a valid JSON output with 2 keys: index: int, and meetsCriteria: bool."
 
+MODEL_CODES = {
+    "gpt4": "get_openai_gpt4",
+    "bigmix": "get_together_bigmix",
+    "dbrx": "get_together_dbrx",
+    "llama3": "get_together_llama3",
+    "deepseek": "get_together_deepseek_4k",
+    "opus": "get_claude_opus",
+    "local": "get_local_model",
+    "ollama": "get_ollama_local_model",
+}
+
 SYSTEM_MESSAGE_CODES = {
     "default": DEFAULT_SYSTEM_MESSAGE,
     "code": CODE_SYSTEM_MESSAGE,
@@ -22,6 +33,8 @@ RAG_COLLECTION_TO_SYSTEM_MESSAGE = {
     "reference_prompt_collection": PROMPT_CHOOSER_SYSTEM_MESSAGE,
     "fixed_reference_nomic_prompt_collection": PROMPT_CHOOSER_SYSTEM_MESSAGE,
 }
+
+LOCAL_MODELS = ["get_ollama_local_model", "get_local_model", "get_ollama_local_embedder", "get_lmstudio_local_embedder"]
 
 
 DEFAULT_QUERY = '''Name 5 strange vegetables that I am unlikely to see in Western countries.'''
