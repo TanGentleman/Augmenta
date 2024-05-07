@@ -8,12 +8,7 @@ LOCAL_MODEL_ONLY = False
 EXPLAIN_EXCERPT = False  # if true, -np will format sample.txt
 
 
-# TODO: Add friendly interface for setting system messages.
-# SYSTEM_MSG_MAP = {
-#     "eval": "You are an AI assistant that evaluates text excerpts to determine if it meets specified criteria. Respond ONLY with a valid JSON output with 2 keys: index: int, and meetsCriteria: bool.",
-#     "code": "You are an expert programmer that helps to review Python code and provide optimizations.",
-#     "chat": "You are a helpful AI."
-# }
+# TODO: Adjust model: system message mapping to be more intuitive.
 SYSTEM_MSG_MAP = {"deepseek-ai/deepseek-llm-67b-chat":
                   "You are an expert programmer. Review the Python code and provide optimizations.", }
 # Formatted using constants.SUMMARY_TEMPLATE
@@ -27,7 +22,7 @@ FAISS_FOLDER = "faiss" + VECTOR_DB_SUFFIX
 MAX_PARENT_DOCS = 8  # This is only relevant for the multiretrieval mode with child docs
 MAX_CHARACTERS_IN_PARENT_DOC = 20000
 
-ALLOW_MULTI_VECTOR = True # Langchain deprecations cause an annoying warning atm
+ALLOW_MULTI_VECTOR = False # Langchain deprecations cause an annoying warning atm
 EXPERIMENTAL_UNSTRUCTURED = False
 METADATA_MAP = None
 FILTER_TOPIC = None
