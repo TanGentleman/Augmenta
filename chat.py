@@ -277,7 +277,7 @@ class Chatbot:
         docs = []
         # If collection exists, load it
         if database_exists(collection_name, method):
-            print(f"Collection {collection_name} exists, now loading")
+            print(f"Loading existing Vector DB: {collection_name}")
             if method == "chroma":
                 vectorstore = load_existing_chroma_vectorstore(
                     collection_name, embedder)
@@ -815,6 +815,11 @@ if __name__ == "__main__":
         '--rag-mode',
         action='store_true',
         help='Enable RAG mode')
+    parser.add_argument(
+        '-m',
+        '--model',
+        type=str,
+        help='Specify a model for chat')
 
     # Add -i flag for making inputs in the form of a list[str]
     parser.add_argument(
@@ -825,19 +830,31 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     config_override = {}
-    config_override["rag_mode"] = args.rag_mode
     # How can I make sure this typechecks correctly?
+    
+    config_override["rag_config"] = {}
+    config_override["chat_config"] = {}
+
     if args.inputs:
-        config_override["rag_mode"] = True
         print('Found inputs. RAG mode enabled')
         assert isinstance(args.inputs, list)
-        assert all(isinstance(i, str) for i in args.inputs)
-        config_override["inputs"] = args.inputs
-    else:
-        config_override["rag_mode"] = args.rag_mode
+        # assert all(isinstance(i, str) for i in args.inputs)
+        args.rag_mode = True
+        config_override["rag_config"]["inputs"] = args.inputs
+    
+    if args.rag_mode:
+        # This means there is no way to disable rag mode from CLI if set in settings.json
+        config_override["rag_config"]["rag_mode"] = args.rag_mode
+
+    if args.model:
+        if args.rag_mode:
+            config_override["rag_config"]["rag_llm"] = args.model
+        else:
+            config_override["chat_config"]["primary_model"] = args.model
+
 
     config = Config(config_override=config_override)
-    if args.rag_mode and config.rag_settings.multivector_enabled is True:
+    if config.rag_settings.rag_mode and config.rag_settings.multivector_enabled is True:
         if MultiVectorRetriever is None:
             print('MultiVectorRetriever not supported. Check config.py and chat.py.')
             raise SystemExit
