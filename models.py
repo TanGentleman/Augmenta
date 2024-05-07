@@ -240,7 +240,7 @@ def get_ollama_local_model(hyperparameters=None) -> Ollama:
     )
 
 
-def get_nomic_local_embedder(hyperparameters=None) -> OllamaEmbeddings:
+def get_ollama_local_embedder(hyperparameters=None) -> OllamaEmbeddings:
     return OllamaEmbeddings(
         model="nomic-embed-text"
     )
@@ -358,8 +358,8 @@ MODEL_DICT = {
         "model_name": "BAAI/bge-large-en-v1.5",
         "model_type": "embedder"
     },
-    "get_nomic_local_embedder": {
-        "function": get_nomic_local_embedder,
+    "get_ollama_local_embedder": {
+        "function": get_ollama_local_embedder,
         "context_size": 8192,
         "model_name": "nomic-embed-text",
         "model_type": "embedder"
@@ -375,7 +375,7 @@ MODEL_DICT = {
 EMBEDDING_CONTEXT_SIZE_DICT = {
     "get_openai_embedder_large": 128000,
     "get_together_embedder_large": 8192,
-    "get_nomic_local_embedder": 8192
+    "get_ollama_local_embedder": 8192
 }
 
 

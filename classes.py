@@ -29,7 +29,7 @@ VALID_LLM = Literal[
 
 VALID_EMBEDDER = Literal["get_openai_embedder_large",
                          "get_together_embedder_large",
-                         "get_nomic_local_embedder",
+                         "get_ollama_local_embedder",
                          "get_lmstudio_local_embedder"]
 
 class ManifestSchema(BaseModel):
@@ -526,7 +526,7 @@ class Config:
             if override_rag_mode is not None:
                 assert isinstance(override_rag_mode, bool), "rag_mode must be a boolean"
                 rag_mode = override_rag_mode
-                print(f"Rag mode overridden to {rag_mode}")
+                # print(f"Rag mode overridden to {rag_mode}")
             ### Not yet implemented
             override_rag = config_override.get("rag_config")
             if override_rag is not None:
@@ -745,7 +745,7 @@ class Config:
         # if self.rag_config["embedding_model"].model_name not in ALLOWED_EMBEDDERS:
         #     print(self.rag_config["embedding_model"].model_name)
         #         raise ValueError(
-        #             "Only local embedder supported is get_nomic_local_embedder (or lmstudio)")
+        #             "Only local embedder supported is get_ollama_local_embedder (or lmstudio)")
         # else:
         #     for model in [
         #             self.chat_config["primary_model"],
