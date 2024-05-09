@@ -160,9 +160,8 @@ class Chatbot:
                 raise ValueError("Doc IDs not initialized")
             self.doc_ids = doc_ids
         self.retriever = self.get_retriever()
-        collection_code = RAG_COLLECTION_TO_SYSTEM_MESSAGE.get(
+        rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE.get(
             self.config.rag_settings.collection_name, "default")
-        rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE[collection_code]
         self.rag_chain = get_rag_chain(
             self.retriever,
             self.rag_model.llm,
@@ -505,11 +504,8 @@ class Chatbot:
                 assert isinstance(
                     self.rag_model, LLM), "RAG LLM not initialized"
 
-                collection_code = RAG_COLLECTION_TO_SYSTEM_MESSAGE.get(
-                    self.config.rag_settings.collection_name)
-                if collection_code is None:
-                    collection_code = "default"
-                rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE[collection_code]
+                rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE.get(
+                    self.config.rag_settings.collection_name, "default")
                 print(f'System message: {rag_system_message}')
                 print(f'RAG LLM: {self.rag_model.model_name}')
                 print(
@@ -820,6 +816,11 @@ if __name__ == "__main__":
         '--model',
         type=str,
         help='Specify a model for chat')
+    parser.add_argument(
+        '-c',
+        '--collection',
+        type=str,
+        help='Specify a collection name for RAG mode')
 
     # Add -i flag for making inputs in the form of a list[str]
     parser.add_argument(
@@ -835,6 +836,10 @@ if __name__ == "__main__":
     config_override["rag_config"] = {}
     config_override["chat_config"] = {}
 
+    if args.collection:
+        args.rag_mode = True
+        config_override["rag_config"]["collection_name"] = args.collection
+
     if args.inputs:
         print('Found inputs. RAG mode enabled')
         assert isinstance(args.inputs, list)
@@ -843,8 +848,7 @@ if __name__ == "__main__":
         config_override["rag_config"]["inputs"] = args.inputs
 
     if args.rag_mode:
-        # This means there is no way to disable rag mode from CLI if set in
-        # settings.json
+        # Currently no way to disable rag mode from CLI if True in settings.json
         config_override["rag_config"]["rag_mode"] = args.rag_mode
 
     if args.model:
