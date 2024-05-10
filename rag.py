@@ -4,9 +4,10 @@ from langchain_core.runnables import RunnablePassthrough
 from langchain_core.documents import Document
 from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 from helpers import clean_docs, database_exists, format_docs
-from constants import get_rag_template, get_summary_template, get_eval_template
+from constants import get_music_template, get_rag_template, get_summary_template, get_eval_template
 import embed
 from config import EXPERIMENTAL_UNSTRUCTURED
+from json import loads as json_loads
 
 
 def get_summary_chain(llm):
@@ -52,9 +53,46 @@ def get_eval_chain(llm):
     This chain will NEED to be passed a dictionary with keys excerpt and criteria, not a string.
     """
     eval_prompt_template = get_eval_template()
-    chain = (eval_prompt_template | llm | eval_output_handler)
+    chain = eval_prompt_template | llm | eval_output_handler
     return chain
 
+def music_output_handler(output):
+    """
+    A parser that returns a list of dictionaries.
+
+    Each dictionary should have keys "title", "artist", and "year".
+    """
+    def is_output_valid(output):
+        """
+        Checks if the output is valid.
+        """
+        for item in output:
+            if not all(key in item for key in ["title", "artist", "year"]):
+                return False
+        return True
+    
+    try:
+        print("Output:", output)
+        response_object = json_loads(output)
+        if not is_output_valid(response_object):
+            raise ValueError("JSON output does not contain the required keys")
+    except BaseException:
+        raise ValueError("Music chain did not return valid JSON")
+    return response_object
+
+def get_music_chain(llm):
+    """
+    Returns a chain for the music pipeline.
+    """
+    music_prompt_template = get_music_template()
+    chain = (
+        {"input": RunnablePassthrough()}
+        | music_prompt_template
+        | llm
+        | StrOutputParser()
+        | music_output_handler
+    )
+    return chain
 
 def get_rag_chain(
         retriever,

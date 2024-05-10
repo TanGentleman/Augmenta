@@ -7,7 +7,7 @@ CODE_SYSTEM_MESSAGE = "You are an expert programmer. Review the Python code and 
 RAG_SYSTEM_MESSAGE = "You are a helpful AI. Use the document excerpts to respond to the best of your ability."
 PROMPT_CHOOSER_SYSTEM_MESSAGE = "Use the context from Anthropic's example prompting guides to create a sample system message and user message template for the given task."
 EVAL_EXCERPT_SYSTEM_MESSAGE = "You are an AI assistant that evaluates text excerpts to determine if it meets specified criteria. Respond ONLY with a valid JSON output with 2 keys: index: int, and meetsCriteria: bool."
-
+MUSIC_SYSTEM_MESSAGE = 'As a data conversion expert, your task is to convert the provided string into a list of dictionaries. Your goal is to extract the relevant information from each line and organize it into a JSON object with the appropriate keys. ONLY output the list[dict] that conforms to the given SearchSchema.'
 MODEL_CODES = {
     "gpt4": "get_openai_gpt4",
     "bigmix": "get_together_bigmix",
@@ -71,6 +71,18 @@ EVAL_TEMPLATE = """Evaluate the following text excerpt(s) based on the given cri
 Criteria: {criteria}
 """
 
+MUSIC_TEMPLATE = """Please convert the following string into a JSON output (a list of dictionaries) with the keys "title", "artist", and "year". Each entry should obey the given SearchSchema.
+class SearchSchema(BaseModel):
+    title: str
+    artist: str
+    year: int
+
+input: {input}
+
+ONLY output the list[dict]. Do not include any other information.
+
+output: 
+"""
 
 def get_rag_template(system_message=None):
     """
@@ -109,3 +121,14 @@ def get_eval_template():
     eval_template.messages.insert(
         0, SystemMessage(content=system_message))
     return eval_template
+
+def get_music_template():
+    """
+    Fetches the template for the music pipeline.
+    """
+    system_message = MUSIC_SYSTEM_MESSAGE
+    template = MUSIC_TEMPLATE
+    music_template = ChatPromptTemplate.from_template(template)
+    music_template.messages.insert(
+        0, SystemMessage(content=system_message))
+    return music_template
