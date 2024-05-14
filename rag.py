@@ -80,13 +80,19 @@ def music_output_handler(output):
         raise ValueError("Music chain did not return valid JSON")
     return response_object
 
-def get_music_chain(llm):
+def get_music_chain(llm, few_shot_examples=None):
     """
     Returns a chain for the music pipeline.
     """
     music_prompt_template = get_music_template()
+    few_shot_string = ""
+    if few_shot_examples:
+        assert isinstance(few_shot_examples, dict)
+        for example in few_shot_examples:
+            assert "input" in example and "output" in example
+            few_shot_string += f"input: {example['input']}\noutput: {example['output']}\n\n"
     chain = (
-        {"input": RunnablePassthrough()}
+        {"input": RunnablePassthrough(), "few_shot_examples": lambda x: few_shot_string}
         | music_prompt_template
         | llm
         | StrOutputParser()

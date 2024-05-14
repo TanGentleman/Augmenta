@@ -192,7 +192,8 @@ class Chatbot:
             # Reload config from settings.json
             # Override with the current rag_mode setting
             config_override = {}
-            config_override["rag_mode"] = self.config.rag_settings.rag_mode
+            config_override["rag_config"] = {}
+            config_override["rag_config"]["rag_mode"] = self.config.rag_settings.rag_mode
             config = Config(config_override=config_override)
         self.config = config
         self.backup_model = None

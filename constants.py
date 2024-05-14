@@ -15,7 +15,7 @@ MODEL_CODES = {
     "llama3": "get_together_llama3",
     "deepseek": "get_together_deepseek_4k",
     "opus": "get_claude_opus",
-    "local": "get_local_model",
+    "lmstudio": "get_local_model",
     "ollama": "get_ollama_local_model",
 }
 
@@ -81,8 +81,19 @@ input: {input}
 
 ONLY output the list[dict]. Do not include any other information.
 
-output: 
-"""
+output: """
+
+ALT_MUSIC_TEMPLATE = """Please convert the following string into a JSON output (a list of dictionaries) with the keys "title", "artist", and "year". Each entry should obey the given SearchSchema.
+class SearchSchema(BaseModel):
+    title: str
+    artist: str
+    year: int
+
+ONLY output the list[dict]. Do not include any other information.
+{few_shot_examples}
+input: {input}
+output: """
+
 
 def get_rag_template(system_message=None):
     """
@@ -122,13 +133,19 @@ def get_eval_template():
         0, SystemMessage(content=system_message))
     return eval_template
 
-def get_music_template():
+def get_music_template(few_shot_data: list[dict] = None):
     """
     Fetches the template for the music pipeline.
+
+    Args:
+    few_shot_data: list[dict] - A list of dictionaries containing few-shot examples for the task. 
+    Each dictionary should be of the form {"input": str, "output": str}
     """
     system_message = MUSIC_SYSTEM_MESSAGE
-    template = MUSIC_TEMPLATE
+    # template = MUSIC_TEMPLATE
+    template = ALT_MUSIC_TEMPLATE
     music_template = ChatPromptTemplate.from_template(template)
     music_template.messages.insert(
         0, SystemMessage(content=system_message))
+
     return music_template
