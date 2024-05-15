@@ -77,11 +77,13 @@ class SearchSchema(BaseModel):
     artist: str
     year: int
 
-input: {input}
+input:
+{input}
 
 ONLY output the list[dict]. Do not include any other information.
 
-output: """
+output:
+"""
 
 ALT_MUSIC_TEMPLATE = """Please convert the following string into a JSON output (a list of dictionaries) with the keys "title", "artist", and "year". Each entry should obey the given SearchSchema.
 class SearchSchema(BaseModel):
@@ -89,10 +91,12 @@ class SearchSchema(BaseModel):
     artist: str
     year: int
 
-ONLY output the list[dict]. Do not include any other information.
+ONLY output the list[dict]. No preamble.
 {few_shot_examples}
-input: {input}
-output: """
+input:
+{input}
+output:
+"""
 
 
 def get_rag_template(system_message=None):
