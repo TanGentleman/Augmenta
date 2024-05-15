@@ -3,14 +3,13 @@ from json import dump as json_dump
 from re import sub as re_sub
 from uuid import uuid4
 from langchain_core.documents import Document
-from os.path import exists as path_exists, join as path_join, isdir as path_isdir
-from os import listdir
 from datetime import datetime
 
-from config import VECTOR_DB_SUFFIX
+# Get the root path of the repository
+from pathlib import Path
+ROOT = Path(__file__).resolve().parent.parent
 
-# TODO:
-# Add a ROOT_FILEPATH constant and use os.join to create the filepaths
+from config import VECTOR_DB_SUFFIX
 
 
 def save_response_to_markdown_file(
@@ -23,7 +22,8 @@ def save_response_to_markdown_file(
     - response_string (str): The response string to be saved.
     - filename (str, optional): The name of the file. Defaults to "response.md".
     """
-    with open(filename, "w", encoding="utf-8") as file:
+    filepath = ROOT / filename
+    with open(filepath, "w", encoding="utf-8") as file:
         file.write(response_string)
 
 
@@ -35,7 +35,8 @@ def save_history_to_markdown_file(messages: list[str], filename="history.md"):
     - messages (list[str]): The list of messages to be saved.
     - filename (str, optional): The name of the file. Defaults to "history.md".
     """
-    with open(filename, "w", encoding="utf-8") as file:
+    filepath = ROOT / filename
+    with open(filepath, "w", encoding="utf-8") as file:
         for message in messages:
             file.write(f"{message}\n\n")
 
@@ -45,7 +46,8 @@ def read_sample():
     Read the sample.txt file and return the excerpt.
     """
     excerpt = ''
-    with open('sample.txt', 'r') as file:
+    filepath = ROOT / 'sample.txt'
+    with open(filepath, 'r') as file:
         excerpt = file.read()
         assert len(excerpt) > 0, "File is empty"
     return excerpt
@@ -56,7 +58,8 @@ def read_settings(config_file="settings.json") -> dict:
     Read the settings file and return the settings as a dictionary.
     """
     settings = {}
-    with open(config_file, 'r') as file:
+    filepath = ROOT / config_file
+    with open(filepath, 'r') as file:
         try:
             settings = json_load(file)
         except JSONDecodeError:
@@ -161,7 +164,8 @@ def format_docs(
         context_string += doc.page_content + "\n\n"
 
     if save_excerpts:
-        with open("excerpts.md", "w") as f:
+        filepath = ROOT / "excerpts.md"
+        with open(filepath, "w") as f:
             f.write(f"Context:\n{context_string}")
     context_string = context_string.strip()
     return context_string
@@ -171,8 +175,9 @@ def database_exists(collection_name: str, method: str) -> bool:
     """
     Check if a vector database exists from the given collection name and method.
     """
-    filepath = path_join(f"{method}{VECTOR_DB_SUFFIX}", collection_name)
-    return path_exists(filepath)
+    # filepath = path_join(f"{method}{VECTOR_DB_SUFFIX}", collection_name)
+    filepath = ROOT / f"{method}{VECTOR_DB_SUFFIX}" / collection_name
+    return filepath.exists()
 
 
 def get_current_time() -> str:
@@ -187,7 +192,8 @@ def get_doc_ids_from_manifest(collection_name):
     Scan the manifest.json file for the collection name and return the doc_ids
     """
     doc_ids = []
-    with open('manifest.json', 'r') as f:
+    filepath = ROOT / "manifest.json"
+    with open(filepath, "r") as f:
         data = json_load(f)
         if not data:
             print("manifest.json is empty")
@@ -206,10 +212,10 @@ def get_db_collection_names(method: str) -> list[str]:
     assert method in ["chroma", "faiss"], "Invalid method"
     collection_names = []
     # All the folders in method+VECTOR_DB_SUFFIX
-    folder = method + VECTOR_DB_SUFFIX
-    if path_exists(folder):
-        collection_names = [name for name in listdir(
-            folder) if path_isdir(path_join(folder, name))]
+    # folder = method + VECTOR_DB_SUFFIX
+    filepath = ROOT / f"{method}{VECTOR_DB_SUFFIX}"
+    if filepath.exists():
+        collection_names = [name for name in filepath.iterdir() if name.is_dir()]
     return collection_names
 
 
@@ -234,10 +240,15 @@ def update_manifest(
     """
     # assert rag_settings is appropriately formed
     data = {}
-    with open('manifest.json', 'r') as f:
-        data = json_load(f)
-    if not data:
-        raise FileNotFoundError("manifest.json has no data")
+    filepath = ROOT / "manifest.json"
+    try:
+        with open(filepath, "r") as f:
+            data = json_load(f)
+    except FileNotFoundError:
+        with open(filepath, "w") as f:
+            json_dump({"databases": []}, f)
+            data = {"databases": []}
+            return
     assert isinstance(data, dict), "manifest.json is not a dict"
     assert "databases" in data, "databases key not found in manifest.json"
     # assert that the id is unique
@@ -262,6 +273,6 @@ def update_manifest(
         }
     }
     data["databases"].append(manifest)
-    with open('manifest.json', 'w') as f:
+    with open(filepath, "w") as f:
         json_dump(data, f, indent=4)
     print("Updated manifest.json")
