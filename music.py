@@ -12,8 +12,9 @@ DEFAULT_DATA = {
     "artist": "Tame Impala",
     "year": 2015
 }
-DEFAULT_INPUT = "The Less I Know The Better Tame Impala 2015"
-DEFAULT_LLM_FN = LLM_FN(get_together_llama3)
+# DEFAULT_INPUT = "The Less I Know The Better Tame Impala 2015"
+DEFAULT_INPUT = "# Used to You • . • Ali Gatie 2019"
+DEFAULT_LLM_FN = LLM_FN(get_ollama_local_model)
 
 class SearchSchema(BaseModel):
     title: str
@@ -73,19 +74,22 @@ def append_to_music_manifest(data: list[dict], manifest_file: str = "music_manif
     with open(filepath, "r") as f:
         manifest = json_load(f)
     if not manifest:
-        print("manifest.json is empty")
-        return
+        print("music manifest is empty")
     for item in data:
         manifest.append(item)
     with open(filepath, "w") as f:
         json_dump(manifest, f)
 
-def music_workflow(query: str):
+def music_workflow(query: str) -> bool:
     llm = LLM(DEFAULT_LLM_FN).llm
     chain = get_music_chain(llm)
     res = chain.invoke(query)
+    if not res:
+        print("No results found")
+        return False
     assert isinstance(res, list), "res must be a list"
     append_to_music_manifest(res)
+    return True
 
 def download_from_manifest(manifest_file: str = "music_manifest.json", save_dir: str = "YouTubeAudio"):
     filepath = ROOT / manifest_file
@@ -95,7 +99,7 @@ def download_from_manifest(manifest_file: str = "music_manifest.json", save_dir:
     with open(filepath, "r") as f:
         manifest = json_load(f)
     if not manifest:
-        print("manifest.json is empty")
+        print("music manifest is empty")
         return
     for item in manifest:
         download_audio(SearchSchema(**item), save_dir)
@@ -127,8 +131,10 @@ def main():
         INPUT = paste()
     else:
         INPUT = DEFAULT_INPUT
-    music_workflow(INPUT)
-    download_from_manifest(manifest_file, save_dir)
+    found_songs = music_workflow(INPUT)
+    if found_songs:
+        print("Downloading songs...")
+        download_from_manifest(manifest_file, save_dir)
 
 if __name__ == "__main__":
     main()
