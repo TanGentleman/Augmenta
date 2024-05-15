@@ -7,7 +7,7 @@ from datetime import datetime
 
 # Get the root path of the repository
 from pathlib import Path
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parent
 
 from config import VECTOR_DB_SUFFIX
 
