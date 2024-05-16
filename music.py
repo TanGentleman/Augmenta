@@ -12,20 +12,19 @@ from helpers import ROOT
 from rag import get_music_chain
 from models import get_ollama_local_model, LLM_FN, LLM, get_together_llama3
 
+# Configuration flags
 USE_LOCAL_MODEL = True
 CONFIRM_SCHEMA_TYPE = True
-# Constants
 USE_CLIPBOARD = True
+
+# Default data and constants
 DEFAULT_DATA = {
     "title": "The Less I Know The Better",
     "artist": "Tame Impala",
     "year": 2015
 }
 DEFAULT_INPUT = "# Used to You • . • Ali Gatie 2019"
-if USE_LOCAL_MODEL:
-    DEFAULT_LLM_FN = LLM_FN(get_ollama_local_model)
-else:
-    DEFAULT_LLM_FN = LLM_FN(get_together_llama3)
+DEFAULT_LLM_FN = LLM_FN(get_ollama_local_model) if USE_LOCAL_MODEL else LLM_FN(get_together_llama3)
 MANIFEST_FILE = "music_db.json"
 MUSIC_DIR = ROOT.parent / "AugmentaMusic"
 SAVE_DIR = MUSIC_DIR / "YouTubeAudio"
@@ -35,6 +34,15 @@ YOUTUBE_URL_PREFIX = "https://youtube.com/watch?v="
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Few-shot examples for the language model
+DEFAULT_FEW_SHOT_EXAMPLES = [
+    {
+        "input": "Used to You • . • Ali Gatie 2019",
+        "output": '[{"title": "Used to You", "artist": "Ali Gatie", "year": 2019}]'
+    }  
+]
+
+# Pydantic models for data validation
 class SearchSchema(BaseModel):
     title: str
     artist: str
@@ -83,11 +91,15 @@ def download_url(url: str, save_dir: str):
     with YoutubeDL(ydl_opts) as ydl:
         ydl.download([url])
 
-def download_audio(data: SearchSchema, save_dir: str):
+def download_audio(data: SearchSchema, save_dir: str, manifest_ids: List[str] = []) -> None | str:
     """Download audio for the given search data."""
     query = create_query(data)
     top_hit = query_to_top_youtube_hit(query)
     url = url_from_top_hit(top_hit)
+    id = url.split("v=")[1]
+    if id in manifest_ids:
+        print("Skipping song with repeat youtube ID!")
+        return None
     download_url(url, save_dir)
     return url
 
@@ -134,13 +146,14 @@ def append_to_music_manifest(data: List[Dict[str, Union[str, int]]], manifest_fi
 def music_workflow(query: str) -> bool:
     """Run the music workflow for the given query."""
     llm = LLM(DEFAULT_LLM_FN).llm
-    chain = get_music_chain(llm)
+    few_shot_examples = DEFAULT_FEW_SHOT_EXAMPLES
+    chain = get_music_chain(llm, few_shot_examples)
     response_object = chain.invoke(query)
     if not response_object:
         logger.info("No results found")
         return False
     if not isinstance(response_object, list):
-        raise TypeError("res must be a list")
+        raise TypeError("response object must be a list")
     res = append_to_music_manifest(response_object)
     if not res:
         logger.info("No new songs found")
@@ -162,17 +175,19 @@ def download_from_manifest(manifest_file: str = MANIFEST_FILE, save_dir: str = S
     if not manifest:
         logger.info("Music manifest is empty")
         return
+    manifest_ids = [item["url"].split("v=")[1] for item in manifest if item.get("url")]
     for item in manifest:
         if item.get("downloaded"):
             continue
-        url = download_audio(SearchSchema(**item), save_dir)
+        url = download_audio(SearchSchema(**item), save_dir, manifest_ids)
+        if not url:
+            continue
         item["downloaded"] = True
         item["url"] = url
         if CONFIRM_SCHEMA_TYPE:
             FinalSchema(**item)
     with filepath.open("w") as f:
         json_dump(manifest, f, indent=2)
-
 
 def main():
     """Main function to run the script."""
@@ -189,10 +204,14 @@ def main():
     else:
         INPUT = DEFAULT_INPUT
 
-    found_songs = music_workflow(INPUT)
+    try:
+        found_songs = music_workflow(INPUT)
+    except KeyboardInterrupt:
+        logger.info("Music workflow aborted")
+        return
     if found_songs:
         logger.info("Downloading songs...")
-        # download_from_manifest(manifest_file, save_dir)
+        download_from_manifest(manifest_file, save_dir)
 
 if __name__ == "__main__":
     main()
