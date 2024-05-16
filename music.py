@@ -68,7 +68,6 @@ def create_query(data: SearchSchema) -> str:
 
 def query_to_top_youtube_hit(query: str) -> dict:
     """Get the top YouTube hit for the given query."""
-    query = "You've Done It Again, Virginia The National 2008 official music video"
     results = YoutubeSearch(query, max_results=1).to_dict()
     if not results:
         raise ValueError("No results found")
@@ -160,7 +159,7 @@ def music_workflow(query: str) -> bool:
     # Run evaluation chain
     eval_chain = get_eval_chain(llm)
     eval_dict = {
-        "excerpt": 'index 0 Excerpt:"\n' + query,
+        "excerpt": 'index 0:"\n' + query,
         "criteria": "The excerpt contains at least one song with a provided song title, artist, and year."
     }
     res = eval_chain.invoke(eval_dict)
