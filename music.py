@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from yt_dlp import YoutubeDL
 
 from helpers import ROOT
-from rag import get_music_chain
+from rag import get_eval_chain, get_music_chain
 from models import get_ollama_local_model, LLM_FN, LLM, get_together_llama3
 
 # Configuration flags
@@ -68,6 +68,7 @@ def create_query(data: SearchSchema) -> str:
 
 def query_to_top_youtube_hit(query: str) -> dict:
     """Get the top YouTube hit for the given query."""
+    query = "You've Done It Again, Virginia The National 2008 official music video"
     results = YoutubeSearch(query, max_results=1).to_dict()
     if not results:
         raise ValueError("No results found")
@@ -156,6 +157,17 @@ def music_workflow(query: str) -> bool:
     """Run the music workflow for the given query."""
     llm = LLM(DEFAULT_LLM_FN).llm
     few_shot_examples = DEFAULT_FEW_SHOT_EXAMPLES
+    # Run evaluation chain
+    eval_chain = get_eval_chain(llm)
+    eval_dict = {
+        "excerpt": 'index 0 Excerpt:"\n' + query,
+        "criteria": "The excerpt contains at least one song with a provided song title, artist, and year."
+    }
+    res = eval_chain.invoke(eval_dict)
+    if res["meetsCriteria"] is False:
+        logger.info("Excerpt does not meet criteria")
+        return False
+    # Run music chain
     chain = get_music_chain(llm, few_shot_examples)
     response_object = chain.invoke(query)
     if not response_object:
@@ -184,7 +196,8 @@ def download_from_manifest(manifest_file: str = MANIFEST_FILE, save_dir: str = S
     if not manifest:
         logger.info("Music manifest is empty")
         return
-    manifest_ids = [item["url"].split("v=")[1] for item in manifest if item.get("url")]
+    manifest_ids = [item["url"].split("v=")[1] for item in manifest if item.get("url") and item.get("downloaded")]
+    # NOTE: I can add a check to see if it has been downloaded, but no need rn
     for item in manifest:
         if item.get("downloaded"):
             continue
