@@ -31,8 +31,6 @@ MUSIC_DIR = ROOT.parent / "AugmentaMusic"
 SAVE_DIR = MUSIC_DIR / "YouTubeAudio"
 YOUTUBE_URL_PREFIX = "https://youtube.com/watch?v="
 QUERY_SUFFIX = "official audio"
-# TODO: Create a demo karaoke use case:
-# QUERY_SUFFIX = "lyrics"
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -110,17 +108,15 @@ def download_url(url: str, save_dir: str, force_m4a: bool = False):
         ydl.download([url])
 
 
-def download_audio(
-        data: SearchSchema,
-        save_dir: str,
-        manifest_ids: List[str] = []) -> None | str:
+def download_audio(data: SearchSchema, save_dir: str,
+                   manifest_ids: List[str] = []) -> Union[None, str]:
     """Download audio for the given search data."""
     query = create_query(data)
     top_hit = query_to_top_youtube_hit(query)
     url = url_from_top_hit(top_hit)
-    id = url.split("v=")[1]
-    if id in manifest_ids:
-        print("Skipping download for repeat youtube ID!")
+    video_id = url.split("v=")[1]
+    if video_id in manifest_ids:
+        logger.info("Skipping download for repeat YouTube ID!")
         return url
     download_url(url, save_dir)
     return url
@@ -142,28 +138,26 @@ def append_to_music_manifest(
         with filepath.open("r") as f:
             manifest = json_load(f) or []
     except JSONDecodeError:
-        print("Invalid JSON in manifest file")
+        logger.error("Invalid JSON in manifest file")
         manifest = []
 
     if CONFIRM_SCHEMA_TYPE:
         for item in manifest:
             SearchSchema(**item)
 
-    # Use a set to track existing items for faster duplicate checking
     existing_items = {(item["title"], item["artist"], item["year"])
                       for item in manifest}
 
-    new_items = []
-    for item in data:
-        if (item["title"], item["artist"], item["year"]) not in existing_items:
-            new_items.append(item)
-            existing_items.add((item["title"], item["artist"], item["year"]))
-        else:
-            print("Duplicate entry found for song:", item["title"])
+    new_items = [
+        item for item in data if (
+            item["title"],
+            item["artist"],
+            item["year"]) not in existing_items]
     if not new_items:
+        print("No new items to add")
         return False
-    manifest.extend(new_items)
 
+    manifest.extend(new_items)
     with filepath.open("w") as f:
         json_dump(manifest, f, indent=2)
     return True
@@ -173,29 +167,26 @@ def music_workflow(query: str) -> bool:
     """Run the music workflow for the given query."""
     llm = LLM(DEFAULT_LLM_FN).llm
     few_shot_examples = DEFAULT_FEW_SHOT_EXAMPLES
-    # Run evaluation chain
+
     eval_chain = get_eval_chain(llm)
     eval_dict = {
-        "excerpt": 'index 0:"\n' + query,
+        "excerpt": f'index 0:"\n{query}',
         "criteria": "The excerpt contains at least one song with a provided song title, artist, and year."
     }
     res = eval_chain.invoke(eval_dict)
-    if res["meetsCriteria"] is False:
+    if not res["meetsCriteria"]:
         logger.info("Excerpt does not meet criteria")
         return False
-    # Run music chain
+
     chain = get_music_chain(llm, few_shot_examples)
     response_object = chain.invoke(query)
     if not response_object:
         logger.info("No results found")
         return False
     if not isinstance(response_object, list):
-        raise TypeError("response object must be a list")
-    res = append_to_music_manifest(response_object)
-    if not res:
-        logger.info("No new songs found")
-        return False
-    return True
+        raise TypeError("Response object must be a list")
+
+    return append_to_music_manifest(response_object)
 
 
 def download_from_manifest(
@@ -206,18 +197,21 @@ def download_from_manifest(
     if not filepath.exists():
         logger.info("Manifest file does not exist")
         return
-    with filepath.open("r") as f:
-        try:
+
+    try:
+        with filepath.open("r") as f:
             manifest = json_load(f)
-        except JSONDecodeError:
-            print("Invalid JSON in manifest file")
-            manifest = []
+    except JSONDecodeError:
+        logger.error("Invalid JSON in manifest file")
+        return
+
     if not manifest:
         logger.info("Music manifest is empty")
         return
+
     manifest_ids = [item["url"].split("v=")[1] for item in manifest if item.get(
         "url") and item.get("downloaded")]
-    # NOTE: I can add a check to see if it has been downloaded, but no need rn
+
     for item in manifest:
         if item.get("downloaded"):
             continue
@@ -228,6 +222,7 @@ def download_from_manifest(
         item["url"] = url
         if CONFIRM_SCHEMA_TYPE:
             FinalSchema(**item)
+
     with filepath.open("w") as f:
         json_dump(manifest, f, indent=2)
 
@@ -237,9 +232,11 @@ def main():
     manifest_file = MANIFEST_FILE
     save_dir = SAVE_DIR
     ONLY_DOWNLOAD = False
+
     if ONLY_DOWNLOAD:
         download_from_manifest(manifest_file, save_dir)
         return
+
     if USE_CLIPBOARD:
         try:
             from pyperclip import paste
@@ -256,6 +253,7 @@ def main():
     except KeyboardInterrupt:
         logger.info("Music workflow aborted")
         return
+
     if found_songs:
         logger.info("Downloading songs...")
         download_from_manifest(manifest_file, save_dir)
