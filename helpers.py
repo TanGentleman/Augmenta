@@ -1,3 +1,4 @@
+from config import VECTOR_DB_SUFFIX
 from json import JSONDecodeError, load as json_load
 from json import dump as json_dump
 from re import sub as re_sub
@@ -8,8 +9,6 @@ from datetime import datetime
 # Get the root path of the repository
 from pathlib import Path
 ROOT = Path(__file__).resolve().parent
-
-from config import VECTOR_DB_SUFFIX
 
 
 def save_response_to_markdown_file(
@@ -215,7 +214,8 @@ def get_db_collection_names(method: str) -> list[str]:
     # folder = method + VECTOR_DB_SUFFIX
     filepath = ROOT / f"{method}{VECTOR_DB_SUFFIX}"
     if filepath.exists():
-        collection_names = [name for name in filepath.iterdir() if name.is_dir()]
+        collection_names = [
+            name for name in filepath.iterdir() if name.is_dir()]
     return collection_names
 
 

@@ -850,7 +850,8 @@ if __name__ == "__main__":
         config_override["rag_config"]["inputs"] = args.inputs
 
     if args.rag_mode:
-        # Currently no way to disable rag mode from CLI if True in settings.json
+        # Currently no way to disable rag mode from CLI if True in
+        # settings.json
         config_override["rag_config"]["rag_mode"] = args.rag_mode
 
     if args.model:

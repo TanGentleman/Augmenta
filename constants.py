@@ -137,12 +137,13 @@ def get_eval_template():
         0, SystemMessage(content=system_message))
     return eval_template
 
+
 def get_music_template(few_shot_data: list[dict] = None):
     """
     Fetches the template for the music pipeline.
 
     Args:
-    few_shot_data: list[dict] - A list of dictionaries containing few-shot examples for the task. 
+    few_shot_data: list[dict] - A list of dictionaries containing few-shot examples for the task.
     Each dictionary should be of the form {"input": str, "output": str}
     """
     system_message = MUSIC_SYSTEM_MESSAGE

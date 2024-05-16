@@ -59,6 +59,7 @@ def get_eval_chain(llm):
     chain = eval_prompt_template | llm | eval_output_handler
     return chain
 
+
 def music_output_handler(output):
     """
     A parser that returns a list of dictionaries.
@@ -74,7 +75,7 @@ def music_output_handler(output):
                 print(f"At least one song does not contain the required keys")
                 return False
         return True
-    
+
     try:
         if isinstance(output, str):
             output_string = output
@@ -89,6 +90,7 @@ def music_output_handler(output):
         return None
         # raise SystemExit("Music chain did not return valid JSON")
     return response_object
+
 
 def get_music_chain(llm, few_shot_examples=None):
     """
@@ -108,6 +110,7 @@ def get_music_chain(llm, few_shot_examples=None):
         | music_output_handler
     )
     return chain
+
 
 def get_rag_chain(
         retriever,
