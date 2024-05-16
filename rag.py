@@ -26,7 +26,7 @@ def get_summary_chain(llm):
 
 def eval_output_handler(output):
     """
-    A dummy output parser that returns the output as is.
+    A JSON output parser that returns the response object.
     """
     def is_output_valid(output):
         """
@@ -68,16 +68,23 @@ def music_output_handler(output):
         """
         for item in output:
             if not all(key in item for key in ["title", "artist", "year"]):
+                print(f"At least one song does not contain the required keys")
                 return False
         return True
     
     try:
-        print("Output:", output)
-        response_object = json_loads(output)
+        if isinstance(output, str):
+            output_string = output
+        else:
+            output_string = output.content
+        print("Output:" + output_string)
+        response_object = JsonOutputParser().parse(output_string)
         if not is_output_valid(response_object):
-            raise ValueError("JSON output does not contain the required keys")
-    except BaseException:
-        raise ValueError("Music chain did not return valid JSON")
+            raise ValueError("JSON output is not valid")
+    except ValueError:
+        print("Music chain did not return valid JSON")
+        return None
+        # raise SystemExit("Music chain did not return valid JSON")
     return response_object
 
 def get_music_chain(llm, few_shot_examples=None):
@@ -95,7 +102,6 @@ def get_music_chain(llm, few_shot_examples=None):
         {"input": RunnablePassthrough(), "few_shot_examples": lambda x: few_shot_string}
         | music_prompt_template
         | llm
-        | StrOutputParser()
         | music_output_handler
     )
     return chain
