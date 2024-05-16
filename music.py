@@ -31,6 +31,12 @@ MUSIC_DIR = ROOT.parent / "AugmentaMusic"
 SAVE_DIR = MUSIC_DIR / "YouTubeAudio"
 YOUTUBE_URL_PREFIX = "https://youtube.com/watch?v="
 QUERY_SUFFIX = "official audio"
+EXAMPLE_JSON_OUTPUT_STRING = """[
+    {"title": "Lux Aeterna", "artist": "Clint Mansell & Kronos Quartet", "year": 2000},
+    {"title": "Too Sad To Cry E", "artist": "Sasha Sloan", "year": 2019},
+    {"title": "Why'd You Only Call Me When You're High?", "artist": "Arctic Monkeys", "year": 2013},
+    {"title": "Sing for You (Single Version) [2015 Remastered]", "artist": "Tracy Chapman", "year": 2008}
+]"""
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -41,6 +47,10 @@ DEFAULT_FEW_SHOT_EXAMPLES = [
     {
         "input": "Used to You • . • Ali Gatie 2019",
         "output": '[{"title": "Used to You", "artist": "Ali Gatie", "year": 2019}]'
+    },
+    {
+        "input": "Lux Aeterna ••• Clint Mansell & Kronos Quartet 2000\nToo Sad To Cry E ••• Sasha Sloan 2019\nWhy'd You Only Call Me When You're High? • • • Arctic Monkeys 2013\nSing for You (Single Version) [2015 Remastered] •. • Tracy Chapman 2008",
+        "output": EXAMPLE_JSON_OUTPUT_STRING
     }
 ]
 
