@@ -29,6 +29,9 @@ MANIFEST_FILE = "music_db.json"
 MUSIC_DIR = ROOT.parent / "AugmentaMusic"
 SAVE_DIR = MUSIC_DIR / "YouTubeAudio"
 YOUTUBE_URL_PREFIX = "https://youtube.com/watch?v="
+QUERY_SUFFIX = "official audio"
+# TODO: Create a demo karaoke use case:
+# QUERY_SUFFIX = "lyrics"
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -61,7 +64,7 @@ class FinalSchema(BaseModel):
 
 def create_query(data: SearchSchema) -> str:
     """Create a search query from the given data."""
-    return f"{data.title} {data.artist} official"
+    return f"{data.title} {data.artist} {QUERY_SUFFIX}"
 
 def query_to_top_youtube_hit(query: str) -> dict:
     """Get the top YouTube hit for the given query."""
@@ -77,7 +80,7 @@ def url_from_top_hit(top_hit: dict) -> str:
         raise ValueError("Invalid video ID")
     return f"{YOUTUBE_URL_PREFIX}{video_id}"
 
-def download_url(url: str, save_dir: str):
+def download_url(url: str, save_dir: str, force_m4a: bool = False):
     """Download audio from the given URL."""
     ydl_opts = {
         "format": "m4a/bestaudio/best",
@@ -85,7 +88,13 @@ def download_url(url: str, save_dir: str):
         "outtmpl": f"{save_dir}/%(title)s.%(ext)s",
         "youtube_include_dash_manifest": False,
         "youtube_include_hls_manifest": False,
+        "extractor_args": {'youtube': {'player_client': ['web']}}
     }
+    if force_m4a:
+            ydl_opts['postprocessors'] = [{  # Extract audio using ffmpeg
+            'key': 'FFmpegExtractAudio',
+            'preferredcodec': 'm4a',
+        }]
     if not url.startswith(YOUTUBE_URL_PREFIX):
         raise ValueError("Invalid URL")
     with YoutubeDL(ydl_opts) as ydl:
@@ -98,8 +107,8 @@ def download_audio(data: SearchSchema, save_dir: str, manifest_ids: List[str] = 
     url = url_from_top_hit(top_hit)
     id = url.split("v=")[1]
     if id in manifest_ids:
-        print("Skipping song with repeat youtube ID!")
-        return None
+        print("Skipping download for repeat youtube ID!")
+        return url
     download_url(url, save_dir)
     return url
 
@@ -193,7 +202,10 @@ def main():
     """Main function to run the script."""
     manifest_file = MANIFEST_FILE
     save_dir = SAVE_DIR
-
+    ONLY_DOWNLOAD = False
+    if ONLY_DOWNLOAD:
+        download_from_manifest(manifest_file, save_dir)
+        return
     if USE_CLIPBOARD:
         try:
             from pyperclip import paste
