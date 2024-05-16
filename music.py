@@ -2,7 +2,7 @@ import logging
 import os
 from pathlib import Path
 from typing import List, Dict, Union
-from json import load as json_load, dump as json_dump
+from json import JSONDecodeError, load as json_load, dump as json_dump
 
 from youtube_search import YoutubeSearch
 from pydantic import BaseModel
@@ -10,8 +10,10 @@ from yt_dlp import YoutubeDL
 
 from helpers import ROOT
 from rag import get_music_chain
-from models import get_ollama_local_model, LLM_FN, LLM
+from models import get_ollama_local_model, LLM_FN, LLM, get_together_llama3
 
+USE_LOCAL_MODEL = True
+CONFIRM_SCHEMA_TYPE = True
 # Constants
 USE_CLIPBOARD = True
 DEFAULT_DATA = {
@@ -20,9 +22,13 @@ DEFAULT_DATA = {
     "year": 2015
 }
 DEFAULT_INPUT = "# Used to You • . • Ali Gatie 2019"
-DEFAULT_LLM_FN = LLM_FN(get_ollama_local_model)
-MANIFEST_FILE = "music_manifest.json"
-SAVE_DIR = "YouTubeAudio"
+if USE_LOCAL_MODEL:
+    DEFAULT_LLM_FN = LLM_FN(get_ollama_local_model)
+else:
+    DEFAULT_LLM_FN = LLM_FN(get_together_llama3)
+MANIFEST_FILE = "music_db.json"
+MUSIC_DIR = ROOT.parent / "AugmentaMusic"
+SAVE_DIR = MUSIC_DIR / "YouTubeAudio"
 YOUTUBE_URL_PREFIX = "https://youtube.com/watch?v="
 
 # Configure logging
@@ -37,6 +43,13 @@ class SearchSchema(BaseModel):
 class ResultSchema(BaseModel):
     url: str
     title: str
+
+class FinalSchema(BaseModel):
+    title: str
+    artist: str
+    year: int
+    downloaded: bool
+    url: str
 
 def create_query(data: SearchSchema) -> str:
     """Create a search query from the given data."""
@@ -76,29 +89,62 @@ def download_audio(data: SearchSchema, save_dir: str):
     top_hit = query_to_top_youtube_hit(query)
     url = url_from_top_hit(top_hit)
     download_url(url, save_dir)
+    return url
 
-def append_to_music_manifest(data: List[Dict[str, Union[str, int]]], manifest_file: str = MANIFEST_FILE):
+def append_to_music_manifest(data: List[Dict[str, Union[str, int]]], manifest_file: str = MANIFEST_FILE) -> bool:
     """Append data to the music manifest file."""
+    if CONFIRM_SCHEMA_TYPE:
+        for item in data:
+            SearchSchema(**item)
+            item["downloaded"] = False
+
     filepath = ROOT / manifest_file
     if not filepath.exists():
         filepath.write_text("[]")
-    with filepath.open("r") as f:
-        manifest = json_load(f) or []
-    manifest.extend(data)
+
+    try:
+        with filepath.open("r") as f:
+            manifest = json_load(f) or []
+    except JSONDecodeError:
+        print("Invalid JSON in manifest file")
+        manifest = []
+
+    if CONFIRM_SCHEMA_TYPE:
+        for item in manifest:
+            SearchSchema(**item)
+
+    # Use a set to track existing items for faster duplicate checking
+    existing_items = {(item["title"], item["artist"], item["year"]) for item in manifest}
+
+    new_items = []
+    for item in data:
+        if (item["title"], item["artist"], item["year"]) not in existing_items:
+            new_items.append(item)
+            existing_items.add((item["title"], item["artist"], item["year"]))
+        else:
+            print("Duplicate entry found for song:", item["title"])
+    if not new_items:
+        return False
+    manifest.extend(new_items)
+
     with filepath.open("w") as f:
-        json_dump(manifest, f)
+        json_dump(manifest, f, indent=2)
+    return True
 
 def music_workflow(query: str) -> bool:
     """Run the music workflow for the given query."""
     llm = LLM(DEFAULT_LLM_FN).llm
     chain = get_music_chain(llm)
-    res = chain.invoke(query)
-    if not res:
+    response_object = chain.invoke(query)
+    if not response_object:
         logger.info("No results found")
         return False
-    if not isinstance(res, list):
+    if not isinstance(response_object, list):
         raise TypeError("res must be a list")
-    append_to_music_manifest(res)
+    res = append_to_music_manifest(response_object)
+    if not res:
+        logger.info("No new songs found")
+        return False
     return True
 
 def download_from_manifest(manifest_file: str = MANIFEST_FILE, save_dir: str = SAVE_DIR):
@@ -108,13 +154,25 @@ def download_from_manifest(manifest_file: str = MANIFEST_FILE, save_dir: str = S
         logger.info("Manifest file does not exist")
         return
     with filepath.open("r") as f:
-        manifest = json_load(f) or []
+        try:
+            manifest = json_load(f)
+        except JSONDecodeError:
+            print("Invalid JSON in manifest file")
+            manifest = []
     if not manifest:
         logger.info("Music manifest is empty")
         return
     for item in manifest:
-        download_audio(SearchSchema(**item), save_dir)
-    filepath.write_text("[]")
+        if item.get("downloaded"):
+            continue
+        url = download_audio(SearchSchema(**item), save_dir)
+        item["downloaded"] = True
+        item["url"] = url
+        if CONFIRM_SCHEMA_TYPE:
+            FinalSchema(**item)
+    with filepath.open("w") as f:
+        json_dump(manifest, f, indent=2)
+
 
 def main():
     """Main function to run the script."""
