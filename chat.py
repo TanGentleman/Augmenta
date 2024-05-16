@@ -604,7 +604,8 @@ class Chatbot:
                 else:
                     if i % 2 == 0:
                         exchange_count += 1
-                print(exchange_count, message.content[:50])
+                message_suffix = "" if len(message.content) < 50 else "..."
+                print(exchange_count, message.content[:50] + message_suffix)
             try:
                 index = input('Enter the index of the exchange to delete: ')
                 if "-" in index:

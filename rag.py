@@ -7,7 +7,6 @@ from helpers import clean_docs, database_exists, format_docs
 from constants import get_music_template, get_rag_template, get_summary_template, get_eval_template
 import embed
 from config import EXPERIMENTAL_UNSTRUCTURED
-from json import loads as json_loads
 
 
 def get_summary_chain(llm):
@@ -34,7 +33,11 @@ def eval_output_handler(output):
         """
         return "index" in output and "meetsCriteria" in output
     try:
-        response_object = JsonOutputParser().parse(output.content)
+        if isinstance(output, str):
+            output_string = output
+        else:
+            output_string = output.content
+        response_object = JsonOutputParser().parse(output_string)
         if not is_output_valid(response_object):
             raise ValueError("JSON output does not contain the required keys")
     except BaseException:
@@ -42,7 +45,7 @@ def eval_output_handler(output):
     # print("Output:", output)
     # Perform JSON validation here
     # This function can also redirect to the next step in the pipeline
-    print("yay!")
+    print("evaluation passed!")
     return response_object
 
 
@@ -94,7 +97,7 @@ def get_music_chain(llm, few_shot_examples=None):
     music_prompt_template = get_music_template()
     few_shot_string = ""
     if few_shot_examples:
-        assert isinstance(few_shot_examples, dict)
+        assert isinstance(few_shot_examples, list)
         for example in few_shot_examples:
             assert "input" in example and "output" in example
             few_shot_string += f"input: {example['input']}\noutput: {example['output']}\n\n"

@@ -34,7 +34,7 @@ def get_openai_gpt4(hyperparameters=None) -> ChatOpenAI:
         model="gpt-4o",
         api_key=OPENAI_API_KEY,
         temperature=0.1,
-        max_tokens=1000,
+        max_tokens=4096,
         streaming=True,
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
@@ -420,6 +420,9 @@ class LLM_FN:
 
 class LLM:
     def __init__(self, llm_fn: LLM_FN, hyperparameters=None):
+        if isinstance(llm_fn, LLM):
+            raise ValueError("LLM object passed to LLM constructor")
+        assert isinstance(llm_fn, LLM_FN), "llm_fn must be an LLM_FN object"
         found = False
         for model in MODEL_DICT.values():
             if model["function"] == llm_fn.model_fn:
