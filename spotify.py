@@ -47,7 +47,7 @@ def perform_lookup(
     return results
 
 
-def uris_from_spotify_urls(urls: list[str]) -> list[Tuple[str, str]] | None:
+def uri_items_from_spotify_urls(urls: list[str]) -> list[Tuple[str, str]] | None:
     """
     Given a list of Spotify URLs, extract the URI type and URI.
 
@@ -132,18 +132,35 @@ def decode_uris(uri_items: str, expand_tracks=False, limit=10):
     return results
 
 
-def search_spotify(query: str, result_type: str, limit: int = 2) -> Optional[Dict]:
+def search_spotify(query: str, result_type: str = "track", limit: int = 2) -> list | dict[str] | None:
     """Search Spotify for tracks or albums."""
     if result_type not in ["track", "album", "both"]:
         logger.error("Only track and album searches are supported")
         raise ValueError("Invalid result type")
     if result_type == "both":
         result_type = "track,album"
+    logging.info(f"Searching for {result_type}s")
     result = READ_ONLY_SP.search(q=query, limit=limit, type=result_type, market=SEARCH_MARKET)
     if result_type == "track":
         result = result.get('tracks', {})
     elif result_type == "album":
         result = result.get('albums', {})
+    else:
+        assert result_type == "track,album", "Invalid result type"
+        tracks = result.get('tracks', {}).get('items', [])
+        albums = result.get('albums', {}).get('items', [])
+        if tracks and albums:
+            logging.warning("Both tracks and albums found. Returning response_object.")
+            response_object = {"tracks": tracks, "albums": albums, "playlists": []}
+            return response_object
+        else:
+            if tracks:
+                result = tracks
+            elif albums:
+                result = albums
+            else:
+                logging.error("No tracks or albums found")
+                return None
     items = result.get('items', [])
     if not items:
         logger.error(f"No {result_type}s found")
@@ -152,21 +169,27 @@ def search_spotify(query: str, result_type: str, limit: int = 2) -> Optional[Dic
 
 
 def add_spotify_tracks_to_library(track_values: list[str]):
+    """Add tracks to the user's Spotify library."""
     # track_values is a list of track URIs, URLs or IDs
-    # Check validity of track_values
+    if AUTHORIZED_SP is None:
+        logging.error("Spotify client not authorized for this function.")
+        raise SystemExit
     return AUTHORIZED_SP.current_user_saved_tracks_add(tracks=track_values)
 
 
 def remove_spotify_tracks_from_library(track_values: list[str], bulk=False):
+    """Remove tracks from the user's Spotify library."""
     # track_values is a list of track URIs, URLs or IDs
+    if AUTHORIZED_SP is None:
+        logging.error("Spotify client not authorized for this function.")
+        raise SystemExit
     if len(track_values) > 50:
-        logging.warning("This will remove more than 50 tracks.")
+        logging.warning("This will check against more than 50 tracks.")
         if not bulk:
             logging.error("bulk arg in remove_spotify_tracks_from_library is False. Set to True to remove override.")
-            logging.info("No tracks removed.")
+            logging.info("No tracks checked.")
             return None
-    deleted_playlist_tracks = AUTHORIZED_SP.current_user_saved_tracks_delete(tracks=track_values)
-    return deleted_playlist_tracks
+    return AUTHORIZED_SP.current_user_saved_tracks_delete(tracks=track_values)
 
 
 def get_saved_tracks(limit=20) -> list | None:
@@ -275,6 +298,7 @@ def prune_library(
             print(f"Removing {track_name} by {artist_name}")
             # Remove from playlist
             playlist_tracks.pop(idx)
+            # TODO: Confirm that this is safe and working
     if len(removed_ids) > 20:
         print("Attempting to remove 20+ tracks!")
         if prune_limit != 100:
@@ -361,7 +385,7 @@ def query_to_top_spotify_hits(
     """Get the top Spotify hits for the given query."""
     res_urls = res_urls_from_query(
         query, filter_type=filter_type, max_urls=limit)
-    uri_items = uris_from_spotify_urls(res_urls)
+    uri_items = uri_items_from_spotify_urls(res_urls)
     if not uri_items:
         print("No uri items found")
         return None
@@ -400,7 +424,7 @@ def wacky_testing():
     if not res_urls:
         logging.error("No urls found")
         raise SystemExit
-    uri_items = uris_from_spotify_urls(res_urls)
+    uri_items = uri_items_from_spotify_urls(res_urls)
     if not uri_items:
         logging.error("No uri items found")
         raise SystemExit
@@ -441,7 +465,7 @@ def main():
         print(url)
 
     # Get the URIs from the URLs
-    uri_items = uris_from_spotify_urls(res_urls)
+    uri_items = uri_items_from_spotify_urls(res_urls)
     if not uri_items:
         print("No uri items found")
         return None
@@ -451,12 +475,12 @@ def main():
     return result_object
 
 if __name__ == "__main__":
-    # main()
+    main()
     # test_functions()
     # tracks = add_track_from_query("boom clap")
     # if tracks:
     #     print_items(tracks, from_playlist=True)
-    print_my_library()
+    # print_my_library()
 
 
 ### Example payload
