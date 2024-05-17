@@ -10,33 +10,36 @@ from yt_dlp import YoutubeDL
 
 from helpers import ROOT
 from rag import get_eval_chain, get_music_chain
-from models import get_ollama_local_model, LLM_FN, LLM, get_together_llama3
+from models import get_ollama_local_model, LLM_FN, LLM, get_together_fn_mix
 
 # Configuration flags
-USE_LOCAL_MODEL = True
+DISABLE_DOWNLOADING = True
+
+USE_LOCAL_MODEL = False
 CONFIRM_SCHEMA_TYPE = True
 USE_CLIPBOARD = True
+ONLY_DOWNLOAD = False
 
-# Default data and constants
-DEFAULT_DATA = {
-    "title": "The Less I Know The Better",
-    "artist": "Tame Impala",
-    "year": 2015
-}
-DEFAULT_INPUT = "# Used to You • . • Ali Gatie 2019"
+QUERY_SUFFIX = "official audio"
+
+DEFAULT_INPUT = "fleetwood mac landslide"
 DEFAULT_LLM_FN = LLM_FN(
-    get_ollama_local_model) if USE_LOCAL_MODEL else LLM_FN(get_together_llama3)
+    get_ollama_local_model) if USE_LOCAL_MODEL else LLM_FN(get_together_fn_mix)
 MANIFEST_FILE = "music_db.json"
 MUSIC_DIR = ROOT.parent / "AugmentaMusic"
 SAVE_DIR = MUSIC_DIR / "YouTubeAudio"
 YOUTUBE_URL_PREFIX = "https://youtube.com/watch?v="
-QUERY_SUFFIX = "official audio"
-EXAMPLE_JSON_OUTPUT_STRING = """[
-    {"title": "Lux Aeterna", "artist": "Clint Mansell & Kronos Quartet", "year": 2000},
-    {"title": "Too Sad To Cry E", "artist": "Sasha Sloan", "year": 2019},
-    {"title": "Why'd You Only Call Me When You're High?", "artist": "Arctic Monkeys", "year": 2013},
-    {"title": "Sing for You (Single Version) [2015 Remastered]", "artist": "Tracy Chapman", "year": 2008}
-]"""
+
+EXAMPLE_JSON_OUTPUT_STRING = """[{"title": "Right Where I Belong", "artist": "Alex Goot", "album": "Wake Up Call"}, 
+{"title": "Mockingbird", "artist": "Eminem", "album": "Encore (Deluxe Version)"}, 
+{"title": "Wicked Man's Rest", "artist": "Passenger", "album": "Wicked Man's Rest"}, 
+{"title": "Martin & Gina", "artist": "Polo G", "album": "THE GOAT"}, 
+{"title": "Le Festin", "artist": "Camille", "album": "Ratatouille (Score from the Motion Picture)"}, 
+{"title": "In da Club", "artist": "50 Cent", "album": "Get Rich or Die Tryin'"}, 
+{"title": "Thanos vs J. Robert Oppenheimer", "artist": "Epic Rap Battles of History", "album": "Thanos vs J. Robert Oppenheimer - Single"}]"""
+
+REQUIRED_KEYS = ["title", "artist", "album"]
+
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -45,22 +48,21 @@ logger = logging.getLogger(__name__)
 # Few-shot examples for the language model
 DEFAULT_FEW_SHOT_EXAMPLES = [
     {
-        "input": "Used to You • . • Ali Gatie 2019",
-        "output": '[{"title": "Used to You", "artist": "Ali Gatie", "year": 2019}]'
+        "input": "drivers license E Olivia Rodrigo SOUR (Video Version)\nSTAY E The Kid LAROI, Justin Bieber F*CK LOVE 3+: OVER YOU",
+        "output": '[{"title": "drivers license", "artist": "Olivia Rodrigo", "album": "SOUR (Video Version)"}, {"title": "STAY", "artist": "The Kid LAROI, Justin Bieber", "album": "F*CK LOVE 3+: OVER YOU"}]'
     },
     {
-        "input": "Lux Aeterna ••• Clint Mansell & Kronos Quartet 2000\nToo Sad To Cry E ••• Sasha Sloan 2019\nWhy'd You Only Call Me When You're High? • • • Arctic Monkeys 2013\nSing for You (Single Version) [2015 Remastered] •. • Tracy Chapman 2008",
+        "input": "Right Where I Belong • .. Alex Goot Wake Up Call Mockingbird 0 ... Eminem Encore (Deluxe Version) Wicked Man's Rest Passenger Wicked Man's Rest Martin & Gina E... Polo G THE GOAT Le Festin ... Camille Ratatouille (Score from the Motion Picture) In da Club ... 50 Cent Get Rich or Die Tryin' Thanos vs J. Robert Oppenheimer • . . Epic Rap Battles of History Thanos vs J. Robert Oppenheimer - Single",
         "output": EXAMPLE_JSON_OUTPUT_STRING
     }
 ]
+# DEFAULT_FEW_SHOT_EXAMPLES = None
 
 # Pydantic models for data validation
-
-
 class SearchSchema(BaseModel):
     title: str
     artist: str
-    year: int
+    album: str
 
 
 class ResultSchema(BaseModel):
@@ -71,9 +73,15 @@ class ResultSchema(BaseModel):
 class FinalSchema(BaseModel):
     title: str
     artist: str
-    year: int
+    # album: str
+    # year: int
     downloaded: bool
     url: str
+
+class AppleMusicSchema(BaseModel):
+    title: str
+    artist: str
+    album: str
 
 
 def create_query(data: SearchSchema) -> str:
@@ -137,6 +145,8 @@ def append_to_music_manifest(
     """Append data to the music manifest file."""
     if CONFIRM_SCHEMA_TYPE:
         for item in data:
+            if not all(key in item for key in REQUIRED_KEYS):
+                raise ValueError("At least one song does not contain the required keys")
             SearchSchema(**item)
             item["downloaded"] = False
 
@@ -155,16 +165,19 @@ def append_to_music_manifest(
         for item in manifest:
             SearchSchema(**item)
 
-    existing_items = {(item["title"], item["artist"], item["year"])
+
+    # TODO: Check for duplicates more effectively
+    existing_items = {
+        (item["title"], item["artist"], item["album"])
                       for item in manifest}
 
     new_items = [
         item for item in data if (
             item["title"],
             item["artist"],
-            item["year"]) not in existing_items]
+            item["album"]) not in existing_items]
     if not new_items:
-        print("No new items to add")
+        logging.info("No new items to add")
         return False
 
     manifest.extend(new_items)
@@ -180,8 +193,8 @@ def music_workflow(query: str) -> bool:
 
     eval_chain = get_eval_chain(llm)
     eval_dict = {
-        "excerpt": f'index 0:"\n{query}',
-        "criteria": "The excerpt contains at least one song with a provided song title, artist, and year."
+        "excerpt": "index 0:\n" + query,
+        "criteria": "The excerpt contains at least one song title, artist, and album."
     }
     res = eval_chain.invoke(eval_dict)
     if not res["meetsCriteria"]:
@@ -195,7 +208,7 @@ def music_workflow(query: str) -> bool:
         return False
     if not isinstance(response_object, list):
         raise TypeError("Response object must be a list")
-
+    
     return append_to_music_manifest(response_object)
 
 
@@ -227,6 +240,7 @@ def download_from_manifest(
             continue
         url = download_audio(SearchSchema(**item), save_dir, manifest_ids)
         if not url:
+            logger.error("Failed to download audio")
             continue
         item["downloaded"] = True
         item["url"] = url
@@ -241,33 +255,42 @@ def main():
     """Main function to run the script."""
     manifest_file = MANIFEST_FILE
     save_dir = SAVE_DIR
-    ONLY_DOWNLOAD = False
+    only_download = ONLY_DOWNLOAD
 
-    if ONLY_DOWNLOAD:
+    if only_download:
+        if DISABLE_DOWNLOADING:
+            logging.error("Downloading is disabled but ONLY_DOWNLOAD is enabled. Aborting.")
+            return
         download_from_manifest(manifest_file, save_dir)
         return
+
+    input = DEFAULT_INPUT
 
     if USE_CLIPBOARD:
         try:
             from pyperclip import paste
-            INPUT = paste()
+            clipboard_contents = paste().strip()
+            if not clipboard_contents:
+                logger.info("Clipboard is empty. Using default input.")
+            else:
+                logger.info("Using clipboard contents as input")
+                input = clipboard_contents
         except ImportError:
             logger.error(
                 "pyperclip is not installed. Falling back to default input.")
-            INPUT = DEFAULT_INPUT
-    else:
-        INPUT = DEFAULT_INPUT
 
+    assert len(input) > 0
     try:
-        found_songs = music_workflow(INPUT)
+        found_songs = music_workflow(input)
     except KeyboardInterrupt:
         logger.info("Music workflow aborted")
         return
 
     if found_songs:
-        logger.info("Downloading songs...")
-        download_from_manifest(manifest_file, save_dir)
-
+        logger.info("Songs found and added to manifest")
+        if not DISABLE_DOWNLOADING:
+            logger.info("Downloading songs...")
+            download_from_manifest(manifest_file, save_dir)
 
 if __name__ == "__main__":
     main()
