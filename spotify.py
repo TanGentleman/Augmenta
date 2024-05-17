@@ -132,36 +132,23 @@ def decode_uris(uri_items: str, expand_tracks=False, limit=10):
     return results
 
 
-def search_spotify_tracks(query: str, limit: int = 2) -> dict | None:
-    result = READ_ONLY_SP.search(
-        q=query,
-        limit=limit,
-        type="track",
-        market=SEARCH_MARKET)
-    if result is None:
-        logging.error("No spotify search results found")
+def search_spotify(query: str, result_type: str, limit: int = 2) -> Optional[Dict]:
+    """Search Spotify for tracks or albums."""
+    if result_type not in ["track", "album", "both"]:
+        logger.error("Only track and album searches are supported")
+        raise ValueError("Invalid result type")
+    if result_type == "both":
+        result_type = "track,album"
+    result = READ_ONLY_SP.search(q=query, limit=limit, type=result_type, market=SEARCH_MARKET)
+    if result_type == "track":
+        result = result.get('tracks', {})
+    elif result_type == "album":
+        result = result.get('albums', {})
+    items = result.get('items', [])
+    if not items:
+        logger.error(f"No {result_type}s found")
         return None
-    tracks = result['tracks']['items']
-    if not tracks:
-        logging.error("No tracks found")
-        return None
-    return tracks
-
-
-def search_spotify_albums(query: str, limit: int = 2) -> dict | None:
-    result = READ_ONLY_SP.search(
-        q=query,
-        limit=limit,
-        type="album",
-        market=SEARCH_MARKET)
-    if result is None:
-        logging.error("No spotify search results found")
-        return None
-    albums = result['albums']['items']
-    if not albums:
-        logging.error("No albums found")
-        return None
-    return albums
+    return items
 
 
 def add_spotify_tracks_to_library(track_ids: list[str]):
@@ -297,7 +284,7 @@ def test_functions():
     query = DEFAULT_QUERY
     limit = 1
     ADD_TO_LIB = False
-    result_tracks = search_spotify_tracks(query, limit=limit)
+    result_tracks = search_spotify(query, result_type="tracks", limit=limit)
     if not result_tracks:
         print("No tracks found")
         return None
@@ -347,13 +334,15 @@ def guess_album_name_from_song_name(song_name: str) -> str | None:
     Returns:
         str | None: The album name of the top track found from the search.
     """
-    res = search_spotify_tracks(song_name, limit=1)
-    print_items(res)
-    if not res:
-        print("No results found")
+    tracks = search_spotify(query=song_name, result_type="track", limit=1)
+    if not tracks:
+        logging.error("No results found")
         return None
-    album_name = res[0]['album']['name']
-    return str(album_name)
+    print(f"Song name: {tracks[0]['name']}")
+    album_name = tracks[0]['album']['name']
+    # print(f"Album name: {album_name}")
+    assert isinstance(album_name, str), "Album name must be a string"
+    return album_name
 
 
 def query_to_top_spotify_hits(
@@ -413,8 +402,9 @@ def wacky_testing():
     albums = get_albums_from_result_object(result_object)
 
 
-def add_top_track_to_library_from_query(query: str):
-    tracks = search_spotify_tracks(query, limit=1)
+def add_track_from_query(query: str):
+    """Add a track to the user's library from a query."""
+    tracks = search_spotify(query, result_type="track", limit=1)
     if not tracks:
         logging.error("No track found")
         return None
