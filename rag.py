@@ -31,7 +31,8 @@ def eval_output_handler(output):
         """
         Checks if the output is valid.
         """
-        structure_passed = bool("index" in output and "meetsCriteria" in output)
+        structure_passed = bool(
+            "index" in output and "meetsCriteria" in output)
         if structure_passed:
             print("Meets criteria:", output["meetsCriteria"])
         return structure_passed

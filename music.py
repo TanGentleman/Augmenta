@@ -30,12 +30,12 @@ MUSIC_DIR = ROOT.parent / "AugmentaMusic"
 SAVE_DIR = MUSIC_DIR / "YouTubeAudio"
 YOUTUBE_URL_PREFIX = "https://youtube.com/watch?v="
 
-EXAMPLE_JSON_OUTPUT_STRING = """[{"title": "Right Where I Belong", "artist": "Alex Goot", "album": "Wake Up Call"}, 
-{"title": "Mockingbird", "artist": "Eminem", "album": "Encore (Deluxe Version)"}, 
-{"title": "Wicked Man's Rest", "artist": "Passenger", "album": "Wicked Man's Rest"}, 
-{"title": "Martin & Gina", "artist": "Polo G", "album": "THE GOAT"}, 
-{"title": "Le Festin", "artist": "Camille", "album": "Ratatouille (Score from the Motion Picture)"}, 
-{"title": "In da Club", "artist": "50 Cent", "album": "Get Rich or Die Tryin'"}, 
+EXAMPLE_JSON_OUTPUT_STRING = """[{"title": "Right Where I Belong", "artist": "Alex Goot", "album": "Wake Up Call"},
+{"title": "Mockingbird", "artist": "Eminem", "album": "Encore (Deluxe Version)"},
+{"title": "Wicked Man's Rest", "artist": "Passenger", "album": "Wicked Man's Rest"},
+{"title": "Martin & Gina", "artist": "Polo G", "album": "THE GOAT"},
+{"title": "Le Festin", "artist": "Camille", "album": "Ratatouille (Score from the Motion Picture)"},
+{"title": "In da Club", "artist": "50 Cent", "album": "Get Rich or Die Tryin'"},
 {"title": "Thanos vs J. Robert Oppenheimer", "artist": "Epic Rap Battles of History", "album": "Thanos vs J. Robert Oppenheimer - Single"}]"""
 
 REQUIRED_KEYS = ["title", "artist", "album"]
@@ -59,6 +59,8 @@ DEFAULT_FEW_SHOT_EXAMPLES = [
 # DEFAULT_FEW_SHOT_EXAMPLES = None
 
 # Pydantic models for data validation
+
+
 class SearchSchema(BaseModel):
     title: str
     artist: str
@@ -77,6 +79,7 @@ class FinalSchema(BaseModel):
     # year: int
     downloaded: bool
     url: str
+
 
 class AppleMusicSchema(BaseModel):
     title: str
@@ -146,7 +149,8 @@ def append_to_music_manifest(
     if CONFIRM_SCHEMA_TYPE:
         for item in data:
             if not all(key in item for key in REQUIRED_KEYS):
-                raise ValueError("At least one song does not contain the required keys")
+                raise ValueError(
+                    "At least one song does not contain the required keys")
             SearchSchema(**item)
             item["downloaded"] = False
 
@@ -165,11 +169,10 @@ def append_to_music_manifest(
         for item in manifest:
             SearchSchema(**item)
 
-
     # TODO: Check for duplicates more effectively
     existing_items = {
         (item["title"], item["artist"], item["album"])
-                      for item in manifest}
+        for item in manifest}
 
     new_items = [
         item for item in data if (
@@ -194,8 +197,7 @@ def music_workflow(query: str) -> bool:
     eval_chain = get_eval_chain(llm)
     eval_dict = {
         "excerpt": "index 0:\n" + query,
-        "criteria": "The excerpt contains at least one song title, artist, and album."
-    }
+        "criteria": "The excerpt contains at least one song title, artist, and album."}
     res = eval_chain.invoke(eval_dict)
     if not res["meetsCriteria"]:
         logger.info("Excerpt does not meet criteria")
@@ -208,7 +210,7 @@ def music_workflow(query: str) -> bool:
         return False
     if not isinstance(response_object, list):
         raise TypeError("Response object must be a list")
-    
+
     return append_to_music_manifest(response_object)
 
 
@@ -259,7 +261,8 @@ def main():
 
     if only_download:
         if DISABLE_DOWNLOADING:
-            logging.error("Downloading is disabled but ONLY_DOWNLOAD is enabled. Aborting.")
+            logging.error(
+                "Downloading is disabled but ONLY_DOWNLOAD is enabled. Aborting.")
             return
         download_from_manifest(manifest_file, save_dir)
         return
@@ -291,6 +294,7 @@ def main():
         if not DISABLE_DOWNLOADING:
             logger.info("Downloading songs...")
             download_from_manifest(manifest_file, save_dir)
+
 
 if __name__ == "__main__":
     main()

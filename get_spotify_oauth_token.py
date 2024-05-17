@@ -1,4 +1,5 @@
 # This file updates the SPOTIFY_OATH_TOKEN in the .env file
+import urllib.parse
 from base64 import b64encode
 from os import environ
 from requests import post
@@ -10,7 +11,6 @@ CLIENT_ID = environ.get("SPOTIFY_CLIENT_ID")
 CLIENT_SECRET = environ.get("SPOTIFY_CLIENT_SECRET")
 if not CLIENT_ID or not CLIENT_SECRET:
     raise Exception("No Spotify client ID or secret found")
-import urllib.parse
 
 redirect_uri = 'https://localhost:3000'
 scope = 'user-library-modify user-library-read user-read-email user-read-private'
@@ -36,18 +36,22 @@ params = {
     'state': state
 }
 
-auth_url = 'https://accounts.spotify.com/authorize?' + urllib.parse.urlencode(params)
+auth_url = 'https://accounts.spotify.com/authorize?' + \
+    urllib.parse.urlencode(params)
 
 print(auth_url)
 
-response = post("https://accounts.spotify.com/api/token", data={
-    "grant_type": "authorization_code",
-    "code": code,
-    "redirect_uri": redirect_uri
-}, headers={
-    "Authorization": "Basic " + b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode(),
-    "Content-Type": "application/x-www-form-urlencoded"
-})
+response = post(
+    "https://accounts.spotify.com/api/token",
+    data={
+        "grant_type": "authorization_code",
+        "code": code,
+        "redirect_uri": redirect_uri},
+    headers={
+        "Authorization": "Basic " +
+        b64encode(
+            f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode(),
+        "Content-Type": "application/x-www-form-urlencoded"})
 # Parse output
 print(response.json())
 response_token = response.json()["access_token"]
