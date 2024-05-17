@@ -47,29 +47,29 @@ def perform_lookup(
     return results
 
 
-def uris_from_spotify_urls(urls: str):
+def uris_from_spotify_urls(urls: list[str]) -> list[Tuple[str, str]] | None:
     """
-    Given a list of Spotify URLs, decode the URIs and couple as tracks, playlists, and albums.
+    Given a list of Spotify URLs, extract the URI type and URI.
 
     Args:
-        urls (str): A list of Spotify URLs.
+        urls (list[str]): A list of Spotify URLs.
 
     Returns:
-        list or None: A list of tuples containing the URI type and URI. Returns None if no valid objects are found.
+        list[Tuple[str, str]] | None: A list of tuples containing the URI type and URI.
     """
     uri_items = []
-    result_item = ()
     for url in urls:
-        assert url.startswith("https://open.spotify.com/"), "Invalid URL"
+        if not url.startswith("https://open.spotify.com/"):
+            logger.error("Invalid URL")
+            continue
         uri_type = url.split("/")[3]
         uri = url.split("/")[-1].split("?")[0]
         if uri_type not in ["track", "playlist", "album"]:
-            logging.info(f"Ignoring URL of type {uri_type}")
+            logger.info(f"Ignoring URL of type {uri_type}")
             continue
-        result_item = (uri_type, uri)
-        uri_items.append(result_item)
+        uri_items.append((uri_type, uri))
     if not uri_items:
-        logging.error("No valid objects found")
+        logger.error("No valid objects found")
         return None
     return uri_items
 
@@ -86,43 +86,37 @@ def decode_uris(uri_items: str, expand_tracks=False, limit=10):
     Returns:
         dict: A dictionary containing the tracks, playlists, and albums.
     """
-    results = {}
-    results["tracks"] = []
-    results["playlists"] = []
-    results["albums"] = []
+    results = {"tracks": [], "playlists": [], "albums": []}
     for uri_type, uri in uri_items:
         if uri_type not in ["track", "playlist", "album"]:
             logging.info("Ignoring uri of type", uri_type)
             continue
         if uri_type == "playlist":
-            # TODO: Get playlist name
             playlist_URI = uri
             playlist = READ_ONLY_SP.playlist(playlist_URI)
             playlist_name = playlist["name"]
             print("Playlist:", playlist_name)
             if expand_tracks:
+                if len(playlist_tracks) > limit:
+                    logging.info(f"{len(playlist_tracks)} tracks truncated to {limit}.")
                 # Use playlist object to get tracks
                 playlist_tracks = playlist["tracks"]["items"]
-                if len(playlist_tracks) > limit:
-                    logging.info(f"Truncating to {limit} tracks")
                 print_items(playlist_tracks, from_playlist=True, limit=limit)
             results["playlists"].append(playlist)
         elif uri_type == "track":
-            track_URI = uri
-            track = READ_ONLY_SP.track(track_URI)
+            track = READ_ONLY_SP.track(uri)
             track_name = track["name"]
             artist_name = track["artists"][0]["name"]
             print(f"Track: {track_name} by {artist_name}")
             results["tracks"].append(track)
         elif uri_type == "album":
-            album_URI = uri
-            album = READ_ONLY_SP.album(album_URI)
-            album_name = album["name"]
+            album = READ_ONLY_SP.album(uri)
             results["albums"].append(album)
+            album_name = album["name"]
             if expand_tracks:
                 tracks = album["tracks"]["items"]
                 if len(tracks) > limit:
-                    logging.info(f"Truncating to {limit} tracks")
+                    logging.info(f"{len(tracks)} tracks truncated to {limit}.")
                 print("Album:", album_name, "Tracks:")
                 print("=======")
                 for track in tracks:
@@ -132,8 +126,8 @@ def decode_uris(uri_items: str, expand_tracks=False, limit=10):
                 print("Album:", album_name)
         else:
             logging.info("Ignoring URL")
-    if not results:
-        logging.error("No valid objects found")
+    if not any(results.values()):
+        logging.error("No valid items found")
         return None
     return results
 
