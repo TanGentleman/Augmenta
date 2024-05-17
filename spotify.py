@@ -192,12 +192,12 @@ def remove_spotify_tracks_from_library(track_values: list[str], bulk=False):
     return AUTHORIZED_SP.current_user_saved_tracks_delete(tracks=track_values)
 
 
-def get_saved_tracks(limit=20) -> list | None:
+def get_user_library_playlist(limit=20) -> list | None:
     user_library_playlist = AUTHORIZED_SP.current_user_saved_tracks(
         limit=limit)
     if not user_library_playlist:
         raise ValueError(
-            "No tracks found in user library. Add logic in get_saved_tracks.")
+            "No tracks found in user library. Add logic in get_user_library_playlist.")
     saved_tracks = user_library_playlist['items']
     return saved_tracks
 
@@ -205,7 +205,7 @@ def get_saved_tracks(limit=20) -> list | None:
 def extract_track_ids(tracks=None, from_playlist=False):
     if not tracks:
         logging.info("Getting user library tracks")
-        tracks = get_saved_tracks()
+        tracks = get_user_library_playlist()
         from_playlist = True
     if len(tracks) > 100:
         logging.info(f"This list of tracks has more than {len(tracks)} items.")
@@ -226,7 +226,7 @@ def extract_track_ids(tracks=None, from_playlist=False):
 def extract_album_ids(tracks=None, from_playlist=False, warning_count=30):
     if not tracks:
         logging.info("Getting user library tracks")
-        tracks = get_saved_tracks()
+        tracks = get_user_library_playlist()
         from_playlist = True
     if len(tracks) > warning_count:
         logging.warning(f"This list of tracks has {len(tracks)} items.")
@@ -274,7 +274,7 @@ def prune_library(
         acceptable_songs: list[str],
         acceptable_artists: list[str],
         prune_limit: int = 99) -> list | None:
-    playlist_tracks = get_saved_tracks()
+    playlist_tracks = get_user_library_playlist()
     if not playlist_tracks:
         logging.error("No tracks in your library found")
         return None
@@ -447,7 +447,7 @@ def add_track_from_query(query: str):
     return None
 
 def print_my_library():
-    print_items(get_saved_tracks(), from_playlist=True)
+    print_items(get_user_library_playlist(), from_playlist=True)
 
 def main():
     max_urls = 3
