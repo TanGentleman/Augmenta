@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 #     }
 #     response = requests.get(url, params=params, headers=headers)
 #     return response.json()
+SEARCH_MARKET = "US"
 FILTER_DOMAIN = "site:open.spotify.com/"
 ALLOW_AUTHORIZED = False
 if ALLOW_AUTHORIZED:
@@ -151,7 +152,7 @@ def decode_uris(uri_items: str, expand_tracks = False, limit = 10):
 
 
 def search_spotify_tracks(query: str, limit: int = 2) -> dict | None:
-    result = READ_ONLY_SP.search(q=query, limit=limit, type="track")
+    result = READ_ONLY_SP.search(q=query, limit=limit, type="track", market=SEARCH_MARKET)
     if result is None:
         logging.error("No spotify search results found")
         return None
@@ -162,7 +163,7 @@ def search_spotify_tracks(query: str, limit: int = 2) -> dict | None:
     return tracks
 
 def search_spotify_albums(query: str, limit:int = 2) -> dict | None:
-    result = READ_ONLY_SP.search(q=query, limit=limit, type="album", market="US")
+    result = READ_ONLY_SP.search(q=query, limit=limit, type="album", market=SEARCH_MARKET)
     if result is None:
         logging.error("No spotify search results found")
         return None
@@ -334,54 +335,6 @@ def res_urls_from_query(query: str, filter_type = "", max_urls: int = 1, include
     res_urls = [str(r["url"]) for r in res]
     return res_urls
 
-def get_spotify_uris_from_urls(urls: list[str]):
-    track_uris = []
-    playlist_uris = []
-    album_uris = []
-    for url in urls:
-        uri = url.split("/")[-1].split("?")[0]
-        if url.startswith("https://open.spotify.com/track/"):
-            track_uris.append(uri)
-        elif url.startswith("https://open.spotify.com/playlist/"):
-            playlist_uris.append(uri)
-        elif url.startswith("https://open.spotify.com/album/"):
-            album_uris.append(uri)
-        else:
-            logging.info("Ignoring URL")
-
-    if not any([track_uris, playlist_uris, album_uris]):
-        print("No valid URIs found")
-        return None
-    return track_uris, playlist_uris, album_uris
-    
-def print_info_from_spotify_uris(track_uris, playlist_uris, album_uris, expand_albums = False):
-    if track_uris:
-        print("Tracks:")
-        tracks = READ_ONLY_SP.tracks(track_uris)
-        track_names = [track["name"] for track in tracks["tracks"]]
-        print(track_names)
-    if playlist_uris:
-        print("Only showing first playlist:")
-        # only do first playlist
-        playlist_uri = playlist_uris[0]
-        playlists = READ_ONLY_SP.playlist(playlist_uri)
-        playlist_name = playlists["name"]
-        print("playlist name:", playlist_name)
-    if album_uris:
-        print("Albums:")
-        albums = READ_ONLY_SP.albums(album_uris)
-        if expand_albums:
-            for album in albums["albums"]:
-                print('Tracks in', album["name"], 'by', album["artists"][0]["name"])
-                print("=======")
-                for track in album["tracks"]["items"]:
-                    print(track['name'])
-                    # print(f"{track['name']} by {track['artists'][0]['name']}")
-                print()
-        else:
-            album_names = [album["name"] for album in albums["albums"]]
-            print(album_names)
-
 def main():
     max_urls = 3
     ### Get the spotify URLS that best fit the query
@@ -396,14 +349,14 @@ def main():
         print(i)  
 
     ### Get the URIs from the URLs
-    track_uris, playlist_uris, album_uris = get_spotify_uris_from_urls(res_urls)
-
-    if not any([track_uris, playlist_uris, album_uris]):
-        print("No valid URIs found")
+    uri_items = uris_from_spotify_urls(res_urls)
+    if not uri_items:
+        print("No uri items found")
         return None
-    
+
     ### Get the track, playlist, and album information          
-    print_info_from_spotify_uris(track_uris, playlist_uris, album_uris, expand_albums=True)
+    result_object = decode_uris(uri_items, expand_tracks=True)
+    return result_object
 
 def guess_album_name_from_song_name(song_name: str) -> str | None:
     """Uses the album name of the top track found from the query.
@@ -425,12 +378,12 @@ def guess_album_name_from_song_name(song_name: str) -> str | None:
 def query_to_top_spotify_hits(query: str, filter_type: str = "track", limit = 3) -> dict:
     """Get the top Spotify hits for the given query."""
     res_urls = res_urls_from_query(query, filter_type=filter_type, max_urls=limit)
-    track_uris, playlist_uris, album_uris = get_spotify_uris_from_urls(res_urls)
-    print_info_from_spotify_uris(track_uris, playlist_uris, album_uris, expand_albums=False)
-    results = search_spotify_tracks(query, limit=1)
-    if not results:
-        raise ValueError("No results found")
-    return results[0]
+    uri_items = uris_from_spotify_urls(res_urls)
+    if not uri_items:
+        print("No uri items found")
+        return None
+    result_object = decode_uris(uri_items, expand_tracks=True)
+    return result_object
 
 def wacky_testing():
     # get the song for the query
@@ -460,9 +413,6 @@ def wacky_testing():
         extract_album_ids(result_object["tracks"])
     if "albums" in result_object and result_object["albums"]:
         extract_album_ids(result_object["albums"])
-    track_uris, playlist_uris, album_uris = get_spotify_uris_from_urls(res_urls)
-    print("\nVERSUS:\n")
-    print_info_from_spotify_uris(track_uris, playlist_uris, album_uris, expand_albums=False)
 
 if __name__ == "__main__":
     # test_functions()
