@@ -1,60 +1,40 @@
-from langchain_community.tools.tavily_search import TavilySearchResults
-from spotipy.oauth2 import SpotifyOAuth
-from spotipy.oauth2 import SpotifyClientCredentials
-from spotipy import Spotify
-from os import environ
 import logging
-from typing import Union
+from os import environ
+from typing import Union, List, Tuple, Dict, Optional
 from dotenv import load_dotenv
 from pydantic import BaseModel
+from spotipy import Spotify
+from spotipy.oauth2 import SpotifyOAuth, SpotifyClientCredentials
+from langchain_community.tools.tavily_search import TavilySearchResults
+
+# Load environment variables
 load_dotenv()
+
 SPOTIFY_CLIENT_ID = environ.get("SPOTIFY_CLIENT_ID")
 SPOTIFY_CLIENT_SECRET = environ.get("SPOTIFY_CLIENT_SECRET")
-
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# import requests
-# def search_spotify(q, result_type, limit, auth_token):
-#     assert result_type in ["album", "artist", "playlist", "track", "show", "episode"], "Invalid type"
-#     SPOTIFY_AUTH_TOKEN = environ.get("SPOTIFY_AUTH_TOKEN")
-#     url = "https://api.spotify.com/v1/search"
-#     params = {
-#         "q": q,
-#         "type": result_type,
-#         "market": "US",
-#         "limit": limit
-#     }
-#     headers = {
-#         "Authorization": f"Bearer {auth_token}"
-#     }
-#     response = requests.get(url, params=params, headers=headers)
-#     return response.json()
+# Constants
 SEARCH_MARKET = "US"
 FILTER_DOMAIN = "site:open.spotify.com/"
 ALLOW_AUTHORIZED = False
-if ALLOW_AUTHORIZED:
-    logging.info(
-        "Allowing authorized Spotify API. This has a destructive scope.")
+DEFAULT_QUERY = "2 poor kids"
 
-READ_ONLY_SP = Spotify(
-    auth_manager=SpotifyClientCredentials(
+# Spotify Clients
+READ_ONLY_SP = Spotify(auth_manager=SpotifyClientCredentials(
+    client_id=SPOTIFY_CLIENT_ID,
+    client_secret=SPOTIFY_CLIENT_SECRET))
+
+AUTHORIZED_SP = None
+if ALLOW_AUTHORIZED:
+    AUTHORIZED_SP = Spotify(auth_manager=SpotifyOAuth(
         client_id=SPOTIFY_CLIENT_ID,
-        client_secret=SPOTIFY_CLIENT_SECRET))
-
-if ALLOW_AUTHORIZED:
-    AUTHORIZED_SP = Spotify(
-        auth_manager=SpotifyOAuth(
-            client_id=SPOTIFY_CLIENT_ID,
-            client_secret=SPOTIFY_CLIENT_SECRET,
-            redirect_uri="http://localhost:3000",
-            scope="user-library-read user-library-modify"))
-else:
-    AUTHORIZED_SP = None
-
-QUERY = "2 poor kids"
+        client_secret=SPOTIFY_CLIENT_SECRET,
+        redirect_uri="http://localhost:3000",
+        scope="user-library-read user-library-modify"))
 
 
 def perform_lookup(
@@ -478,3 +458,20 @@ def main():
 if __name__ == "__main__":
     # main()
     test_functions()
+
+### Example payload
+# import requests
+# def search_spotify(q, result_type, limit, auth_token):
+#     assert result_type in ["album", "artist", "playlist", "track", "show", "episode"], "Invalid type"
+#     SPOTIFY_AUTH_TOKEN = environ.get("SPOTIFY_AUTH_TOKEN")
+#     url = "https://api.spotify.com/v1/search"
+#     params = {
+#         "q": q,
+#         "type": result_type,
+#         "market": "US",
+#         "limit": limit
+#     }
+#     headers = {
+#         "Authorization": f"Bearer {auth_token}"
+#     }
+#     response = requests.get(url, params=params, headers=headers)
