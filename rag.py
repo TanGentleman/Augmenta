@@ -31,7 +31,10 @@ def eval_output_handler(output):
         """
         Checks if the output is valid.
         """
-        return "index" in output and "meetsCriteria" in output
+        structure_passed = bool("index" in output and "meetsCriteria" in output)
+        if structure_passed:
+            print("Meets criteria:", output["meetsCriteria"])
+        return structure_passed
     try:
         if isinstance(output, str):
             output_string = output
@@ -45,7 +48,6 @@ def eval_output_handler(output):
     # print("Output:", output)
     # Perform JSON validation here
     # This function can also redirect to the next step in the pipeline
-    print("evaluation passed!")
     return response_object
 
 
@@ -64,14 +66,14 @@ def music_output_handler(output):
     """
     A parser that returns a list of dictionaries.
 
-    Each dictionary should have keys "title", "artist", and "year".
+    Each dictionary should have keys "title", "artist", and "album".
     """
     def is_output_valid(output):
         """
         Checks if the output is valid.
         """
         for item in output:
-            if not all(key in item for key in ["title", "artist", "year"]):
+            if not all(key in item for key in ["title", "artist", "album"]):
                 print(f"At least one song does not contain the required keys")
                 return False
         return True

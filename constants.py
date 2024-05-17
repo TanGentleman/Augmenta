@@ -7,11 +7,12 @@ CODE_SYSTEM_MESSAGE = "You are an expert programmer. Review the Python code and 
 RAG_SYSTEM_MESSAGE = "You are a helpful AI. Use the document excerpts to respond to the best of your ability."
 PROMPT_CHOOSER_SYSTEM_MESSAGE = "Use the context from Anthropic's example prompting guides to create a sample system message and user message template for the given task."
 EVAL_EXCERPT_SYSTEM_MESSAGE = "You are an AI assistant that evaluates text excerpts to determine if it meets specified criteria. Respond ONLY with a valid JSON output with 2 keys: index: int, and meetsCriteria: bool."
-MUSIC_SYSTEM_MESSAGE = 'As a data conversion expert, your task is to convert the provided string into a list of dictionaries. Your goal is to extract the relevant information from each line and organize it into a JSON object with the appropriate keys. ONLY output the list[dict] that conforms to the given SearchSchema. NO PREAMBLE.'
+MUSIC_SYSTEM_MESSAGE = 'You will be provided with unstructured data, and your task is to parse it into JSON format. You should output a list of dictionaries, where each dictionary contains the keys "title", "artist", and "album".'
 MODEL_CODES = {
     "gpt4": "get_openai_gpt4",
     "bigmix": "get_together_bigmix",
     "dbrx": "get_together_dbrx",
+    "arctic": "get_together_arctic",
     "llama3": "get_together_llama3",
     "deepseek": "get_together_deepseek_4k",
     "opus": "get_claude_opus",
@@ -71,11 +72,11 @@ EVAL_TEMPLATE = """Evaluate the following text excerpt(s) based on the given cri
 Criteria: {criteria}
 """
 
-MUSIC_TEMPLATE = """Please convert the following string into a JSON output (a list of dictionaries) with the keys "title", "artist", and "year". Each entry should obey the given SearchSchema.
+MUSIC_TEMPLATE = """Please convert the following string into a JSON output (a list of dictionaries) with the keys "title", "artist", and "album". Each entry should obey the given SearchSchema.
 class SearchSchema(BaseModel):
     title: str
     artist: str
-    year: int
+    album: int
 
 input:
 {input}
@@ -85,13 +86,13 @@ ONLY output the list[dict]. Do not include any other information.
 output:
 """
 
-ALT_MUSIC_TEMPLATE = """Please convert the following string into a JSON output (a list of dictionaries) with the keys "title", "artist", and "year". Each entry should obey the given SearchSchema.
+ALT_MUSIC_TEMPLATE = """Convert the string into JSON output (a list of dictionaries). Each dictionary should obey the given SearchSchema.
 class SearchSchema(BaseModel):
     title: str
     artist: str
-    year: int
+    album: int
 
-ONLY output the list[dict]. If the string contains no valid entries, ONLY output False. No preamble.
+ONLY output the list[dict]. No preamble.
 {few_shot_examples}
 input:
 {input}
@@ -138,7 +139,7 @@ def get_eval_template():
     return eval_template
 
 
-def get_music_template(few_shot_data: list[dict] = None):
+def get_music_template():
     """
     Fetches the template for the music pipeline.
 
