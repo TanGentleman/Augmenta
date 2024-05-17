@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 # Constants
 SEARCH_MARKET = "US"
 FILTER_DOMAIN = "site:open.spotify.com/"
-ALLOW_AUTHORIZED = False
+ALLOW_AUTHORIZED = True
 DEFAULT_QUERY = "2 poor kids"
 
 # Spotify Clients
@@ -97,10 +97,10 @@ def decode_uris(uri_items: str, expand_tracks=False, limit=10):
             playlist_name = playlist["name"]
             print("Playlist:", playlist_name)
             if expand_tracks:
+                playlist_tracks = playlist["tracks"]["items"]
                 if len(playlist_tracks) > limit:
                     logging.info(f"{len(playlist_tracks)} tracks truncated to {limit}.")
                 # Use playlist object to get tracks
-                playlist_tracks = playlist["tracks"]["items"]
                 print_items(playlist_tracks, from_playlist=True, limit=limit)
             results["playlists"].append(playlist)
         elif uri_type == "track":
@@ -151,13 +151,22 @@ def search_spotify(query: str, result_type: str, limit: int = 2) -> Optional[Dic
     return items
 
 
-def add_spotify_tracks_to_library(track_ids: list[str]):
-    # This can accept more than just track_ids!
-    AUTHORIZED_SP.current_user_saved_tracks_add(tracks=track_ids)
+def add_spotify_tracks_to_library(track_values: list[str]):
+    # track_values is a list of track URIs, URLs or IDs
+    # Check validity of track_values
+    return AUTHORIZED_SP.current_user_saved_tracks_add(tracks=track_values)
 
 
-def remove_spotify_tracks_from_library(track_ids):
-    AUTHORIZED_SP.current_user_saved_tracks_delete(tracks=track_ids)
+def remove_spotify_tracks_from_library(track_values: list[str], bulk=False):
+    # track_values is a list of track URIs, URLs or IDs
+    if len(track_values) > 50:
+        logging.warning("This will remove more than 50 tracks.")
+        if not bulk:
+            logging.error("bulk arg in remove_spotify_tracks_from_library is False. Set to True to remove override.")
+            logging.info("No tracks removed.")
+            return None
+    deleted_playlist_tracks = AUTHORIZED_SP.current_user_saved_tracks_delete(tracks=track_values)
+    return deleted_playlist_tracks
 
 
 def get_saved_tracks(limit=20) -> list | None:
@@ -284,7 +293,7 @@ def test_functions():
     query = DEFAULT_QUERY
     limit = 1
     ADD_TO_LIB = False
-    result_tracks = search_spotify(query, result_type="tracks", limit=limit)
+    result_tracks = search_spotify(query, result_type="track", limit=limit)
     if not result_tracks:
         print("No tracks found")
         return None
@@ -338,7 +347,7 @@ def guess_album_name_from_song_name(song_name: str) -> str | None:
     if not tracks:
         logging.error("No results found")
         return None
-    print(f"Song name: {tracks[0]['name']}")
+    logging.info(f"Input song name: {tracks[0]['name']}")
     album_name = tracks[0]['album']['name']
     # print(f"Album name: {album_name}")
     assert isinstance(album_name, str), "Album name must be a string"
@@ -411,7 +420,10 @@ def add_track_from_query(query: str):
     track_id = tracks[0]['id']
     track_ids = [track_id]
     add_spotify_tracks_to_library(track_ids)
+    return None
 
+def print_my_library():
+    print_items(get_saved_tracks(), from_playlist=True)
 
 def main():
     max_urls = 3
@@ -438,10 +450,14 @@ def main():
     result_object = decode_uris(uri_items, expand_tracks=True)
     return result_object
 
-
 if __name__ == "__main__":
     # main()
-    test_functions()
+    # test_functions()
+    # tracks = add_track_from_query("boom clap")
+    # if tracks:
+    #     print_items(tracks, from_playlist=True)
+    print_my_library()
+
 
 ### Example payload
 # import requests
