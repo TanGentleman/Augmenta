@@ -37,7 +37,7 @@ SEARCH_MARKET = "US"
 FILTER_DOMAIN = "site:open.spotify.com/"
 ALLOW_AUTHORIZED = False
 if ALLOW_AUTHORIZED:
-    logging.info("Allowing authorized Spotify API. Make sure your key is up to date.")
+    logging.info("Allowing authorized Spotify API. This has a destructive scope.")
 
 READ_ONLY_SP = Spotify(auth_manager=SpotifyClientCredentials(client_id=SPOTIFY_CLIENT_ID,
                                                             client_secret=SPOTIFY_CLIENT_SECRET))
@@ -116,10 +116,9 @@ def decode_uris(uri_items: str, expand_tracks = False, limit = 10):
                 # Use playlist object to get tracks
                 playlist_tracks = playlist["tracks"]["items"]
                 if len(playlist_tracks) > limit:
-                    print(f"Truncating to {limit} tracks")
+                    logging.info(f"Truncating to {limit} tracks")
                 print_items(playlist_tracks, from_playlist=True, limit=limit)
             results["playlists"].append(playlist)
-            
         elif uri_type == "track":
             track_URI = uri
             track = READ_ONLY_SP.track(track_URI)
@@ -136,7 +135,7 @@ def decode_uris(uri_items: str, expand_tracks = False, limit = 10):
                 tracks = album["tracks"]["items"]
                 if len(tracks) > limit:
                     logging.info(f"Truncating to {limit} tracks")
-                print("Tracks in", album_name)
+                print("Album:", album_name, "Tracks:")
                 print("=======")
                 for track in tracks:
                     print(track["name"])
@@ -180,8 +179,8 @@ def add_spotify_tracks_to_library(track_ids: list[str]):
 def remove_spotify_tracks_from_library(track_ids):
     AUTHORIZED_SP.current_user_saved_tracks_delete(tracks=track_ids)
 
-def get_saved_tracks():
-    user_library_playlist = AUTHORIZED_SP.current_user_saved_tracks()
+def get_saved_tracks(limit = 20) -> list | None:
+    user_library_playlist = AUTHORIZED_SP.current_user_saved_tracks(limit=limit)
     if not user_library_playlist:
         raise ValueError("No tracks found in user library. Add logic in get_saved_tracks.")
     saved_tracks = user_library_playlist['items']
@@ -207,24 +206,29 @@ def extract_track_ids(tracks = None, from_playlist = False):
     return track_ids
 
 
-def extract_album_ids(tracks = None, from_playlist = False):
+def extract_album_ids(tracks = None, from_playlist = False, warning_count = 30):
     if not tracks:
         logging.info("Getting user library tracks")
         tracks = get_saved_tracks()
         from_playlist = True
-    if len(tracks) > 100:
-        logging.info(f"This list of tracks has more than {len(tracks)} items.")
+    if len(tracks) > warning_count:
+        logging.warning(f"This list of tracks has {len(tracks)} items.")
     
     album_ids = []
     for idx, track in enumerate(tracks):
         if from_playlist:
-            if "album" not in track:
-                logging.error("No track key found in playlist item. Fix the logic in extract_album_ids.")
-                raise SystemExit
-            track = track['album']
-        album_id = track['id']
+            track = track["track"]
+        
+        # If it's a track, enter the album
+        if "album" in track:
+            album = track['album']
+        else:
+            logging.info("Missing album key. Assuming this is an album.")
+            album = track
+            # logging.error("No track key found in playlist item. Fix the logic in extract_album_ids.")
+        album_id = album['id']
         if album_id not in album_ids:
-            print(f"Album {idx+1}: {track['name']} by {track['artists'][0]['name']}")
+            print(f"Album {idx+1}: {album['name']} by {album['artists'][0]['name']}")
             album_ids.append(album_id)
     logging.info(f'Found {len(album_ids)} unique albums')
     return album_ids
@@ -245,14 +249,14 @@ class TrackSchema(BaseModel):
     artist: str
     album: str
 
-def prune_library(acceptable_songs: list[str], acceptable_artists: list[str], prune_limit: int = 99) -> int:
+def prune_library(acceptable_songs: list[str], acceptable_artists: list[str], prune_limit: int = 99) -> list | None:
     playlist_tracks = get_saved_tracks()
     if not playlist_tracks:
         logging.error("No tracks in your library found")
-        return 0
-    print("All tracks:")
-    print("=======")
-    print_items(playlist_tracks, from_playlist=True, limit=prune_limit)
+        return None
+    # print("All tracks:")
+    # print("=======")
+    # print_items(playlist_tracks, from_playlist=True, limit=prune_limit)
     removed_ids = []
     for idx, item in enumerate(playlist_tracks):
         if idx >= prune_limit:
@@ -268,49 +272,35 @@ def prune_library(acceptable_songs: list[str], acceptable_artists: list[str], pr
             track_id = item['track']['id']
             removed_ids.append(track_id)
             print(f"Removing {track_name} by {artist_name}")
+            # Remove from playlist
+            playlist_tracks.pop(idx)
+    if len(removed_ids) > 20:
+        print("Attempting to remove 20+ tracks!")
+        if prune_limit!= 100:
+            logging.warning("prune_limit must be set to 100 as confirmation remove this many songs")
+            logging.info("No songs removed")
+            return playlist_tracks
     if removed_ids:
         remove_spotify_tracks_from_library(removed_ids)
         print(f"Removed {len(removed_ids)} tracks")
-        return len(removed_ids)
-    return 0
+        return playlist_tracks
+    return playlist_tracks
 
 def test_functions():
-    query = QUERY
+    query = DEFAULT_QUERY
     limit = 1
-    prune_limit = 99
-    ADD_TO_LIB = True
-    FROM_SAVED = False
-    if FROM_SAVED:
-        playlist_tracks = get_saved_tracks()
-        if not playlist_tracks:
-            print("No tracks in your library found")
-            return None
-        print_items(playlist_tracks, from_playlist=True, limit=limit)
-    else:
-        result_tracks = search_spotify_tracks(query, limit=limit)
-        if not result_tracks:
-            print("No tracks found")
-            return None
-        print_items(result_tracks)
+    ADD_TO_LIB = False
+    result_tracks = search_spotify_tracks(query, limit=limit)
+    if not result_tracks:
+        print("No tracks found")
+        return None
+    print_items(result_tracks)
     
     # Add the tracks to the user's library
-    if ADD_TO_LIB and not FROM_SAVED:
+    if ADD_TO_LIB:
         track_ids = [track['id'] for track in result_tracks]
         print(f"Adding {len(track_ids)} tracks to library")
         add_spotify_tracks_to_library(track_ids)
-    
-    # Print the user library
-    playlist_tracks = get_saved_tracks()
-    print_items(playlist_tracks, from_playlist=True, limit=limit)
-
-    prune_collection = True
-    acceptable_songs = "Good Luck"
-    acceptable_artists = ["Ruth B.", "Tennis", "Rick and Morty"]
-    final_tracks = []
-    if prune_collection:
-        final_tracks = prune_library(acceptable_songs, acceptable_artists, prune_limit=prune_limit)
-    
-    return final_tracks
 
 
 def res_urls_from_query(query: str, filter_type = "", max_urls: int = 1, include_substring: str | None = None) -> None | list[str]:
@@ -334,29 +324,6 @@ def res_urls_from_query(query: str, filter_type = "", max_urls: int = 1, include
         return None
     res_urls = [str(r["url"]) for r in res]
     return res_urls
-
-def main():
-    max_urls = 3
-    ### Get the spotify URLS that best fit the query
-    query = "ruth b dandelions"
-    filter_type = "album"
-    res_urls = res_urls_from_query(query, filter_type=filter_type, max_urls=max_urls)
-    if not res_urls:
-        print("No results found")
-        return None
-    # Print the URLs
-    for i in res_urls:
-        print(i)  
-
-    ### Get the URIs from the URLs
-    uri_items = uris_from_spotify_urls(res_urls)
-    if not uri_items:
-        print("No uri items found")
-        return None
-
-    ### Get the track, playlist, and album information          
-    result_object = decode_uris(uri_items, expand_tracks=True)
-    return result_object
 
 def guess_album_name_from_song_name(song_name: str) -> str | None:
     """Uses the album name of the top track found from the query.
@@ -385,16 +352,29 @@ def query_to_top_spotify_hits(query: str, filter_type: str = "track", limit = 3)
     result_object = decode_uris(uri_items, expand_tracks=True)
     return result_object
 
+def get_albums_from_result_object(result_object: dict) -> list:
+    """Get the album information for all items in the result object."""
+    albums = []
+    # TODO: Check if this plays nice with all 3 types
+    if "playlists" in result_object and result_object["playlists"]:
+        for playlist in result_object["playlists"]:
+            albums.extend(extract_album_ids(playlist["tracks"]["items"], from_playlist=True))
+    if "tracks" in result_object and result_object["tracks"]:
+        albums.extend(extract_album_ids(result_object["tracks"]))
+    if "albums" in result_object and result_object["albums"]:
+        albums.extend(extract_album_ids(result_object["albums"]))
+    return albums
+
 def wacky_testing():
     # get the song for the query
-    query = "roomie numb"
+    query = "birthday gia margaret"
     url_limit = 1
     # spotify_limit = 1
     # res = search_spotify_tracks(query, limit=spotify_limit)
     # print_items(res)
     # if not res:
     #     raise SystemExit
-    res_urls = res_urls_from_query(query, filter_type="", max_urls=url_limit)
+    res_urls = res_urls_from_query(query, filter_type="track", max_urls=url_limit)
     if not res_urls:
         logging.error("No urls found")
         raise SystemExit
@@ -406,14 +386,41 @@ def wacky_testing():
     if not result_object:
         logging.error("No result object found")
         raise SystemExit
-    # or get the track, playlist, and album information
-    if "playlist" in result_object and result_object["playlist"]:
-        extract_album_ids(result_object["playlist"])
-    if "tracks" in result_object and result_object["tracks"]:
-        extract_album_ids(result_object["tracks"])
-    if "albums" in result_object and result_object["albums"]:
-        extract_album_ids(result_object["albums"])
+    albums = get_albums_from_result_object(result_object)
+
+def add_top_track_to_library_from_query(query: str):
+    tracks = search_spotify_tracks(query, limit=1)
+    if not tracks:
+        logging.error("No track found")
+        return None
+    track_id = tracks[0]['id']
+    track_ids = [track_id]
+    add_spotify_tracks_to_library(track_ids)
+
+def main():
+    max_urls = 3
+    ### Get the spotify URLS that best fit the query
+    query = DEFAULT_QUERY
+    filter_type = ""
+    res_urls = res_urls_from_query(query, filter_type=filter_type, max_urls=max_urls)
+    if not res_urls:
+        print("No results found")
+        return None
+    # Print the URLs
+    logging.info(f"{len(res_urls)} URLs found:")
+    for url in res_urls:
+        print(url)
+
+    ### Get the URIs from the URLs
+    uri_items = uris_from_spotify_urls(res_urls)
+    if not uri_items:
+        print("No uri items found")
+        return None
+
+    ### Get the track, playlist, and album information          
+    result_object = decode_uris(uri_items, expand_tracks=True)
+    return result_object
 
 if __name__ == "__main__":
-    # test_functions()
-    wacky_testing()
+    # main()
+    test_functions()
