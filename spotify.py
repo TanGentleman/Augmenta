@@ -1,6 +1,6 @@
 import logging
 from os import environ
-from typing import Union, List, Tuple, Dict, Optional
+from typing import Literal, Union, List, Tuple, Dict, Optional
 from dotenv import load_dotenv
 from pydantic import BaseModel
 from spotipy import Spotify
@@ -35,6 +35,32 @@ if ALLOW_AUTHORIZED:
         client_secret=SPOTIFY_CLIENT_SECRET,
         redirect_uri="http://localhost:3000",
         scope="user-library-read user-library-modify"))
+
+# Schemas
+class Track(BaseModel):
+    name: str
+    artists: str
+    album: str
+    id: str
+    type: Literal["track"]
+
+class Album(BaseModel):
+    name: str
+    artists: str
+    id: str
+    type: Literal["album"]
+    
+class Playlist(BaseModel):
+    name: str
+    id: str
+    tracks: dict # This dictionary has a key "items" that is list[PlaylistTrackObjects]
+    type: Literal["playlist"]
+
+class PlaylistTrackObject(BaseModel):
+    name: str
+    track: list
+    # The list contains Track or Episode objects, filter out the episodes
+    type: Literal["track", "episode"]
 
 
 def perform_lookup(
@@ -86,7 +112,7 @@ def decode_uris(uri_items: str, expand_tracks=False, limit=10):
     Returns:
         dict: A dictionary containing the tracks, playlists, and albums.
     """
-    results = {"tracks": [], "playlists": [], "albums": []}
+    results = {"tracks": [], "playlists": [], "albums": [], uri_items: []}
     for uri_type, uri in uri_items:
         if uri_type not in ["track", "playlist", "album"]:
             logging.info("Ignoring uri of type", uri_type)
@@ -129,6 +155,7 @@ def decode_uris(uri_items: str, expand_tracks=False, limit=10):
     if not any(results.values()):
         logging.error("No valid items found")
         return None
+    results["uri_items"] = uri_items
     return results
 
 
@@ -204,44 +231,58 @@ def get_user_library_playlist(limit=20) -> list | None:
     return user_library_playlist.get('items', [])
 
 
-def extract_item_ids(items=None, from_playlist=False):
+def extract_item_ids(items = False, from_playlist=False):
     if not items:
         logging.info("Getting user library tracks")
         tracks = get_user_library_playlist()
         from_playlist = True
     if len(items) > 100:
         logging.info(f"This list of tracks has more than {len(tracks)} items.")
-    item_ids = [item['track']['id'] if from_playlist else item['id'] for item in items]
+    item_ids = []
+    seen_ids = set()
+    for item in items:
+        if from_playlist:
+            track_id = item['track']['id']
+        else:
+            track_id = item['id']
+        if track_id in seen_ids:
+            logging.info(f"Skipping duplicate track {track_id}")
+            continue
+        item_ids.append(track_id)
+        seen_ids.add(track_id)
     return item_ids
 
 
-def extract_album_ids(tracks=None, from_playlist=False, warning_count=30):
-    if not tracks:
+def print_album_names(items = False, from_playlist=False, warning_count=30):
+    if items is None:
+        raise ValueError("None value for items passed to get_album_names.")
+    if items is False:
         logging.info("Getting user library tracks")
-        tracks = get_user_library_playlist()
+        playlist_items = get_user_library_playlist()
+        items = playlist_items
         from_playlist = True
-    if len(tracks) > warning_count:
-        logging.warning(f"This list of tracks has {len(tracks)} items.")
+    if len(items) > warning_count:
+        logging.warning(f"This list of items has {len(items)} items.")
 
-    album_ids = []
-    for idx, track in enumerate(tracks):
+    album_names = []
+    item_ids = []
+    seen_ids = set()
+    for item in items:
         if from_playlist:
-            track = track["track"]
-
-        # If it's a track, enter the album
-        if "album" in track:
-            album = track['album']
+            album = item['track']['album']
         else:
-            logging.info("Missing album key. Assuming this is an album.")
-            album = track
-            # logging.error("No track key found in playlist item. Fix the logic in extract_album_ids.")
-        album_id = album['id']
-        if album_id not in album_ids:
-            print(
-                f"Album {idx+1}: {album['name']} by {album['artists'][0]['name']}")
-            album_ids.append(album_id)
-    logging.info(f'Found {len(album_ids)} unique albums')
-    return album_ids
+            album = item['album']
+        assert album["type"] == "album", "Invalid album type"
+        album_name = album["name"]
+        album_id = album["id"]
+        if album_id in seen_ids:
+            logging.info(f"Skipping duplicate album {album_id}")
+            continue
+        album_names.append(album_name)
+        item_ids.append(album_id)
+        seen_ids.add(album_id)
+    logging.info(f'Found {len(item_ids)} unique albums')
+    return item_ids
 
 
 def print_items(items, from_playlist=False, limit=10):
@@ -392,13 +433,13 @@ def get_albums_from_result_object(result_object: dict) -> list:
     if "playlists" in result_object and result_object["playlists"]:
         for playlist in result_object["playlists"]:
             albums.extend(
-                extract_album_ids(
+                extract_item_ids(
                     playlist["tracks"]["items"],
                     from_playlist=True))
     if "tracks" in result_object and result_object["tracks"]:
-        albums.extend(extract_album_ids(result_object["tracks"]))
+        albums.extend(extract_item_ids(result_object["tracks"]))
     if "albums" in result_object and result_object["albums"]:
-        albums.extend(extract_album_ids(result_object["albums"]))
+        albums.extend(extract_item_ids(result_object["albums"]))
     return albums
 
 
