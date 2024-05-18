@@ -39,14 +39,14 @@ if ALLOW_AUTHORIZED:
 # Schemas
 class Track(BaseModel):
     name: str
-    artists: str
+    artists: list
     album: str
     id: str
     type: Literal["track"]
 
 class Album(BaseModel):
     name: str
-    artists: str
+    artists: list
     id: str
     type: Literal["album"]
     
@@ -113,11 +113,19 @@ def decode_id_tuples(id_tuples: str, expand_tracks=False, limit=10):
     """
     results = {"tracks": [], "playlists": [], "albums": [], "id_tuples": []}
     for id_type, spot_id in id_tuples:
-        if spot_id not in ["track", "playlist", "album"]:
-            logging.info("Ignoring type", id_type)
+        # Check for duplicate
+        if (id_type, spot_id) in results["id_tuples"]:
+            logging.info(f"Skipping duplicate {id_type}")
+            continue
+        if id_type not in ["track", "playlist", "album"]:
+            logging.info(f"Ignoring type {id_type}")
             continue
         if id_type == "playlist":
             playlist = READ_ONLY_SP.playlist(spot_id)
+            # Handle null playlist here?
+            if playlist.get("type") != "playlist":
+                logging.error("Unexpected type")
+                raise ValueError("Invalid playlist type")
             playlist_name = playlist["name"]
             print("Playlist:", playlist_name)
             if expand_tracks:
@@ -129,16 +137,26 @@ def decode_id_tuples(id_tuples: str, expand_tracks=False, limit=10):
             results["playlists"].append(playlist)
         elif id_type == "track":
             track = READ_ONLY_SP.track(spot_id)
+            # Handle null track here?
+            if track.get("type") != "track":
+                logging.warning("Skipping unexpected type")
+                continue
             track_name = track["name"]
             artist_name = track["artists"][0]["name"]
             print(f"Track: {track_name} by {artist_name}")
             results["tracks"].append(track)
         elif id_type == "album":
             album = READ_ONLY_SP.album(spot_id)
-            results["albums"].append(album)
+            # Handle null album here?
+            if album.get("type") != "album":
+                logging.error("Unexpected type")
+                raise ValueError("Invalid album type")
             album_name = album["name"]
             if expand_tracks:
-                tracks = album["tracks"]["items"]
+                tracks = album["tracks"].get("items", [])
+                if not tracks:
+                    logging.error("No tracks found in album. Not saving")
+                    continue
                 # These are apparently SimplifiedTrackObjects
                 if len(tracks) > limit:
                     logging.info(f"{len(tracks)} tracks truncated to {limit}.")
@@ -146,12 +164,14 @@ def decode_id_tuples(id_tuples: str, expand_tracks=False, limit=10):
                 print_items(tracks, from_playlist=False, limit=limit)
             else:
                 print("Album:", album_name)
+            results["albums"].append(album)
         else:
             raise ValueError("Invalid id_type")
+        # Add the id_tuple to the results
+        results["id_tuples"].append((id_type, spot_id))
     if not any(results.values()):
         logging.error("No valid items found")
         return None
-    results["id_tuples"] = id_tuples
     return results
 
 
@@ -265,9 +285,17 @@ def print_album_names(items = False, from_playlist=False, warning_count=30):
     seen_ids = set()
     for item in items:
         if from_playlist:
+            # This is a list of PlaylistTrackObjects
             album = item['track']['album']
         else:
-            album = item['album']
+            # This is an AlbumObject
+            if item["type"] == "track":
+                album = item['album']
+            elif item["type"] == "album":
+                album = item
+            else:
+                logging.error(f"Skipping {item['type']}")
+                continue
         assert album["type"] == "album", "Invalid album type"
         album_name = album["name"]
         album_id = album["id"]
@@ -278,6 +306,10 @@ def print_album_names(items = False, from_playlist=False, warning_count=30):
         item_ids.append(album_id)
         seen_ids.add(album_id)
     logging.info(f'Found {len(item_ids)} unique albums')
+    print("Album names:")
+    print("============")
+    for idx, album_name in enumerate(album_names):
+        print(f"{idx+1}. {album_name}")
     return item_ids
 
 
@@ -295,8 +327,6 @@ def print_items(items, from_playlist=False, limit=10):
                 continue
             item_name = playlist_track['name']
             item_type = playlist_track['type']
-            # NOTE: Only 90% sure about the item type here
-            assert item_type == "track", "Invalid item type"
         else:
             item_name = item['name']
             item_type = item['type']
@@ -308,6 +338,8 @@ def prune_library(
         acceptable_songs: list[str],
         acceptable_artists: list[str],
        bulk = False) -> list | None:
+    """Prune the user's library based on the acceptable songs and artists."""
+    # TODO: Make this robust, input should be dict with allowed/forbidden songs/artists/albums/ids
     playlist_tracks = get_user_library_playlist()
     if not playlist_tracks:
         logging.error("No tracks in your library found")
@@ -371,8 +403,7 @@ def res_urls_from_query(
         filter_type="",
         max_urls: int = 1,
         include_substring: str | None = None) -> None | list[str]:
-    assert filter_type in ["", "track",
-                           "playlist", "album"], "Invalid filter type"
+    assert filter_type in ["", "track", "playlist", "album"], "Invalid filter type"
     if filter_type:
         logging.info(f"Restricting search to {filter_type}")
     query = query.strip()
@@ -380,16 +411,13 @@ def res_urls_from_query(
         logging.error("No query provided")
         return None
     # filter_substring = ' "ruth b"' # default
-    filter_substring = ""
-    if include_substring:
-        filter_substring = f' "{include_substring.strip()}"'
-
+    filter_substring = f' "{include_substring.strip()}"' if include_substring else ""
     filter_suffix = f" {FILTER_DOMAIN}{filter_type}{filter_substring}"
-    formatted_query = f"{query}{filter_suffix}".strip()
+    formatted_query = f"{query}{filter_suffix}" # This should already be stripped() right?
     query = formatted_query
     res = perform_lookup(query, max_results=max_urls)
     if not res:
-        return None
+        return []
     res_urls = [str(r["url"]) for r in res]
     return res_urls
 
@@ -482,6 +510,10 @@ def wacky_testing():
         logging.error("No result object found")
         raise SystemExit
     albums = extract_all_albums_from_result_object(result_object)
+    if not albums:
+        logging.error("No albums found")
+        raise SystemExit
+    print_album_names(items=albums, from_playlist=False)
 
 
 def add_track_from_query(query: str):
