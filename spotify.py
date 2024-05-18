@@ -73,53 +73,51 @@ def perform_lookup(
     return results
 
 
-def uri_items_from_spotify_urls(urls: list[str]) -> list[Tuple[str, str]] | None:
+def id_tuples_from_spotify_urls(urls: list[str]) -> list[Tuple[str, str]]:
     """
-    Given a list of Spotify URLs, extract the URI type and URI.
+    Given a list of Spotify URLs, extract the types and IDs.
 
     Args:
         urls (list[str]): A list of Spotify URLs.
 
     Returns:
-        list[Tuple[str, str]] | None: A list of tuples containing the URI type and URI.
+        list[Tuple[str, str]] | None: A list of tuples containing the type and ID.
     """
-    uri_items = []
+    id_tuples = []
     for url in urls:
         if not url.startswith("https://open.spotify.com/"):
             logger.error("Invalid URL")
             continue
-        uri_type = url.split("/")[3]
-        uri = url.split("/")[-1].split("?")[0]
-        if uri_type not in ["track", "playlist", "album"]:
-            logger.info(f"Ignoring URL of type {uri_type}")
+        id_type = url.split("/")[3]
+        spot_id = url.split("/")[-1].split("?")[0]
+        if id_type not in ["track", "playlist", "album"]:
+            logger.info(f"Ignoring URL of type {id_type}")
             continue
-        uri_items.append((uri_type, uri))
-    if not uri_items:
+        id_tuples.append((id_type, spot_id))
+    if not id_tuples:
         logger.error("No valid objects found")
-        return None
-    return uri_items
+        return []
+    return id_tuples
 
 
-def decode_uris(uri_items: str, expand_tracks=False, limit=10):
+def decode_id_tuples(id_tuples: str, expand_tracks=False, limit=10):
     """
-    Given a list of uri types and uris, decode the Spotify URIs and print the tracks, playlists, and albums.
+    Given a list of tuples with type and ID, decode the tracks, playlists, and albums.
 
     Args:
-        urls (str): A list of Spotify URLs.
-        expand_playlist (bool, optional): If True, print tracks in the playlist. Defaults to False.
-        limit (int, optional): The limit of tracks to show. Defaults to 10.
-
+        id_tuples (list[Tuple[str, str]]): A list of tuples containing the type and ID.
+        expand_tracks (bool, optional): Whether to expand the tracks. Defaults to False.
+        limit (int, optional): The limit for the number of tracks to print. Defaults to 10.
     Returns:
         dict: A dictionary containing the tracks, playlists, and albums.
     """
-    results = {"tracks": [], "playlists": [], "albums": [], "uri_items": []}
-    for uri_type, uri in uri_items:
-        if uri_type not in ["track", "playlist", "album"]:
-            logging.info("Ignoring uri of type", uri_type)
+    results = {"tracks": [], "playlists": [], "albums": [], "id_tuples": []}
+    for id_type, spot_id in id_tuples:
+        if spot_id not in ["track", "playlist", "album"]:
+            logging.info("Ignoring type", id_type)
             continue
-        if uri_type == "playlist":
-            playlist_URI = uri
-            playlist = READ_ONLY_SP.playlist(playlist_URI)
+        if id_type == "playlist":
+            playlist = READ_ONLY_SP.playlist(spot_id)
             playlist_name = playlist["name"]
             print("Playlist:", playlist_name)
             if expand_tracks:
@@ -129,33 +127,31 @@ def decode_uris(uri_items: str, expand_tracks=False, limit=10):
                 # Use playlist object to get tracks
                 print_items(playlist_tracks, from_playlist=True, limit=limit)
             results["playlists"].append(playlist)
-        elif uri_type == "track":
-            track = READ_ONLY_SP.track(uri)
+        elif id_type == "track":
+            track = READ_ONLY_SP.track(spot_id)
             track_name = track["name"]
             artist_name = track["artists"][0]["name"]
             print(f"Track: {track_name} by {artist_name}")
             results["tracks"].append(track)
-        elif uri_type == "album":
-            album = READ_ONLY_SP.album(uri)
+        elif id_type == "album":
+            album = READ_ONLY_SP.album(spot_id)
             results["albums"].append(album)
             album_name = album["name"]
             if expand_tracks:
                 tracks = album["tracks"]["items"]
+                # These are apparently SimplifiedTrackObjects
                 if len(tracks) > limit:
                     logging.info(f"{len(tracks)} tracks truncated to {limit}.")
                 print("Album:", album_name, "Tracks:")
-                print("=======")
-                for track in tracks:
-                    print(track["name"])
-                print()
+                print_items(tracks, from_playlist=False, limit=limit)
             else:
                 print("Album:", album_name)
         else:
-            logging.info("Ignoring URL")
+            raise ValueError("Invalid id_type")
     if not any(results.values()):
         logging.error("No valid items found")
         return None
-    results["uri_items"] = uri_items
+    results["id_tuples"] = id_tuples
     return results
 
 
@@ -419,15 +415,15 @@ def guess_album_name_from_song_name(song_name: str) -> str | None:
 def query_to_top_spotify_hits(
         query: str,
         filter_type: str = "track",
-        limit=3) -> dict:
+        limit=3) -> dict | None:
     """Get the top Spotify hits for the given query."""
     res_urls = res_urls_from_query(
         query, filter_type=filter_type, max_urls=limit)
-    uri_items = uri_items_from_spotify_urls(res_urls)
-    if not uri_items:
-        print("No uri items found")
+    id_tuples = id_tuples_from_spotify_urls(res_urls)
+    if not id_tuples:
+        print("No items found for query")
         return None
-    result_object = decode_uris(uri_items, expand_tracks=True)
+    result_object = decode_id_tuples(id_tuples, expand_tracks=True)
     return result_object
 
 
@@ -475,11 +471,11 @@ def wacky_testing():
     if not res_urls:
         logging.error("No urls found")
         raise SystemExit
-    uri_items = uri_items_from_spotify_urls(res_urls)
-    if not uri_items:
-        logging.error("No uri items found")
+    id_tuples = id_tuples_from_spotify_urls(res_urls)
+    if not id_tuples:
+        logging.error("No id tuples found")
         raise SystemExit
-    result_object = decode_uris(uri_items, expand_tracks=True)
+    result_object = decode_id_tuples(id_tuples, expand_tracks=True)
     if not result_object:
         logging.error("No result object found")
         raise SystemExit
@@ -515,23 +511,23 @@ def main():
     for url in res_urls:
         print(url)
 
-    # Get the URIs from the URLs
-    uri_items = uri_items_from_spotify_urls(res_urls)
-    if not uri_items:
-        print("No uri items found")
+    # Get the id_tuples from the URLs
+    id_tuples = id_tuples_from_spotify_urls(res_urls)
+    if not id_tuples:
+        logging.error("No id tuples found")
         return None
 
     # Get the track, playlist, and album information
-    result_object = decode_uris(uri_items, expand_tracks=True)
+    result_object = decode_id_tuples(id_tuples, expand_tracks=True)
     return result_object
 
 if __name__ == "__main__":
     main()
-    test_functions()
-    tracks = add_track_from_query("every breath you take")
-    if tracks:
-        print_items(tracks, from_playlist=True)
-    print_my_library()
+    # test_functions()
+    # tracks = add_track_from_query("every breath you take")
+    # if tracks:
+    #     print_items(tracks, from_playlist=True)
+    # print_my_library()
 
 
 ### Example payload
