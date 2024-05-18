@@ -516,7 +516,7 @@ class Config:
     def __init__(
             self,
             config_file="settings.json",
-            config_override=None | dict):
+            config_override: dict | None = None):
         # assert config file exists
         assert path.exists(config_file), "Config file not found"
         config = read_settings(config_file)
