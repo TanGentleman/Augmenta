@@ -307,7 +307,7 @@ def print_items(items, from_playlist=False, limit=10):
 def prune_library(
         acceptable_songs: list[str],
         acceptable_artists: list[str],
-        prune_limit: int = 99) -> list | None:
+       bulk = False) -> list | None:
     playlist_tracks = get_user_library_playlist()
     if not playlist_tracks:
         logging.error("No tracks in your library found")
@@ -315,9 +315,11 @@ def prune_library(
     # print("All tracks:")
     # print("=======")
     # print_items(playlist_tracks, from_playlist=True, limit=prune_limit)
+    prune_limit = 500 if bulk else 20
     removed_ids = []
     for idx, item in enumerate(playlist_tracks):
         if idx >= prune_limit:
+            logging.info(f"Pruning limit reached at {prune_limit}")
             break
         track_name = item['track']['name']
         artist_name = item['track']['artists'][0]['name']
@@ -335,13 +337,13 @@ def prune_library(
             # TODO: Confirm that this is safe and working
     if len(removed_ids) > 20:
         print("Attempting to remove 20+ tracks!")
-        if prune_limit != 100:
-            logging.warning(
-                "prune_limit must be set to 100 as confirmation remove this many songs")
-            logging.info("No songs removed")
+        if not bulk:
+            logging.warning("Bulk removal not enabled. Set bulk=True to remove all tracks.")
+            logging.info("No songs removed from library. Returning modified playlist.")
             return playlist_tracks
+            # TODO: Test contents of this playlist
     if removed_ids:
-        remove_spotify_tracks_from_library(removed_ids)
+        remove_spotify_tracks_from_library(removed_ids, bulk=bulk)
         print(f"Removed {len(removed_ids)} tracks")
         return playlist_tracks
     return playlist_tracks
