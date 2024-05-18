@@ -71,6 +71,10 @@ def perform_lookup(
         return None
     return results
 
+def check_scope() -> bool:
+    """Check if the Spotify client is authorized to read/modify the library."""
+    is_authorized = AUTHORIZED_SP is not None
+    return is_authorized
 
 def id_tuples_from_spotify_urls(urls: list[str]) -> list[tuple[str, str]]:
     """
@@ -202,14 +206,15 @@ def search_spotify(query: str, result_type: str = "track", limit: int = 2) -> li
     if not items:
         logger.error(f"No {result_type}s found")
         return None
-    print(f"Found {len(items)} {result_type}s")
+    logger.info(f"Found {len(items)} {result_type}s")
     return items
 
 
 def add_spotify_tracks_to_library(track_values: list[str]):
     """Add tracks to the user's Spotify library."""
     # track_values is a list of track URIs, URLs or IDs
-    if AUTHORIZED_SP is None:
+    is_authorized = check_scope()
+    if not is_authorized:
         logger.error("Spotify client not authorized for this function.")
         raise SystemExit
     return AUTHORIZED_SP.current_user_saved_tracks_add(tracks=track_values)
@@ -218,14 +223,15 @@ def add_spotify_tracks_to_library(track_values: list[str]):
 def remove_spotify_tracks_from_library(track_values: list[str], bulk=False):
     """Remove tracks from the user's Spotify library."""
     # track_values is a list of track URIs, URLs or IDs
-    if AUTHORIZED_SP is None:
+    is_authorized = check_scope()
+    if not is_authorized:
         logger.error("Spotify client not authorized for this function.")
         raise SystemExit
     if len(track_values) > 50:
         logger.warning("This will check against more than 50 tracks.")
         if not bulk:
             logger.error("bulk arg in remove_spotify_tracks_from_library is False. Set to True to remove override.")
-            logger.info("No tracks checked.")
+            logger.info("No tracks removed.")
             return None
     return AUTHORIZED_SP.current_user_saved_tracks_delete(tracks=track_values)
 
@@ -355,21 +361,17 @@ def prune_library(
         else:
             track_id = item['track']['id']
             removed_ids.append(track_id)
-            print(f"Removing {track_name} by {artist_name}")
+            logger.info(f"Removing {track_name} by {artist_name}")
             # Remove from playlist
             playlist_tracks.pop(idx)
             # TODO: Confirm that this is safe and working
-    if len(removed_ids) > 20:
-        print("Attempting to remove 20+ tracks!")
-        if not bulk:
+    if removed_ids:
+        if len(removed_ids) > 20 and not bulk:
             logger.warning("Bulk removal not enabled. Set bulk=True to remove all tracks.")
             logger.info("No songs removed from library. Returning modified playlist.")
             return playlist_tracks
-            # TODO: Test contents of this playlist
-    if removed_ids:
         remove_spotify_tracks_from_library(removed_ids, bulk=bulk)
-        print(f"Removed {len(removed_ids)} tracks")
-        return playlist_tracks
+        logger.info(f"Removed {len(removed_ids)} tracks")
     return playlist_tracks
 
 
@@ -379,29 +381,31 @@ def test_functions():
     ADD_TO_LIB = False
     result_tracks = search_spotify(query, result_type="track", limit=limit)
     if not result_tracks:
-        print("No tracks found")
+        logger.info("No tracks found")
         return None
     print_items(result_tracks)
 
     # Add the tracks to the user's library
     if ADD_TO_LIB:
         track_ids = [track['id'] for track in result_tracks]
-        print(f"Adding {len(track_ids)} tracks to library")
+        logger.info(f"Adding {len(track_ids)} tracks to library")
         add_spotify_tracks_to_library(track_ids)
 
 
 def res_urls_from_query(
         query: str,
-        filter_type="",
+        filter_type: Literal["", "track", "playlist", "album"] = "",
         max_urls: int = 1,
         include_substring: str | None = None) -> None | list[str]:
-    assert filter_type in ["", "track", "playlist", "album"], "Invalid filter type"
+    if filter_type not in ["", "track", "playlist", "album"]:
+        logger.error("Invalid filter type")
+        raise ValueError("Invalid filter type")
     if filter_type:
         logger.info(f"Restricting search to {filter_type}")
     query = query.strip()
     if not query:
         logger.error("No query provided")
-        return None
+        raise ValueError("No query provided")
     # filter_substring = ' "ruth b"' # default
     filter_substring = f' "{include_substring.strip()}"' if include_substring else ""
     filter_suffix = f" {FILTER_DOMAIN}{filter_type}{filter_substring}"
@@ -434,27 +438,33 @@ def guess_album_name_from_song_name(song_name: str) -> str | None:
     return album_name
 
 
-def query_to_top_spotify_hits(
+def query_tavily_return_spotify_dict(
         query: str,
         filter_type: str = "track",
-        limit=3) -> dict | None:
+        limit=3) -> dict:
     """Get the top Spotify hits for the given query."""
     res_urls = res_urls_from_query(
         query, filter_type=filter_type, max_urls=limit)
+    if not res_urls:
+        logger.error("No tavily results found")
+        return {}
     id_tuples = id_tuples_from_spotify_urls(res_urls)
     if not id_tuples:
-        print("No items found for query")
-        return None
-    result_object = decode_id_tuples(id_tuples, expand_tracks=True)
-    return result_object
+        logger.error("No valid spotify items found for query")
+        return {}
+    spotify_dict = decode_id_tuples(id_tuples, expand_tracks=True)
+    if not spotify_dict:
+        logger.error("No result object found")
+        return {}
+    return spotify_dict
 
 
-def extract_all_albums_from_result_object(result_object: dict) -> list[Album]:
+def extract_all_albums_from_spotify_dict(spotify_dict: dict) -> list[Album]:
     """Get the album information for all items in the result object."""
     albums = []
     # TODO: Check if this plays nice with all 3 types
-    if "playlists" in result_object and result_object["playlists"]:
-        for playlist in result_object["playlists"]:
+    if "playlists" in spotify_dict and spotify_dict["playlists"]:
+        for playlist in spotify_dict["playlists"]:
             playlist_tracks = playlist["tracks"]["items"]
             for track in playlist_tracks:
                 if track["type"] == "episode":
@@ -463,13 +473,17 @@ def extract_all_albums_from_result_object(result_object: dict) -> list[Album]:
                 album = track["track"]["album"]
                 Album(**album)
                 albums.append(album)
-    if "tracks" in result_object and result_object["tracks"]:
-        for track in result_object["tracks"]:
+    if "tracks" in spotify_dict and spotify_dict["tracks"]:
+        for track in spotify_dict["tracks"]:
             album = track["album"]
             Album(**album)
+            if album in albums:
+                logger.info("Skipping duplicate album")
+                # Do I really need to report dupes?
+                continue
             albums.append(album)
-    if "albums" in result_object and result_object["albums"]:
-        for album in result_object["albums"]:
+    if "albums" in spotify_dict and spotify_dict["albums"]:
+        for album in spotify_dict["albums"]:
             Album(**album)
             albums.append(album)
     
@@ -497,11 +511,11 @@ def wacky_testing():
     if not id_tuples:
         logger.error("No id tuples found")
         raise SystemExit
-    result_object = decode_id_tuples(id_tuples, expand_tracks=True)
-    if not result_object:
+    spotify_dict = decode_id_tuples(id_tuples, expand_tracks=True)
+    if not spotify_dict:
         logger.error("No result object found")
         raise SystemExit
-    albums = extract_all_albums_from_result_object(result_object)
+    albums = extract_all_albums_from_spotify_dict(spotify_dict)
     if not albums:
         logger.error("No albums found")
         raise SystemExit
@@ -530,7 +544,7 @@ def main():
     res_urls = res_urls_from_query(
         query, filter_type=filter_type, max_urls=max_urls)
     if not res_urls:
-        print("No results found")
+        logger.info("No results found")
         return None
     # Print the URLs
     logger.info(f"{len(res_urls)} URLs found:")
@@ -544,11 +558,49 @@ def main():
         return None
 
     # Get the track, playlist, and album information
-    result_object = decode_id_tuples(id_tuples, expand_tracks=True)
-    return result_object
+    spotify_dict = decode_id_tuples(id_tuples, expand_tracks=True)
+    return spotify_dict
+
+def test_guess():
+    song_name = "every breath you take"
+    try:
+        album_name = guess_album_name_from_song_name(song_name)
+        logger.info(f"Album name: {album_name}")
+        return len(album_name) > 0
+    except Exception as e:
+        logger.error(e)
+        return False
+    
+def test_albums():
+    query = "every breath you take"
+    spotify_dict = query_tavily_return_spotify_dict(query)
+    if not spotify_dict:
+        logger.error("No result object found")
+        return False
+    albums = extract_all_albums_from_spotify_dict(spotify_dict)
+    if not albums:
+        logger.error("No albums found")
+        return False
+    return True
+
+
+
+def test_prune():
+    acceptable_songs = ["Every Breath You Take", "Roxanne"]
+    acceptable_artists = ["The Police"]
+    prune_library(acceptable_songs, acceptable_artists)
+
+def run_tests():
+    # Test 1 - Spotify search track + parse name
+    # assert test_guess(), "Test 1 failed"
+    # Test 2 
+    assert test_albums(), "Test 2 failed"
+
+
 
 if __name__ == "__main__":
-    main()
+    run_tests()
+    # main()
     # test_functions()
     # tracks = add_track_from_query("every breath you take")
     # if tracks:
