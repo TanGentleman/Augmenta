@@ -155,8 +155,10 @@ def search_spotify(query: str, result_type: str = "track", limit: int = 2) -> li
             return response_object
         else:
             if tracks:
+                logging.info(f"Found {len(tracks)} tracks")
                 result = tracks
             elif albums:
+                logging.info(f"Found {len(albums)} albums")
                 result = albums
             else:
                 logging.error("No tracks or albums found")
@@ -165,6 +167,7 @@ def search_spotify(query: str, result_type: str = "track", limit: int = 2) -> li
     if not items:
         logger.error(f"No {result_type}s found")
         return None
+    print(f"Found {len(items)} {result_type}s")
     return items
 
 
@@ -198,29 +201,18 @@ def get_user_library_playlist(limit=20) -> list | None:
     if not user_library_playlist:
         raise ValueError(
             "No tracks found in user library. Add logic in get_user_library_playlist.")
-    saved_tracks = user_library_playlist['items']
-    return saved_tracks
+    return user_library_playlist.get('items', [])
 
 
-def extract_track_ids(tracks=None, from_playlist=False):
-    if not tracks:
+def extract_item_ids(items=None, from_playlist=False):
+    if not items:
         logging.info("Getting user library tracks")
         tracks = get_user_library_playlist()
         from_playlist = True
-    if len(tracks) > 100:
+    if len(items) > 100:
         logging.info(f"This list of tracks has more than {len(tracks)} items.")
-
-    track_ids = []
-    for idx, track in enumerate(tracks):
-        if from_playlist:
-            if "track" not in track:
-                logging.error(
-                    "No track key found in playlist item. Fix the logic in extract_track_ids.")
-                raise SystemExit
-            track = track['track']
-        # print(f"Track {idx+1}. {track['name']} by {track['artists'][0]['name']}")
-        track_ids.append(track['id'])
-    return track_ids
+    item_ids = [item['track']['id'] if from_playlist else item['id'] for item in items]
+    return item_ids
 
 
 def extract_album_ids(tracks=None, from_playlist=False, warning_count=30):
