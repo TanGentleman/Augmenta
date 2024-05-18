@@ -112,7 +112,7 @@ def decode_uris(uri_items: str, expand_tracks=False, limit=10):
     Returns:
         dict: A dictionary containing the tracks, playlists, and albums.
     """
-    results = {"tracks": [], "playlists": [], "albums": [], uri_items: []}
+    results = {"tracks": [], "playlists": [], "albums": [], "uri_items": []}
     for uri_type, uri in uri_items:
         if uri_type not in ["track", "playlist", "album"]:
             logging.info("Ignoring uri of type", uri_type)
@@ -288,19 +288,24 @@ def print_album_names(items = False, from_playlist=False, warning_count=30):
 def print_items(items, from_playlist=False, limit=10):
     print("Items:")
     print("=======")
-    for idx, track in enumerate(items):
+    for idx, item in enumerate(items):
         if idx >= limit:
             break
         if from_playlist:
-            track = track['track']
-        print(f"{idx+1}. {track['name']} by {track['artists'][0]['name']}")
+            playlist_track = item['track']
+            if playlist_track["type"] != "track":
+                assert playlist_track["type"] == "episode"
+                logging.info("Skipping episode")
+                continue
+            item_name = playlist_track['name']
+            item_type = playlist_track['type']
+            # NOTE: Only 90% sure about the item type here
+            assert item_type == "track", "Invalid item type"
+        else:
+            item_name = item['name']
+            item_type = item['type']
+        print(f"{idx+1}. ({item_type}): {item_name}")
     print()
-
-
-class TrackSchema(BaseModel):
-    name: str
-    artist: str
-    album: str
 
 
 def prune_library(
@@ -426,20 +431,33 @@ def query_to_top_spotify_hits(
     return result_object
 
 
-def get_albums_from_result_object(result_object: dict) -> list:
+def extract_all_albums_from_result_object(result_object: dict) -> list[Album]:
     """Get the album information for all items in the result object."""
     albums = []
     # TODO: Check if this plays nice with all 3 types
     if "playlists" in result_object and result_object["playlists"]:
         for playlist in result_object["playlists"]:
-            albums.extend(
-                extract_item_ids(
-                    playlist["tracks"]["items"],
-                    from_playlist=True))
+            playlist_tracks = playlist["tracks"]["items"]
+            for track in playlist_tracks:
+                if track["type"] == "episode":
+                    logging.info("Skipping episode")
+                    continue
+                album = track["track"]["album"]
+                Album(**album)
+                albums.append(album)
     if "tracks" in result_object and result_object["tracks"]:
-        albums.extend(extract_item_ids(result_object["tracks"]))
+        for track in result_object["tracks"]:
+            album = track["album"]
+            Album(**album)
+            albums.append(album)
     if "albums" in result_object and result_object["albums"]:
-        albums.extend(extract_item_ids(result_object["albums"]))
+        for album in result_object["albums"]:
+            Album(**album)
+            albums.append(album)
+    
+    if not albums:
+        logging.error("No albums found in result object")
+        return []
     return albums
 
 
@@ -465,7 +483,7 @@ def wacky_testing():
     if not result_object:
         logging.error("No result object found")
         raise SystemExit
-    albums = get_albums_from_result_object(result_object)
+    albums = extract_all_albums_from_result_object(result_object)
 
 
 def add_track_from_query(query: str):
@@ -479,8 +497,8 @@ def add_track_from_query(query: str):
     add_spotify_tracks_to_library(track_ids)
     return None
 
-def print_my_library():
-    print_items(get_user_library_playlist(), from_playlist=True)
+def print_my_library(limit=20):
+    print_items(get_user_library_playlist(limit=limit), from_playlist=True, limit=limit)
 
 def main():
     max_urls = 3
@@ -509,11 +527,11 @@ def main():
 
 if __name__ == "__main__":
     main()
-    # test_functions()
-    # tracks = add_track_from_query("boom clap")
-    # if tracks:
-    #     print_items(tracks, from_playlist=True)
-    # print_my_library()
+    test_functions()
+    tracks = add_track_from_query("every breath you take")
+    if tracks:
+        print_items(tracks, from_playlist=True)
+    print_my_library()
 
 
 ### Example payload
