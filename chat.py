@@ -5,7 +5,7 @@ from langchain_community.vectorstores.faiss import FAISS
 from langchain_core.vectorstores import VectorStoreRetriever
 from helpers import database_exists, get_db_collection_names, process_docs, get_doc_ids_from_manifest, save_response_to_markdown_file, save_history_to_markdown_file, read_sample, update_manifest
 from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SUMMARY_TEMPLATE, SYSTEM_MESSAGE_CODES
-from config import MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, EXPLAIN_EXCERPT, FILTER_TOPIC, ALLOW_MULTI_VECTOR
+from config import MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, EXPLAIN_EXCERPT, FILTER_TOPIC
 from classes import Config
 from models import LLM_FN, LLM
 from rag import get_summary_chain, input_to_docs, get_rag_chain, get_eval_chain
@@ -19,10 +19,7 @@ try:
 except ImportError:
     pass
 
-if ALLOW_MULTI_VECTOR:
-    from langchain.retrievers.multi_vector import MultiVectorRetriever
-else:
-    MultiVectorRetriever = None
+from langchain.retrievers.multi_vector import MultiVectorRetriever
 
 try:
     from pyperclip import paste as clipboard_paste, copy as clipboard_copy
@@ -58,7 +55,7 @@ PROCESSING_DOCS_FN = process_docs
 
 ID_KEY = "doc_id"
 
-REFORMATTING_PROMPTS = ["paste", "read"]
+REFORMATTING_PROMPTS = [".paste", ".read"]
 COMMAND_LIST = [
     "del",
     "quit",
@@ -72,7 +69,7 @@ COMMAND_LIST = [
     "reg",
     ".s",
     ".names",
-    ".sr",
+    ".copy",
     ".rm"]
 
 
@@ -403,7 +400,7 @@ class Chatbot:
         print('yay!')
         raise SystemExit("Test complete")
 
-    def get_retriever(self) -> MultiVectorRetriever | VectorStoreRetriever:  # type: ignore
+    def get_retriever(self) -> MultiVectorRetriever | VectorStoreRetriever:
         vectorstore = self.get_vectorstore()
         # self.run_eval_tests_on_vectorstore(vectorstore)
         search_kwargs = {}
@@ -418,6 +415,7 @@ class Chatbot:
                 vectorstore=vectorstore,
                 byte_store=InMemoryByteStore(),
                 id_key=ID_KEY,
+                search_kwargs=search_kwargs,
             )
             multi_retriever.docstore.mset(
                 list(zip(self.doc_ids, self.parent_docs)))
@@ -552,7 +550,7 @@ class Chatbot:
             # Print the current codes
             print(f"Available codes:")
             for k, v in SYSTEM_MESSAGE_CODES.items():
-                print(f"- {k}: {v[:50]}[...]")
+                print(f"- {k}: {v[:50]}{'[...]'if len(v)>50 else ''}")
             user_system_message = input(
                 'Enter a code or type a system message: ')
             if not user_system_message:
@@ -579,8 +577,8 @@ class Chatbot:
             print("Collection names:")
             for name in collection_names:
                 print("-", name)
-        elif prompt == ".sr":
-            # Save response to clipboard
+        elif prompt == ".copy":
+            # Copy response to clipboard
             if len(self.messages) < 2:
                 print('No responses to save')
             else:
@@ -752,28 +750,28 @@ class Chatbot:
             else:
                 prompt = input("Enter your query: ")
             if prompt in REFORMATTING_PROMPTS:
-                if prompt == "paste":
+                if prompt == ".paste":
                     # use clipboard content as prompt
                     prompt = self.get_clipboard()
                     if not prompt:
                         print('No text in clipboard! Try again.')
                         continue
-                elif prompt == "read":
+                elif prompt == ".read":
                     # Read sample.txt as prompt
                     # TODO: Add some checks for string content of sample.txt
                     prompt = read_sample()
                 # Do not continue here
-
-            if not prompt.strip():
+            stripped_prompt = prompt.strip()
+            if not stripped_prompt:
                 print('No input given, try again')
                 continue
             if len(prompt) > MAX_CHARS_IN_PROMPT:
                 print(
                     f'Input too long, max characters is {MAX_CHARS_IN_PROMPT}')
                 continue
-
-            if prompt in COMMAND_LIST:
-                self.handle_command(prompt)
+            
+            if stripped_prompt in COMMAND_LIST:
+                self.handle_command(stripped_prompt)
                 continue
             # Generate response
             if self.config.rag_settings.rag_mode:
@@ -793,9 +791,14 @@ class Chatbot:
         print('Deleted last exchange')
         self.count -= 1
 
+def run_chat(config: Config | None = None):
+    chatbot = Chatbot(config)
+    chatbot.chat()
 
-# Argparse implementation
-if __name__ == "__main__":
+def main():
+    run_chat()
+
+def main_cli():
     import argparse
     parser = argparse.ArgumentParser(description='Interactive chat')
     parser.add_argument(
@@ -861,10 +864,6 @@ if __name__ == "__main__":
             config_override["chat_config"]["primary_model"] = args.model
 
     config = Config(config_override=config_override)
-    if config.rag_settings.rag_mode and config.rag_settings.multivector_enabled is True:
-        if MultiVectorRetriever is None:
-            print('MultiVectorRetriever not supported. Check config.py and chat.py.')
-            raise SystemExit
     prompt = args.prompt
 
     persistence_enabled = not args.not_persistent
@@ -882,3 +881,6 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print('Keyboard interrupt, exiting.')
         raise SystemExit
+
+if __name__ == "__main__":
+    main_cli()
