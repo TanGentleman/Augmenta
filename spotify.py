@@ -1,16 +1,17 @@
 import logging
-from typing import Literal, Union, Optional
-from dotenv import dotenv_values
+from typing import Literal, Union
+from dotenv import load_dotenv
 from pydantic import BaseModel
 from spotipy import Spotify
 from spotipy.oauth2 import SpotifyOAuth, SpotifyClientCredentials
 from langchain_community.tools.tavily_search import TavilySearchResults
 
 # Load environment variables
-env_config = dotenv_values()
-
-SPOTIFY_CLIENT_ID = env_config.get("SPOTIFY_CLIENT_ID")
-SPOTIFY_CLIENT_SECRET = env_config.get("SPOTIFY_CLIENT_SECRET")
+# env_config = dotenv_values()
+load_dotenv()
+import os
+SPOTIFY_CLIENT_ID = os.getenv("SPOTIFY_CLIENT_ID")
+SPOTIFY_CLIENT_SECRET = os.getenv("SPOTIFY_CLIENT_SECRET")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -22,6 +23,20 @@ FILTER_DOMAIN = "site:open.spotify.com/"
 ALLOW_AUTHORIZED = True
 DEFAULT_QUERY = "2 poor kids"
 
+
+READ_LIBRARY_SCOPE = "user-library-read"
+MODIFY_LIBRARY_SCOPE = "user-library-modify"
+MODIFY_PLAYLIST_SCOPE = "playlist-modify-private"
+MODIFY_PLAYBACK_SCOPE = "user-modify-playback-state"
+READ_PLAYBACK_SCOPE = "user-read-playback-state"
+
+AUTHORIZED_CLIENT_SCOPES = [
+    READ_LIBRARY_SCOPE,
+    MODIFY_LIBRARY_SCOPE,
+    MODIFY_PLAYLIST_SCOPE,
+    MODIFY_PLAYBACK_SCOPE,
+    READ_PLAYBACK_SCOPE
+]
 # Spotify Clients
 READ_ONLY_SP = Spotify(auth_manager=SpotifyClientCredentials(
     client_id=SPOTIFY_CLIENT_ID,
@@ -29,12 +44,14 @@ READ_ONLY_SP = Spotify(auth_manager=SpotifyClientCredentials(
 
 AUTHORIZED_SP = None
 if ALLOW_AUTHORIZED:
+    scope_string = " ".join(AUTHORIZED_CLIENT_SCOPES)
+    assert scope_string == "user-library-read user-library-modify playlist-modify-private user-modify-playback-state user-read-playback-state"
     AUTHORIZED_SP = Spotify(auth_manager=SpotifyOAuth(
         client_id=SPOTIFY_CLIENT_ID,
         client_secret=SPOTIFY_CLIENT_SECRET,
         redirect_uri="http://localhost:3000",
-        scope="user-library-read user-library-modify"))
-
+        scope=scope_string
+    ))
 # Schemas
 class Track(BaseModel):
     name: str
@@ -71,9 +88,12 @@ def perform_lookup(
         return None
     return results
 
-def check_scope() -> bool:
-    """Check if the Spotify client is authorized to read/modify the library."""
-    is_authorized = AUTHORIZED_SP is not None
+def check_scope(scopes: list[str] = None) -> bool:
+    """Check if the Spotify client is authorized to to run the function."""
+    if scopes:
+        if AUTHORIZED_SP is None:
+            return False
+        is_authorized = all([scope in AUTHORIZED_CLIENT_SCOPES for scope in scopes])
     return is_authorized
 
 def id_tuples_from_spotify_urls(urls: list[str]) -> list[tuple[str, str]]:
@@ -173,17 +193,22 @@ def decode_id_tuples(id_tuples: str, expand_tracks=False, limit=10):
 
 def search_spotify(query: str, result_type: str = "track", limit: int = 2) -> list | dict[str] | None:
     """Search Spotify for tracks or albums."""
-    if result_type not in ["track", "album", "both"]:
+    if result_type not in ["track", "album", "playlist", "both"]: # both is track + album
         logger.error("Only track and album searches are supported")
         raise ValueError("Invalid result type")
     if result_type == "both":
         result_type = "track,album"
     logger.info(f"Searching for {result_type}s")
     result = READ_ONLY_SP.search(q=query, limit=limit, type=result_type, market=SEARCH_MARKET)
+    if not result:
+        logger.error("No results found")
+        return None
     if result_type == "track":
         result = result.get('tracks', {})
     elif result_type == "album":
         result = result.get('albums', {})
+    elif result_type == "playlist":
+        result = result.get('playlists', {})
     else:
         assert result_type == "track,album", "Invalid result type"
         tracks = result.get('tracks', {}).get('items', [])
@@ -219,7 +244,6 @@ def add_spotify_tracks_to_library(track_values: list[str]):
         raise SystemExit
     return AUTHORIZED_SP.current_user_saved_tracks_add(tracks=track_values)
 
-
 def remove_spotify_tracks_from_library(track_values: list[str], bulk=False):
     """Remove tracks from the user's Spotify library."""
     # track_values is a list of track URIs, URLs or IDs
@@ -235,6 +259,14 @@ def remove_spotify_tracks_from_library(track_values: list[str], bulk=False):
             return None
     return AUTHORIZED_SP.current_user_saved_tracks_delete(tracks=track_values)
 
+def create_playlist(playlist_name: str, public=False):
+    """Create a new playlist for the user."""
+    is_authorized = check_scope()
+    if not is_authorized:
+        logger.error("Spotify client not authorized for this function.")
+        raise SystemExit
+    AUTHORIZED_SP.user_playlist_create(
+        user="31iv2kp6oet73g2ahmdf3tkmk3iq", name=playlist_name, public=public)
 
 def get_user_library_playlist(limit=20) -> list | None:
     user_library_playlist = AUTHORIZED_SP.current_user_saved_tracks(
@@ -246,7 +278,7 @@ def get_user_library_playlist(limit=20) -> list | None:
 
 
 def extract_item_ids(items = False, from_playlist=False):
-    if not items:
+    if items is False:
         logger.info("Getting user library tracks")
         tracks = get_user_library_playlist()
         from_playlist = True
@@ -335,10 +367,12 @@ def print_items(items, from_playlist=False, limit=10):
 def prune_library(
         acceptable_songs: list[str],
         acceptable_artists: list[str],
+        playlist_tracks: list | None = None, # If not provided, get from user library
        bulk = False) -> list | None:
     """Prune the user's library based on the acceptable songs and artists."""
     # TODO: Make this robust, input should be dict with allowed/forbidden songs/artists/albums/ids
-    playlist_tracks = get_user_library_playlist()
+    if playlist_tracks is None:
+        playlist_tracks = get_user_library_playlist()
     if not playlist_tracks:
         logger.error("No tracks in your library found")
         return None
@@ -374,6 +408,21 @@ def prune_library(
         logger.info(f"Removed {len(removed_ids)} tracks")
     return playlist_tracks
 
+def start_playback(context_uri: str = ""):
+    """Start playback on the user's Spotify account."""
+    REQUIRED_SCOPES = [MODIFY_PLAYBACK_SCOPE]
+    is_authorized = check_scope(REQUIRED_SCOPES)
+    if not is_authorized:
+        logger.error("Spotify client not authorized for this function.")
+        raise SystemExit
+    track = search_spotify("kurt hugo listen to your heart", result_type="track", limit=1)
+    if not track:
+        logger.error("No track found")
+        return None
+    uri = track[0]['uri']
+    uri_values = [uri]
+    return AUTHORIZED_SP.start_playback(uris=uri_values)
+
 
 def test_functions():
     query = DEFAULT_QUERY
@@ -392,7 +441,7 @@ def test_functions():
         add_spotify_tracks_to_library(track_ids)
 
 
-def res_urls_from_query(
+def query_tavily_get_urls(
         query: str,
         filter_type: Literal["", "track", "playlist", "album"] = "",
         max_urls: int = 1,
@@ -443,7 +492,7 @@ def query_tavily_return_spotify_dict(
         filter_type: str = "track",
         limit=3) -> dict:
     """Get the top Spotify hits for the given query."""
-    res_urls = res_urls_from_query(
+    res_urls = query_tavily_get_urls(
         query, filter_type=filter_type, max_urls=limit)
     if not res_urls:
         logger.error("No tavily results found")
@@ -502,7 +551,7 @@ def wacky_testing():
     # print_items(res)
     # if not res:
     #     raise SystemExit
-    res_urls = res_urls_from_query(
+    res_urls = query_tavily_get_urls(
         query, filter_type="track", max_urls=url_limit)
     if not res_urls:
         logger.error("No urls found")
@@ -541,7 +590,7 @@ def main():
     # Get the spotify URLS that best fit the query
     query = DEFAULT_QUERY
     filter_type = ""
-    res_urls = res_urls_from_query(
+    res_urls = query_tavily_get_urls(
         query, filter_type=filter_type, max_urls=max_urls)
     if not res_urls:
         logger.info("No results found")
@@ -583,12 +632,56 @@ def test_albums():
         return False
     return True
 
-
-
 def test_prune():
     acceptable_songs = ["Every Breath You Take", "Roxanne"]
     acceptable_artists = ["The Police"]
     prune_library(acceptable_songs, acceptable_artists)
+
+def test_workflow():
+    query = "songs your neighbors listen to. Stargazing songs by The Neighbours"
+    USE_TAVILY = False
+    if not check_scope():
+        logger.error("Spotify client not authorized for this function.")
+        raise SystemExit
+    if USE_TAVILY:
+        res_urls = query_tavily_get_urls(query, filter_type="playlist")
+        if not res_urls:
+            logger.error("No result urls found")
+            return None
+        # Get the tracks from the playlist
+        id_tuples = id_tuples_from_spotify_urls(res_urls)
+        if not id_tuples:
+            logger.error("No id tuples found")
+            return None
+        spotify_dict = decode_id_tuples(id_tuples, expand_tracks=True)
+        if not spotify_dict:
+            logger.error("No result object found")
+            return None
+        playlists = spotify_dict["playlists"]
+        playlist_tracks = playlists[0]["tracks"]["items"]
+        print_items(playlist_tracks, from_playlist=True)
+    else:
+        playlists = search_spotify(query, result_type="playlist", limit=1)
+    if not playlists:
+        logger.error("No playlists found")
+        return None
+    logger.info("Using the first playlist")
+    playlist = playlists[0]
+    assert playlist["type"] == "playlist", "Invalid type"
+    logger.info(f"Playlist: {playlist['name']}")
+    # download from uri
+    uri_list = [playlist["uri"]]
+    # add to library
+    logger.info(f"Adding tracks: {uri_list} to library")
+    add_spotify_tracks_to_library(uri_list)
+    playlist_tracks = playlist["tracks"]["items"]
+    print_items(playlist_tracks, from_playlist=True)
+    item_ids = extract_item_ids(playlist_tracks, from_playlist=True)
+    # add_spotify_tracks_to_library(item_ids)
+    # save the str(list) to a file temp.txt
+    with open("temp.txt", "w") as f:
+        f.write(str(item_ids))
+    return None
 
 def run_tests():
     # Test 1 - Spotify search track + parse name
@@ -597,6 +690,34 @@ def run_tests():
     assert test_albums(), "Test 2 failed"
 
 
+
+
+def download_playlist_from_url(url: str, limit=30):
+    id_tuples = id_tuples_from_spotify_urls([url])
+    if not id_tuples:
+        logger.error("No id tuples found")
+        return None
+    spotify_dict = decode_id_tuples(id_tuples, expand_tracks=True, limit=limit)
+    if not spotify_dict:
+        logger.error("No result object found")
+        return None
+    playlists = spotify_dict["playlists"]
+    if not playlists:
+        logger.error("No playlists found")
+        return None
+    playlist_tracks = playlists[0]["tracks"]["items"]
+    # print_items(playlist_tracks, from_playlist=True)
+    track_ids = extract_item_ids(playlist_tracks, from_playlist=True)
+    # track_ids = track_ids[:1]
+    with open("temp.txt", "w") as f:
+        f.write(str(track_ids))
+        logger.info("Saved track IDs to temp.txt")
+    add_spotify_tracks_to_library(track_ids)
+
+def test_playlist_dl():
+    input_url = input("Enter the Spotify URL: ")
+    assert input_url.startswith("https://open.spotify.com/"), "Invalid URL"
+    download_playlist_from_url(input_url)
 
 if __name__ == "__main__":
     run_tests()
