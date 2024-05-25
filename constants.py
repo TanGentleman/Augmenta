@@ -17,7 +17,8 @@ MODEL_CODES = {
     "deepseek": "get_together_deepseek_4k",
     "opus": "get_claude_opus",
     "lmstudio": "get_local_model",
-    "ollama": "get_ollama_local_model",
+    "ollama3": "get_ollama_llama3",
+    "ollama": "get_ollama_mistral",
 }
 
 SYSTEM_MESSAGE_CODES = {
@@ -36,7 +37,8 @@ RAG_COLLECTION_TO_SYSTEM_MESSAGE = {
 }
 
 LOCAL_MODELS = [
-    "get_ollama_local_model",
+    "get_ollama_llama3",
+    "get_ollama_mistral"
     "get_local_model",
     "get_ollama_local_embedder",
     "get_lmstudio_local_embedder"]

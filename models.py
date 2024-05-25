@@ -10,18 +10,19 @@ from langchain.callbacks.manager import CallbackManager
 from langchain_anthropic import ChatAnthropic
 from langchain_openai import ChatOpenAI
 from os import getenv
-from os.path import join, dirname
 from dotenv import load_dotenv
 from langchain_together import TogetherEmbeddings
 from langchain_community.embeddings import OllamaEmbeddings
-from langchain_community.llms import Ollama
-dotenv_path = join(dirname(__file__), '.env')
-load_dotenv(dotenv_path)
+from langchain_community.llms.ollama import Ollama
+
+load_dotenv()
 
 TOGETHER_API_KEY = getenv("TOGETHER_API_KEY")
 ANTHROPIC_API_KEY = getenv("ANTHROPIC_API_KEY")
 OPENAI_API_KEY = getenv("OPENAI_API_KEY")
 assert TOGETHER_API_KEY and ANTHROPIC_API_KEY, "Please set API keys in .env file"
+import logging
+logger = logging.getLogger(__name__)
 
 
 # This model is the flagship for improved instruction following,
@@ -59,7 +60,7 @@ def get_together_quen(hyperparameters=None) -> ChatOpenAI:
         base_url="https://api.together.xyz",
         api_key=TOGETHER_API_KEY,
         model="Qwen/Qwen1.5-72B-Chat",
-        temperature=0.1,
+        temperature=0,
         max_tokens=1000,
         streaming=True,
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
@@ -72,7 +73,7 @@ def get_together_nous_mix(hyperparameters=None) -> ChatOpenAI:
         base_url="https://api.together.xyz",
         api_key=TOGETHER_API_KEY,
         model="NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
-        temperature=0.1,
+        temperature=0,
         max_tokens=1000,
         streaming=True,
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
@@ -85,7 +86,7 @@ def get_together_bigmix(hyperparameters=None) -> ChatOpenAI:
         base_url="https://api.together.xyz",
         api_key=TOGETHER_API_KEY,
         model="mistralai/Mixtral-8x22B-Instruct-v0.1",
-        temperature=0.1,
+        temperature=0,
         max_tokens=1000,
         streaming=True,
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
@@ -98,7 +99,7 @@ def get_together_dbrx(hyperparameters=None) -> ChatOpenAI:
         base_url="https://api.together.xyz",
         api_key=TOGETHER_API_KEY,
         model="databricks/dbrx-instruct",
-        temperature=0.1,
+        temperature=0,
         max_tokens=1000,
         streaming=True,
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
@@ -111,7 +112,7 @@ def get_together_arctic(hyperparameters=None) -> ChatOpenAI:
         base_url="https://api.together.xyz",
         api_key=TOGETHER_API_KEY,
         model="Snowflake/snowflake-arctic-instruct",
-        temperature=0.1,
+        temperature=0,
         max_tokens=1000,
         streaming=True,
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
@@ -124,7 +125,7 @@ def get_together_llama3(hyperparameters=None) -> ChatOpenAI:
         base_url="https://api.together.xyz",
         api_key=TOGETHER_API_KEY,
         model="meta-llama/Llama-3-70b-chat-hf",
-        temperature=0.1,
+        temperature=0,
         max_tokens=1000,
         streaming=True,
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
@@ -137,7 +138,7 @@ def get_together_fn_mix(hyperparameters=None) -> ChatOpenAI:
         base_url="https://api.together.xyz",
         api_key=TOGETHER_API_KEY,
         model="mistralai/Mixtral-8x7B-Instruct-v0.1",
-        temperature=0.1,
+        temperature=0,
         max_tokens=1000,
         streaming=True,
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
@@ -150,7 +151,7 @@ def get_together_fn_mistral(hyperparameters=None) -> ChatOpenAI:
         base_url="https://api.together.xyz",
         api_key=TOGETHER_API_KEY,
         model="mistralai/Mistral-7B-Instruct-v0.1",
-        temperature=0.1,
+        temperature=0,
         max_tokens=1000,
         streaming=True,
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
@@ -227,18 +228,25 @@ def get_local_model(hyperparameters=None) -> ChatOpenAI:
         base_url="http://localhost:1234/v1",
         api_key='lm-studio',
         model="local-model",
-        temperature=0.1,
+        temperature=0,
         max_tokens=1000,
         streaming=True,
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
 
-def get_ollama_local_model(hyperparameters=None) -> Ollama:
+def get_ollama_llama3(hyperparameters=None) -> Ollama:
     return Ollama(
         model="llama3",
+        temperature=0,
+        num_predict=1000,
     )
-
+def get_ollama_mistral(hyperparameters=None) -> Ollama:
+    return Ollama(
+        model="mistral:7b-instruct-v0.3-q6_K",
+        temperature=0,
+        num_predict=1000,
+    )
 
 def get_ollama_local_embedder(hyperparameters=None) -> OllamaEmbeddings:
     return OllamaEmbeddings(
@@ -305,7 +313,7 @@ MODEL_DICT = {
     },
     "get_together_llama3": {
         "function": get_together_llama3,
-        "context_size": 4096,
+        "context_size": 8000,
         "model_name": "meta-llama/Llama-3-70b-chat-hf",
         "model_type": "llm"
     },
@@ -340,10 +348,16 @@ MODEL_DICT = {
         "model_name": "local-model",
         "model_type": "llm"
     },
-    "get_ollama_local_model": {
-        "function": get_ollama_local_model,
+    "get_ollama_llama3": {
+        "function": get_ollama_llama3,
         "context_size": 4096,
         "model_name": "local-ollama3",  # Should this be llama3?
+        "model_type": "llm"
+    },
+    "get_ollama_mistral": {
+        "function": get_ollama_mistral,
+        "context_size": 4096,
+        "model_name": "mistral:7b-instruct-v0.3-q6_K",
         "model_type": "llm"
     },
     "get_openai_embedder_large": {
@@ -437,28 +451,33 @@ class LLM:
         # replace the hyperparameters with the new ones
         self.llm = llm_fn.get_llm(hyperparameters)
 
-        self.confirm_model_name()
+        if not self.confirm_model_name():
+            logger.error("Critical error. Model name failed in LLM.confirm_model_name. Exiting.")
+            raise SystemExit
 
-    def confirm_model_name(self) -> str:
-        """
-        Get the name of the model
-        """
-        if hasattr(self.llm, 'model_name'):
-            model_name = self.llm.model_name
-        elif hasattr(self.llm, 'model'):
-            model_name = self.llm.model
-        else:
-            raise ValueError("Model name not found in model object")
 
+    def confirm_model_name(self) -> bool:
+        """
+        Raise an error if the model name from the API does not match the MODEL_DICT
+        """
+        model_name = getattr(self.llm, 'model_name', getattr(self.llm, 'model', None))
+        if model_name is None:
+            logger.error("Model name not found in model object")
+            return False
+        
+        # override-llama3 name
         if model_name == "llama3":
+            logger.info("Model name override: llama3 -> local-ollama3")
             model_name = "local-ollama3"
+        
         if model_name != self.model_name:
-            raise ValueError(
+            logger.error(
                 f"Model name from API: {model_name} does not match expected model name: {self.model_name}")
-        return model_name
+            return False
+        return True
     pass
 
-    def invoke(self, query):
+    def invoke(self, query: str | list, tools=None, tool_choice=None):
         """
         Generate a response from the model
         """
