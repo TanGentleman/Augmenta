@@ -2,12 +2,15 @@ from config import LOCAL_MODEL_ONLY, SYSTEM_MSG_MAP
 from constants import LOCAL_MODELS, MODEL_CODES, SYSTEM_MESSAGE_CODES
 from helpers import database_exists, read_settings
 # use pydantic to enforce Config schema
-from typing import Literal
+from typing import Literal, Union
 from pydantic import BaseModel, Field
 
 from models import LLM_FN, MODEL_DICT
 from os import path, mkdir
 from json import load as json_load, dump as json_dump
+
+import logging
+logger = logging.getLogger(__name__)
 
 ACTIVE_JSON_FILE = "active.json"
 
@@ -26,7 +29,8 @@ VALID_LLM = Literal[
     "get_claude_opus",
     "get_claude_sonnet",
     "get_local_model",
-    "get_ollama_local_model"
+    "get_ollama_llama3",
+    "get_ollama_mistral"
 ]
 
 VALID_EMBEDDER = Literal["get_openai_embedder_large",
@@ -34,6 +38,7 @@ VALID_EMBEDDER = Literal["get_openai_embedder_large",
                          "get_ollama_local_embedder",
                          "get_lmstudio_local_embedder"]
 
+configValue = Union[str, int, float, bool]
 
 class ManifestSchema(BaseModel):
     """
@@ -80,7 +85,27 @@ class RagSchema(BaseModel):
     inputs: list[str]
     multivector_enabled: bool
     multivector_method: Literal["summary", "qa"]
+    doc_ids: list[str] = []
 
+def get_llm_fn(model_name: str, model_type: Literal["llm", "embedder"]) -> LLM_FN:
+    """
+    Get the LLM function from the name
+    """
+    assert model_type in ["llm", "embedder"], "Model type must be llm or embedder"
+    model_function = MODEL_DICT.get(model_name)
+    if model_function is None:
+        raise ValueError(f"Model {model_name} not found")
+    if model_function["model_type"] != model_type:
+        raise ValueError(f"Model {model_name} must be type {model_type}")
+    
+    llm_fn = LLM_FN(model_function["function"])
+    if LOCAL_MODEL_ONLY:
+        if llm_fn.model_name not in LOCAL_MODELS:
+            logger.warning(f"Local model must be in {LOCAL_MODELS}")
+            logger.error(f"Model {llm_fn.model_name} is not local")
+            raise ValueError(
+                f"LOCAL_MODEL_ONLY is set to True. Change this {model_type}.")
+    return llm_fn
 
 class RagSettings:
     """
@@ -90,6 +115,7 @@ class RagSettings:
     def __init__(self, **kwargs):
         self.__config = RagSchema(**kwargs)
         # TODO: Expose more attributes
+        self.database_exists = None
         if self.__config.rag_mode:
             self.rag_mode = True
             # The other attributes are ONLY set if RAG mode is enabled
@@ -112,20 +138,28 @@ class RagSettings:
         Enable RAG mode
         """
         assert self.rag_mode, "RAG mode must be enabled"
-        self.database_exists = database_exists(collection_name, method)
-
         self.collection_name = collection_name
-        self.embedding_model = embedding_model
         self.method = method
-        self.chunk_size = chunk_size
-        self.chunk_overlap = chunk_overlap
         self.k_excerpts = k_excerpts
-        self.rag_llm = rag_llm
-        self.inputs = inputs
-        self.multivector_enabled = multivector_enabled
         self.multivector_method = multivector_method
+        if self.database_exists is None:
+            self.database_exists = database_exists(collection_name, method)
+        else:
+            logger.warning("Found value for rag_settings.database_exists!")
+        
+        if self.database_exists:
+            logger.info("DB exists! Replacing the manifest.json settings.")
+            self.update_rag_settings(override_all=True)
+            # Passing override_all will ensure that the model, chunk size, overlap, inputs, and multivector are updated
+        else:
+            self.embedding_model = embedding_model
+            self.chunk_size = chunk_size
+            self.chunk_overlap = chunk_overlap
+            self.inputs = inputs
+            self.multivector_enabled = multivector_enabled
+        self.rag_llm = rag_llm
 
-    def adjust_rag_settings(self, metadata: dict):
+    def adjust_rag_settings(self, metadata: dict[str, configValue], override_all = False):
         """
         Adjust the rag settings based on the metadata from manifest.json
 
@@ -137,66 +171,113 @@ class RagSettings:
         - inputs
         - doc_ids ([] unless multivector_enabled is True)
         """
-        assert "embedding_model" in metadata, "Embedding model not found"
+        assert "embedding_model" in metadata, "Embedding model key not found"
+        # Replace the manifest "embedKding model" value from the model name to the MODEL_DICT key
         for model in MODEL_DICT:
             if MODEL_DICT[model]["model_name"] == metadata["embedding_model"]:
                 metadata["embedding_model"] = model
                 break
         else:
-            raise ValueError("Embedding model not found")
+            raise ValueError("Model not found in MODEL_DICT")
         ManifestSchema(**metadata)
-        model = MODEL_DICT.get(metadata["embedding_model"])
-        if model is None:
-            raise ValueError("Embedding model not found")
-        metadata["embedding_model"] = model["model_name"]
-        if metadata["embedding_model"] != self.embedding_model.model_name:
+        if override_all or (metadata["embedding_model"] != self.embedding_model.model_name):
             self.embedding_model = metadata["embedding_model"]
-            assert isinstance(
-                self.embedding_model, LLM_FN), "Embedding model must be type LLM_FN"
-            print(
-                f"Warning: Embedding model in settings.json switched to {self.embedding_model.model_name} from manifest.json.")
-        if metadata["method"] != self.method:
+            logger.warning(f"Switched embedding model to {self.embedding_model.model_name} from manifest.json.")
+        if override_all or (metadata["method"] != self.method):
             self.method = metadata["method"]
-            print(
-                f"Warning: Method in settings.json has been switched to {self.method} from manifest.json.")
+            logger.warning(f"Switched method to {self.method} from manifest.json.")
 
         manifest_chunk_size = int(metadata["chunk_size"])
-        if manifest_chunk_size != self.chunk_size:
+        if override_all or (manifest_chunk_size != self.chunk_size):
             self.chunk_size = manifest_chunk_size
-            print(
-                f"Warning: Chunk size in settings.json has been switched to {manifest_chunk_size} from manifest.json.")
+            logger.warning(f"Switched chunk size to {manifest_chunk_size} from manifest.json.")
 
         manifest_chunk_overlap = int(metadata["chunk_overlap"])
-        if manifest_chunk_overlap != self.chunk_overlap:
+        if override_all or (manifest_chunk_overlap != self.chunk_overlap):
             self.chunk_overlap = manifest_chunk_overlap
-            print(
-                f"Warning: Chunk overlap in settings.json has been switched to {manifest_chunk_overlap} from manifest.json.")
-        if metadata["inputs"] != self.inputs:
+            logger.warning(f"Switched chunk overlap to {manifest_chunk_overlap} from manifest.json.")
+
+        if override_all or (metadata["inputs"] != self.inputs):
             self.inputs = metadata["inputs"]
-            print("Warning: Inputs loaded from manifest.json.")
-        if self.multivector_enabled is True:
-            if not metadata["doc_ids"]:
-                raise ValueError(
-                    "Multivector enabled but no doc_ids in manifest")
-        else:
-            if metadata["doc_ids"]:
-                print("Multivector disabled but doc_ids in manifest")
-                print("Warning: Enabling multivector.")
+            logger.warning(f"Switched to {len(metadata['inputs'])} inputs from manifest.json.")
+            logger.info(f"Inputs: {self.inputs}")
+        
+        
+        # Check if metadata["doc_ids"] exists
+        
+        if metadata.get("doc_ids"):
+            if override_all:
                 self.multivector_enabled = True
+            else:
+                # If multivector is not enabled and doc_ids exist
+                if not self.multivector_enabled:
+                    logger.warning("Multivector switched to True from manifest.json")
+            self.multivector_enabled = True
+            logger.warning("Multivector is enabled! Make sure to get the doc IDS for RAG needs!")
+        else:
+            # No doc ids found
+            self.multivector_enabled = False
+            logger.warning("Multivector forcibly disabled. Could this be problematic?")
+            # if self.multivector_enabled:
+            #     logger.error("Multivector should not be enabled with no doc ids! Aborting.")
+            #     raise ValueError("Error in manifest.json")
+
+    def update_rag_settings(self, override_all = False):
+        """
+        Make sure documents folder and manifest.json initialized correctly.
+        """
+        # Check if the collection exists in manifest.json/vector DB
+        # Adjust rag_config with correct fields (include print statements)
+        if override_all:
+            assert self.database_exists is True, "DB must exist to override all settings"
+        with open("manifest.json", "r") as f:
+            data = json_load(f)
+            assert "databases" in data, "databases key not found in manifest.json"
+            if self.rag_mode:
+                prune_collection = False
+                if self.database_exists is None:
+                    logger.error("This check should not ever be called! Set DB exists first!")
+                    self.set_database_exists()
+                
+                for item in data["databases"]:
+                    if item["collection_name"] == self.collection_name:
+                        if self.database_exists:
+                            logger.info("Collection found in vector DB")
+                            # Adjust rag config to match the collection
+                            self.adjust_rag_settings(item["metadata"], override_all=override_all)
+                            logger.info("RAG settings adjusted.")
+                            break
+                        else:
+                            logger.warning(
+                                "Collection found in manifest.json but not in vector DB")
+                            prune_collection = True
+                            break
+                else:
+                    if self.database_exists:
+                        logger.warning("Collection from DB not found in manifest.json")
+               
+                if prune_collection:
+                    # Happens when DB is deleted but collection in manifest
+                    logger.warning("Removing this collection from manifest.json")
+                    # Remove by collection name
+                    data["databases"] = [item for item in data["databases"]
+                                            if item["collection_name"] != self.collection_name]
+                    with open("manifest.json", "w") as f:
+                        json_dump(data, f, indent=2)
 
     @property
     def rag_mode(self):
         return self.__rag_mode
 
     @rag_mode.setter
-    def rag_mode(self, value):
+    def rag_mode(self, value: bool):
         if not isinstance(value, bool):
             raise ValueError("Rag mode must be a boolean")
         # TODO: Should this have side effects?
         self.__rag_mode = value
-        print(f"Rag mode set to {self.__rag_mode}")
+        logger.info(f"Rag mode set to {self.__rag_mode}")
         if value is True:
-            print("Enabling RAG mode. Doing some validation steps")
+            logger.info("Enabling RAG mode. Doing some validation steps")
             self.__enable_rag_mode(
                 self.__config.collection_name,
                 self.__config.embedding_model,
@@ -209,14 +290,12 @@ class RagSettings:
                 self.__config.multivector_enabled,
                 self.__config.multivector_method)
 
-    def set_database_exists(self):
+    def set_database_exists(self, collection_name: str, method: str):
         """
         Check if the collection exists in vector DB
         """
-        if database_exists(self.collection_name, self.method):
-            self.database_exists = True
-        else:
-            self.database_exists = False
+        logger.warning("This is deprecated. Directly call database_exists, sparingly.")
+        self.database_exists = database_exists(collection_name, method)
 
     @property
     def collection_name(self):
@@ -237,37 +316,21 @@ class RagSettings:
         return self.__embedding_model
 
     @embedding_model.setter
-    def embedding_model(self, value):
-        if not value:
-            raise ValueError("Embedding model cannot be empty")
-        if not isinstance(value, str):
+    def embedding_model(self, model_name: str):
+        if not isinstance(model_name, str):
             raise ValueError("Embedding model must be a string")
-        for embedder_fn_name in MODEL_DICT.keys():
-            if value == embedder_fn_name:
-                if MODEL_DICT[embedder_fn_name]["model_type"] != "embedder":
-                    raise ValueError("Embedding model must be type embedder")
-                embedding_fn = MODEL_DICT[embedder_fn_name]["function"]
-                self.__embedding_model = LLM_FN(embedding_fn)
-                print(
-                    f"Embedding model set to {self.__embedding_model.model_name}")
-                break
-        else:
-            raise ValueError("Embedding model not found")
-
-        if LOCAL_MODEL_ONLY:
-            if value not in LOCAL_MODELS:
-                raise ValueError(
-                    "LOCAL_MODEL_ONLY is set to True. Only local embedders are supported.")
+        
+        self.__embedding_model = get_llm_fn(model_name, "embedder")
 
     @property
     def method(self):
         return self.__method
 
     @method.setter
-    def method(self, value):
-        if value not in ["faiss", "chroma"]:
+    def method(self, vector_db_method):
+        if vector_db_method not in ["faiss", "chroma"]:
             raise ValueError("Method must be 'faiss' or 'chroma'")
-        self.__method = value
+        self.__method = vector_db_method
 
     @property
     def chunk_size(self):
@@ -310,26 +373,22 @@ class RagSettings:
         return self.__rag_llm
 
     @rag_llm.setter
-    def rag_llm(self, value):
-        if not value:
+    def rag_llm(self, model_name: str):
+        if not model_name:
             raise ValueError("RAG LLM cannot be empty")
-        if not isinstance(value, str):
+        if not isinstance(model_name, str):
             raise ValueError("RAG LLM must be a string")
-        if value in MODEL_DICT.keys():
-            if MODEL_DICT[value]["model_type"] != "llm":
-                raise ValueError("RAG LLM must be type llm")
-            self.__rag_llm = LLM_FN(MODEL_DICT[value]["function"])
-            print(f"RAG LLM set to {self.__rag_llm.model_name}")
-        else:
-            raise ValueError("RAG LLM not found")
-        # Check context max
-        context_max = self.__rag_llm.context_size
+        
+        rag_llm_fn = get_llm_fn(model_name, "llm")
+        self.__rag_llm = rag_llm_fn
+        context_max = rag_llm_fn.context_size
         max_chars = context_max * 4
         if self.chunk_size * self.k_excerpts > max_chars:
-            print("Warning: Chunk size * k exceeds model limit.")
+            logger.warning("Warning: Chunk size * k exceeds model limit.")
+
 
         if LOCAL_MODEL_ONLY:
-            if value not in LOCAL_MODELS:
+            if model_name not in LOCAL_MODELS:
                 raise ValueError(
                     f"LOCAL_MODEL_ONLY is set to True. {self.__rag_llm.model_name}, is non-local.")
 
@@ -342,18 +401,18 @@ class RagSettings:
         if not isinstance(value, list):
             raise ValueError("Inputs must be a list")
 
-        if self.database_exists:
-            print("Vector DB exists, not validating inputs!")
-        else:
-            print("Vector DB does not exist!")
+        logger.info(f"Checking if DB exists for inputs. Make sure this is after settings are finalized!")
+        if self.database_exists is False:
+            logger.info("Vector DB does not exist! (Or self.database_exists is None)")
             if not any(i for i in value):
+                # TODO: Check if the inputs are valid
                 raise ValueError("RAG mode requires valid string inputs")
-
-        if LOCAL_MODEL_ONLY and self.database_exists is False:
-            for input in value:
-                if input.startswith("http"):
-                    raise ValueError(
-                        f"LOCAL_MODEL_ONLY is set to True. '{input}' is non-local.")
+            if LOCAL_MODEL_ONLY:
+                for input in value:
+                    if input.startswith("http"):
+                        raise ValueError(
+                            f"LOCAL_MODEL_ONLY is set to True. '{input}' is non-local.")
+        logger.info(f"Set {len(value)} inputs")
         self.__inputs = value
 
     @property
@@ -427,23 +486,11 @@ class ChatSettings:
 
     @primary_model.setter
     def primary_model(self, value):
-        if not value:
-            raise ValueError("Primary model cannot be empty")
         if not isinstance(value, str):
             raise ValueError("Primary model must be a string")
-        if value in MODEL_DICT.keys():
-            if MODEL_DICT[value]["model_type"] != "llm":
-                raise ValueError("Primary model must be type llm")
-            self.__primary_model = LLM_FN(MODEL_DICT[value]["function"])
-            print(
-                f"Primary model set to {self.__primary_model.model_name}")
-        else:
-            raise ValueError("Primary model not found")
-
-        if LOCAL_MODEL_ONLY:
-            if value not in LOCAL_MODELS:
-                raise ValueError(
-                    f"LOCAL_MODEL_ONLY is set to True. {self.__primary_model.model_name}, is non-local.")
+        primary_model_llm_fn = get_llm_fn(value, "llm")
+        logger.info(f"Primary model set to {primary_model_llm_fn.model_name}")
+        self.__primary_model = primary_model_llm_fn
 
     @property
     def backup_model(self):
@@ -451,21 +498,11 @@ class ChatSettings:
 
     @backup_model.setter
     def backup_model(self, value):
-        if not value:
-            raise ValueError("Backup model cannot be empty")
         if not isinstance(value, str):
             raise ValueError("Backup model must be a string")
-        if value in MODEL_DICT.keys():
-            if MODEL_DICT[value]["model_type"] != "llm":
-                raise ValueError("Backup model must be type llm")
-            self.__backup_model = LLM_FN(MODEL_DICT[value]["function"])
-            print(
-                f"Backup model set to {self.__backup_model.model_name}")
-
-        if LOCAL_MODEL_ONLY:
-            if value not in LOCAL_MODELS:
-                raise ValueError(
-                    f"LOCAL_MODEL_ONLY is set to True. {self.__backup_model.model_name}, is non-local.")
+        backup_model_llm_fn = get_llm_fn(value, "llm")
+        logger.info(f"Backup model set to {backup_model_llm_fn.model_name}")
+        self.__backup_model = backup_model_llm_fn
 
     @property
     def enable_system_message(self):
@@ -489,7 +526,7 @@ class ChatSettings:
             raise ValueError("System message must be a string")
         if value in SYSTEM_MESSAGE_CODES:
             value = SYSTEM_MESSAGE_CODES[value]
-        print(f"Config INFO: System message set to {value}")
+        logger.info(f"System message set to {value}")
         self.__system_message = value
 
     def to_dict(self):
@@ -526,14 +563,14 @@ class Config:
                 for key in config_override["rag_config"]:
                     if key in config["rag_config"]:
                         config["rag_config"][key] = config_override["rag_config"][key]
-                        print(f"Rag config key {key} overridden")
+                        logger.info(f"Rag config key {key} overridden")
                     else:
                         raise ValueError(f"Key {key} not found in rag_config")
             if "chat_config" in config_override:
                 for key in config_override["chat_config"]:
                     if key in config["chat_config"]:
                         config["chat_config"][key] = config_override["chat_config"][key]
-                        print(f"Chat config key {key} overridden")
+                        logger.info(f"Chat config key {key} overridden")
                     else:
                         raise ValueError(f"Key {key} not found in chat_config")
         # Replace the LLM codes with the function name
@@ -554,12 +591,11 @@ class Config:
             model_name = self.chat_settings.primary_model.model_name
             if model_name in SYSTEM_MSG_MAP:
                 self.chat_settings.system_message = SYSTEM_MSG_MAP[model_name]
-                print(f"System message adjusted for model {model_name}.")
+                logger.info(f"System message adjusted for model {model_name}.")
 
         self.__validate_rag_config()
-        # print(self)
         self.save_to_json()
-        print(f"Config initialized and set in {ACTIVE_JSON_FILE}.")
+        logger.info(f"Config initialized and set in {ACTIVE_JSON_FILE}.")
 
     def __validate_rag_config(self):
         """
@@ -571,43 +607,6 @@ class Config:
             with open("manifest.json", "w") as f:
                 # Make databases key
                 f.write('{"databases": []}')
-
-        if self.rag_settings.rag_mode:
-            self.__check_rag_files()
-
-    def __check_rag_files(self):
-        """
-        Make sure documents folder and manifest.json initialized correctly.
-        """
-        # Check if the collection exists in manifest.json/vector DB
-        # Adjust rag_config with correct fields (include print statements)
-
-        with open("manifest.json", "r") as f:
-            data = json_load(f)
-            assert "databases" in data, "databases key not found in manifest.json"
-            collection_in_manifest = False
-            if self.rag_settings.rag_mode:
-                for item in data["databases"]:
-                    if item["collection_name"] == self.rag_settings.collection_name:
-                        collection_in_manifest = True
-                if self.rag_settings.database_exists:
-                    if collection_in_manifest:
-                        print("Collection found in vector DB")
-                        # Adjust rag config to match the collection
-                        self.rag_settings.adjust_rag_settings(item["metadata"])
-                    else:
-                        print(
-                            "Collection found in vector DB, but not in manifest.json")
-                else:
-                    if collection_in_manifest:
-                        # This is when DB is deleted but collection is in
-                        # manifest
-                        print("Vector DB does not exist, removing from manifest.json")
-                        # Remove by collection name
-                        data["databases"] = [item for item in data["databases"]
-                                             if item["collection_name"] != self.rag_settings.collection_name]
-                        with open("manifest.json", "w") as f:
-                            json_dump(data, f, indent=2)
 
     def save_to_json(self, filename=ACTIVE_JSON_FILE):
         """
