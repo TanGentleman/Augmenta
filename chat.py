@@ -70,7 +70,8 @@ COMMAND_LIST = [
     ".s",
     ".names",
     ".copy",
-    ".rm"]
+    ".rm",
+    ".eval"]
 
 
 class Chatbot:
@@ -345,21 +346,27 @@ class Chatbot:
             assert vectorstore is not None, "Vectorstore not created properly"
             return vectorstore
 
-    def run_eval_tests_on_vectorstore(self, vectorstore):
+    def run_eval_tests_on_vectorstore(self, 
+                                      vectorstore, 
+                                      similarity_query: str, 
+                                      criteria: str = "This document is about dolphins", 
+                                      k_excerpts: int = 1,
+                                      enable_llm_eval: bool = False):
         # This function is for testing purposes
+        if not criteria:
+            print("Error: Criteria not provided")
+            criteria = "This document is about dolphins"
         print('Running evaluation tests on vectorstore')
-        EVAL_QUERY = "What animal is this about?"
-        EVAL_K_EXCERPTS = 1
         filter = {}
         if self.filter_topic is not None:
             filter = {"topic": self.filter_topic}
 
         # This is a test for similarity search
         docs = vectorstore.similarity_search(
-            EVAL_QUERY, k=EVAL_K_EXCERPTS, filter=filter)
+            similarity_query, k=k_excerpts, filter=filter)
         # print(docs[0])
         # There should only be one document
-        assert len(docs) == 1, "There should be exactly one document"
+        assert len(docs) == k_excerpts, f"Document count must be {k_excerpts}"
         print(len(docs), "documents found")
         # Optional scan through documents
         for doc in docs:
@@ -367,28 +374,30 @@ class Chatbot:
             source = doc.metadata.get("source")
             topic = doc.metadata.get("topic")
             char_count = doc.metadata.get("char_count")
+
+            topic_string = f"(Topic: {topic})" if topic else ""
             print(
-                f"Document {index} ({source}) ({topic}) ({char_count} chars long)")
+                f"Document {index} ({source}) (Word count: {round(char_count/5)}) {topic_string}")
             print_adjusted(doc.page_content)
-            print('\n\n')
-            if char_count > 2000:
+            if char_count > 3000:
                 print(
                     f"Warning: Document {index} ({source}) is {char_count} chars long!")
         # This is a test for evaluation
         assert isinstance(self.rag_model, LLM), "RAG LLM not initialized"
+        if not enable_llm_eval:
+            return
+        print('\n\nGetting evaluation from criteria!')
         eval_chain = get_eval_chain(self.rag_model.llm)
         eval_dict = {
             "excerpt": docs[0].page_content,
-            "criteria": "The topic of this excerpt is dolphins."}
+            "criteria": criteria}
         res = eval_chain.invoke(eval_dict)
         print(res)
         if res["meetsCriteria"] is True:
-            print("Now fetching related documents")
+            print("Now fetching neighbor document chunk")
             index = docs[0].metadata["index"]
-            if index > 0:
-                new_index = index + 1
-            else:
-                new_index = index + 1
+            # Get next document unless it's the last one, then get the last one
+            new_index = index + 1 if index < len(docs) - 1 else index-1
             temp_search_kwargs = {"k": 1, "filter": {"index": new_index}}
             new_docs = vectorstore.similarity_search(
                 "", search_kwargs=temp_search_kwargs)
@@ -398,7 +407,7 @@ class Chatbot:
                 new_res = eval_chain.invoke(eval_dict)
                 print(new_res)
         print('yay!')
-        raise SystemExit("Test complete")
+        return
 
     def get_retriever(self) -> MultiVectorRetriever | VectorStoreRetriever:
         vectorstore = self.get_vectorstore()
@@ -585,6 +594,17 @@ class Chatbot:
                 clipboard_text = self.messages[-1].content
                 self.set_clipboard(clipboard_text)
             return
+        elif prompt == ".eval":
+            if not self.config.rag_settings.rag_mode:
+                print('Must evaluate in RAG mode')
+                return
+            user_input = input('Type a query to retrieve similar docs for: ').strip()
+            if user_input:
+                # criteria = input('Type a criteria to evaluate the document: ').strip()
+                criteria = "The language of this document is English"
+                self.run_eval_tests_on_vectorstore(self.retriever.vectorstore, user_input, criteria)
+            return
+
         elif prompt == ".rm":
             if self.config.rag_settings.rag_mode:
                 print('Cannot remove messages in RAG mode')
@@ -643,6 +663,9 @@ class Chatbot:
         else:
             print('Invalid command: ', prompt)
             return
+    
+    def is_ollama_model(self, model_name: str) -> bool:
+        return model_name in ["local-ollama3", "mistral:7b-instruct-v0.3-q6_K"]
 
     def get_chat_response(self, prompt: str, stream: bool = False):
         assert self.chat_model is not None, "Chat model not initialized"
@@ -651,7 +674,7 @@ class Chatbot:
         try:
             if stream:
                 response_string = ""
-                if self.chat_model.model_name == "local-ollama3":
+                if self.is_ollama_model(self.chat_model.model_name):
                     for chunk in self.chat_model.stream(self.messages):
                         print(chunk, end="", flush=True)
                         response_string += chunk
@@ -665,7 +688,7 @@ class Chatbot:
                 response = AIMessage(content=response_string)
             else:
                 response = self.chat_model.invoke(self.messages)
-                if self.chat_model.model_name == "local-ollama3":
+                if self.is_ollama_model(self.chat_model.model_name):
                     assert isinstance(response, str), "Response not str"
                     print_adjusted(response)
                     response = AIMessage(content=response)
@@ -693,7 +716,7 @@ class Chatbot:
         try:
             if stream:
                 response_string = ""
-                if self.rag_model.model_name == "local-ollama3":
+                if self.is_ollama_model(self.rag_model.model_name):
                     for chunk in self.rag_chain.stream(prompt):
                         print(chunk, end="", flush=True)
                         response_string += chunk
@@ -705,7 +728,7 @@ class Chatbot:
                 response = AIMessage(content=response_string)
             else:
                 response = self.rag_chain.invoke(prompt)
-                if self.rag_model.model_name == "local-ollama3":
+                if self.is_ollama_model(self.rag_model.model_name):
                     assert isinstance(response, str), "Response not str"
                     print_adjusted(response)
                     response = AIMessage(content=response)
