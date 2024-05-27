@@ -388,7 +388,7 @@ class RagSettings:
 
 
         if LOCAL_MODEL_ONLY:
-            if model_name not in LOCAL_MODELS:
+            if self.__rag_llm.model_name not in LOCAL_MODELS:
                 raise ValueError(
                     f"LOCAL_MODEL_ONLY is set to True. {self.__rag_llm.model_name}, is non-local.")
 
