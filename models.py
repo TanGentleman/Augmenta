@@ -227,7 +227,7 @@ def get_local_model(hyperparameters=None) -> ChatOpenAI:
     return ChatOpenAI(
         base_url="http://localhost:1234/v1",
         api_key='lm-studio',
-        model="local-model",
+        model="lmstudio-model",
         temperature=0,
         max_tokens=1000,
         streaming=True,
@@ -257,7 +257,7 @@ def get_ollama_local_embedder(hyperparameters=None) -> OllamaEmbeddings:
 def get_lmstudio_local_embedder(hyperparameters=None) -> OpenAIEmbeddings:
     return OpenAIEmbeddings(
         base_url="http://localhost:1234/v1",
-        model="local-embedding-model",
+        model="lmstudio-embedding-model",
         api_key="lm-studio"
     )
 
@@ -345,7 +345,7 @@ MODEL_DICT = {
     "get_local_model": {
         "function": get_local_model,
         "context_size": 32768,
-        "model_name": "local-model",
+        "model_name": "lmstudio-model",
         "model_type": "llm"
     },
     "get_ollama_llama3": {
@@ -381,7 +381,7 @@ MODEL_DICT = {
     "get_lmstudio_local_embedder": {
         "function": get_lmstudio_local_embedder,
         "context_size": 8192,
-        "model_name": "local-embedding-model",
+        "model_name": "lmstudio-embedding-model",
         "model_type": "embedder"
     }
 }
