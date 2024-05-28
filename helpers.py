@@ -74,7 +74,7 @@ def clean_text(text):
     Clean text, return str
     """
     cleaned_text = re_sub(r'\s+', ' ', text)
-    cleaned_text = re_sub(r'[^\w\s]', '', cleaned_text)
+    cleaned_text = re_sub(r'[^a-zA-Z0-9(),.\-! ]', '', cleaned_text)
     return cleaned_text
 
 
