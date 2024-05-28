@@ -22,7 +22,6 @@ FAISS_FOLDER = "faiss" + VECTOR_DB_SUFFIX
 MAX_PARENT_DOCS = 8  # This is only relevant for the multiretrieval mode with child docs
 MAX_CHARACTERS_IN_PARENT_DOC = 20000
 
-ALLOW_MULTI_VECTOR = False  # Langchain deprecations cause an annoying warning atm
 EXPERIMENTAL_UNSTRUCTURED = False
 METADATA_MAP = None
 FILTER_TOPIC = None

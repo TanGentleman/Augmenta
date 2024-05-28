@@ -40,6 +40,7 @@ VALID_EMBEDDER = Literal["get_openai_embedder_large",
 
 configValue = Union[str, int, float, bool]
 
+
 class ManifestSchema(BaseModel):
     """
     Manifest schema
@@ -87,17 +88,21 @@ class RagSchema(BaseModel):
     multivector_method: Literal["summary", "qa"]
     doc_ids: list[str] = []
 
-def get_llm_fn(model_name: str, model_type: Literal["llm", "embedder"]) -> LLM_FN:
+
+def get_llm_fn(model_name: str,
+               model_type: Literal["llm",
+                                   "embedder"]) -> LLM_FN:
     """
     Get the LLM function from the name
     """
-    assert model_type in ["llm", "embedder"], "Model type must be llm or embedder"
+    assert model_type in [
+        "llm", "embedder"], "Model type must be llm or embedder"
     model_function = MODEL_DICT.get(model_name)
     if model_function is None:
         raise ValueError(f"Model {model_name} not found")
     if model_function["model_type"] != model_type:
         raise ValueError(f"Model {model_name} must be type {model_type}")
-    
+
     llm_fn = LLM_FN(model_function["function"])
     if LOCAL_MODEL_ONLY:
         if llm_fn.model_name not in LOCAL_MODELS:
@@ -106,6 +111,7 @@ def get_llm_fn(model_name: str, model_type: Literal["llm", "embedder"]) -> LLM_F
             raise ValueError(
                 f"LOCAL_MODEL_ONLY is set to True. Change this {model_type}.")
     return llm_fn
+
 
 class RagSettings:
     """
@@ -146,11 +152,12 @@ class RagSettings:
             self.database_exists = database_exists(collection_name, method)
         else:
             logger.warning("Found value for rag_settings.database_exists!")
-        
+
         if self.database_exists:
             logger.info("DB exists! Replacing the manifest.json settings.")
             self.update_rag_settings(override_all=True)
-            # Passing override_all will ensure that the model, chunk size, overlap, inputs, and multivector are updated
+            # Passing override_all will ensure that the model, chunk size,
+            # overlap, inputs, and multivector are updated
         else:
             self.embedding_model = embedding_model
             self.chunk_size = chunk_size
@@ -159,7 +166,8 @@ class RagSettings:
             self.multivector_enabled = multivector_enabled
         self.rag_llm = rag_llm
 
-    def adjust_rag_settings(self, metadata: dict[str, configValue], override_all = False):
+    def adjust_rag_settings(
+            self, metadata: dict[str, configValue], override_all=False):
         """
         Adjust the rag settings based on the metadata from manifest.json
 
@@ -172,7 +180,8 @@ class RagSettings:
         - doc_ids ([] unless multivector_enabled is True)
         """
         assert "embedding_model" in metadata, "Embedding model key not found"
-        # Replace the manifest "embedKding model" value from the model name to the MODEL_DICT key
+        # Replace the manifest "embedKding model" value from the model name to
+        # the MODEL_DICT key
         for model in MODEL_DICT:
             if MODEL_DICT[model]["model_name"] == metadata["embedding_model"]:
                 metadata["embedding_model"] = model
@@ -180,49 +189,57 @@ class RagSettings:
         else:
             raise ValueError("Model not found in MODEL_DICT")
         ManifestSchema(**metadata)
-        if override_all or (metadata["embedding_model"] != self.embedding_model.model_name):
+        if override_all or (
+                metadata["embedding_model"] != self.embedding_model.model_name):
             self.embedding_model = metadata["embedding_model"]
-            logger.warning(f"Switched embedding model to {self.embedding_model.model_name} from manifest.json.")
+            logger.warning(
+                f"Switched embedding model to {self.embedding_model.model_name} from manifest.json.")
         if override_all or (metadata["method"] != self.method):
             self.method = metadata["method"]
-            logger.warning(f"Switched method to {self.method} from manifest.json.")
+            logger.warning(
+                f"Switched method to {self.method} from manifest.json.")
 
         manifest_chunk_size = int(metadata["chunk_size"])
         if override_all or (manifest_chunk_size != self.chunk_size):
             self.chunk_size = manifest_chunk_size
-            logger.warning(f"Switched chunk size to {manifest_chunk_size} from manifest.json.")
+            logger.warning(
+                f"Switched chunk size to {manifest_chunk_size} from manifest.json.")
 
         manifest_chunk_overlap = int(metadata["chunk_overlap"])
         if override_all or (manifest_chunk_overlap != self.chunk_overlap):
             self.chunk_overlap = manifest_chunk_overlap
-            logger.warning(f"Switched chunk overlap to {manifest_chunk_overlap} from manifest.json.")
+            logger.warning(
+                f"Switched chunk overlap to {manifest_chunk_overlap} from manifest.json.")
 
         if override_all or (metadata["inputs"] != self.inputs):
             self.inputs = metadata["inputs"]
-            logger.warning(f"Switched to {len(metadata['inputs'])} inputs from manifest.json.")
+            logger.warning(
+                f"Switched to {len(metadata['inputs'])} inputs from manifest.json.")
             logger.info(f"Inputs: {self.inputs}")
-        
-        
+
         # Check if metadata["doc_ids"] exists
-        
+
         if metadata.get("doc_ids"):
             if override_all:
                 self.multivector_enabled = True
             else:
                 # If multivector is not enabled and doc_ids exist
                 if not self.multivector_enabled:
-                    logger.warning("Multivector switched to True from manifest.json")
+                    logger.warning(
+                        "Multivector switched to True from manifest.json")
             self.multivector_enabled = True
-            logger.warning("Multivector is enabled! Make sure to get the doc IDS for RAG needs!")
+            logger.warning(
+                "Multivector is enabled! Make sure to get the doc IDS for RAG needs!")
         else:
             # No doc ids found
             self.multivector_enabled = False
-            logger.warning("Multivector forcibly disabled. Could this be problematic?")
+            logger.warning(
+                "Multivector forcibly disabled. Could this be problematic?")
             # if self.multivector_enabled:
             #     logger.error("Multivector should not be enabled with no doc ids! Aborting.")
             #     raise ValueError("Error in manifest.json")
 
-    def update_rag_settings(self, override_all = False):
+    def update_rag_settings(self, override_all=False):
         """
         Make sure documents folder and manifest.json initialized correctly.
         """
@@ -236,15 +253,17 @@ class RagSettings:
             if self.rag_mode:
                 prune_collection = False
                 if self.database_exists is None:
-                    logger.error("This check should not ever be called! Set DB exists first!")
+                    logger.error(
+                        "This check should not ever be called! Set DB exists first!")
                     self.set_database_exists()
-                
+
                 for item in data["databases"]:
                     if item["collection_name"] == self.collection_name:
                         if self.database_exists:
                             logger.info("Collection found in vector DB")
                             # Adjust rag config to match the collection
-                            self.adjust_rag_settings(item["metadata"], override_all=override_all)
+                            self.adjust_rag_settings(
+                                item["metadata"], override_all=override_all)
                             logger.info("RAG settings adjusted.")
                             break
                         else:
@@ -254,14 +273,16 @@ class RagSettings:
                             break
                 else:
                     if self.database_exists:
-                        logger.warning("Collection from DB not found in manifest.json")
-               
+                        logger.warning(
+                            "Collection from DB not found in manifest.json")
+
                 if prune_collection:
                     # Happens when DB is deleted but collection in manifest
-                    logger.warning("Removing this collection from manifest.json")
+                    logger.warning(
+                        "Removing this collection from manifest.json")
                     # Remove by collection name
                     data["databases"] = [item for item in data["databases"]
-                                            if item["collection_name"] != self.collection_name]
+                                         if item["collection_name"] != self.collection_name]
                     with open("manifest.json", "w") as f:
                         json_dump(data, f, indent=2)
 
@@ -294,7 +315,8 @@ class RagSettings:
         """
         Check if the collection exists in vector DB
         """
-        logger.warning("This is deprecated. Directly call database_exists, sparingly.")
+        logger.warning(
+            "This is deprecated. Directly call database_exists, sparingly.")
         self.database_exists = database_exists(collection_name, method)
 
     @property
@@ -319,7 +341,7 @@ class RagSettings:
     def embedding_model(self, model_name: str):
         if not isinstance(model_name, str):
             raise ValueError("Embedding model must be a string")
-        
+
         self.__embedding_model = get_llm_fn(model_name, "embedder")
 
     @property
@@ -378,14 +400,13 @@ class RagSettings:
             raise ValueError("RAG LLM cannot be empty")
         if not isinstance(model_name, str):
             raise ValueError("RAG LLM must be a string")
-        
+
         rag_llm_fn = get_llm_fn(model_name, "llm")
         self.__rag_llm = rag_llm_fn
         context_max = rag_llm_fn.context_size
         max_chars = context_max * 4
         if self.chunk_size * self.k_excerpts > max_chars:
             logger.warning("Warning: Chunk size * k exceeds model limit.")
-
 
         if LOCAL_MODEL_ONLY:
             if self.__rag_llm.model_name not in LOCAL_MODELS:
@@ -401,9 +422,11 @@ class RagSettings:
         if not isinstance(value, list):
             raise ValueError("Inputs must be a list")
 
-        logger.info(f"Checking if DB exists for inputs. Make sure this is after settings are finalized!")
+        logger.info(
+            f"Checking if DB exists for inputs. Make sure this is after settings are finalized!")
         if self.database_exists is False:
-            logger.info("Vector DB does not exist! (Or self.database_exists is None)")
+            logger.info(
+                "Vector DB does not exist! (Or self.database_exists is None)")
             if not any(i for i in value):
                 # TODO: Check if the inputs are valid
                 raise ValueError("RAG mode requires valid string inputs")

@@ -10,7 +10,7 @@ from yt_dlp import YoutubeDL
 
 from helpers import ROOT
 from rag import get_eval_chain, get_music_chain
-from models import get_ollama_local_model, LLM_FN, LLM, get_together_fn_mix
+from models import get_ollama_llama3, LLM_FN, LLM, get_together_fn_mix
 
 # Configuration flags
 DISABLE_DOWNLOADING = True
@@ -24,7 +24,7 @@ QUERY_SUFFIX = "official audio"
 
 DEFAULT_INPUT = "fleetwood mac landslide"
 DEFAULT_LLM_FN = LLM_FN(
-    get_ollama_local_model) if USE_LOCAL_MODEL else LLM_FN(get_together_fn_mix)
+    get_ollama_llama3) if USE_LOCAL_MODEL else LLM_FN(get_together_fn_mix)
 MANIFEST_FILE = "music_db.json"
 MUSIC_DIR = ROOT.parent / "AugmentaMusic"
 SAVE_DIR = MUSIC_DIR / "YouTubeAudio"
@@ -180,7 +180,7 @@ def append_to_music_manifest(
             item["artist"],
             item["album"]) not in existing_items]
     if not new_items:
-        logging.info("No new items to add")
+        logger.info("No new items to add")
         return False
 
     manifest.extend(new_items)
@@ -261,7 +261,7 @@ def main():
 
     if only_download:
         if DISABLE_DOWNLOADING:
-            logging.error(
+            logger.error(
                 "Downloading is disabled but ONLY_DOWNLOAD is enabled. Aborting.")
             return
         download_from_manifest(manifest_file, save_dir)

@@ -346,12 +346,13 @@ class Chatbot:
             assert vectorstore is not None, "Vectorstore not created properly"
             return vectorstore
 
-    def run_eval_tests_on_vectorstore(self, 
-                                      vectorstore, 
-                                      similarity_query: str, 
-                                      criteria: str = "This document is about dolphins", 
-                                      k_excerpts: int = 1,
-                                      enable_llm_eval: bool = False):
+    def run_eval_tests_on_vectorstore(
+            self,
+            vectorstore,
+            similarity_query: str,
+            criteria: str = "This document is about dolphins",
+            k_excerpts: int = 1,
+            enable_llm_eval: bool = False):
         # This function is for testing purposes
         if not criteria:
             print("Error: Criteria not provided")
@@ -397,7 +398,7 @@ class Chatbot:
             print("Now fetching neighbor document chunk")
             index = docs[0].metadata["index"]
             # Get next document unless it's the last one, then get the last one
-            new_index = index + 1 if index < len(docs) - 1 else index-1
+            new_index = index + 1 if index < len(docs) - 1 else index - 1
             temp_search_kwargs = {"k": 1, "filter": {"index": new_index}}
             new_docs = vectorstore.similarity_search(
                 "", search_kwargs=temp_search_kwargs)
@@ -598,11 +599,13 @@ class Chatbot:
             if not self.config.rag_settings.rag_mode:
                 print('Must evaluate in RAG mode')
                 return
-            user_input = input('Type a query to retrieve similar docs for: ').strip()
+            user_input = input(
+                'Type a query to retrieve similar docs for: ').strip()
             if user_input:
                 # criteria = input('Type a criteria to evaluate the document: ').strip()
                 criteria = "The language of this document is English"
-                self.run_eval_tests_on_vectorstore(self.retriever.vectorstore, user_input, criteria)
+                self.run_eval_tests_on_vectorstore(
+                    self.retriever.vectorstore, user_input, criteria)
             return
 
         elif prompt == ".rm":
@@ -663,7 +666,7 @@ class Chatbot:
         else:
             print('Invalid command: ', prompt)
             return
-    
+
     def is_ollama_model(self, model_name: str) -> bool:
         return model_name in ["local-ollama3", "mistral:7b-instruct-v0.3-q6_K"]
 
@@ -792,7 +795,7 @@ class Chatbot:
                 print(
                     f'Input too long, max characters is {MAX_CHARS_IN_PROMPT}')
                 continue
-            
+
             if stripped_prompt in COMMAND_LIST:
                 self.handle_command(stripped_prompt)
                 continue
@@ -814,12 +817,15 @@ class Chatbot:
         print('Deleted last exchange')
         self.count -= 1
 
+
 def run_chat(config: Config | None = None):
     chatbot = Chatbot(config)
     chatbot.chat()
 
+
 def main():
     run_chat()
+
 
 def main_cli():
     import argparse
@@ -904,6 +910,7 @@ def main_cli():
     except KeyboardInterrupt:
         print('Keyboard interrupt, exiting.')
         raise SystemExit
+
 
 if __name__ == "__main__":
     main_cli()

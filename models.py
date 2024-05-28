@@ -3,6 +3,7 @@
 # TODO: Implement embedding model context size checks, potentially issues
 # during vectorstore steps?
 
+import logging
 from typing import Union
 from langchain_openai import OpenAIEmbeddings
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
@@ -21,7 +22,6 @@ TOGETHER_API_KEY = getenv("TOGETHER_API_KEY")
 ANTHROPIC_API_KEY = getenv("ANTHROPIC_API_KEY")
 OPENAI_API_KEY = getenv("OPENAI_API_KEY")
 assert TOGETHER_API_KEY and ANTHROPIC_API_KEY, "Please set API keys in .env file"
-import logging
 logger = logging.getLogger(__name__)
 
 
@@ -241,12 +241,15 @@ def get_ollama_llama3(hyperparameters=None) -> Ollama:
         temperature=0,
         num_predict=1000,
     )
+
+
 def get_ollama_mistral(hyperparameters=None) -> Ollama:
     return Ollama(
         model="mistral:7b-instruct-v0.3-q6_K",
         temperature=0,
         num_predict=1000,
     )
+
 
 def get_ollama_local_embedder(hyperparameters=None) -> OllamaEmbeddings:
     return OllamaEmbeddings(
@@ -452,24 +455,26 @@ class LLM:
         self.llm = llm_fn.get_llm(hyperparameters)
 
         if not self.confirm_model_name():
-            logger.error("Critical error. Model name failed in LLM.confirm_model_name. Exiting.")
+            logger.error(
+                "Critical error. Model name failed in LLM.confirm_model_name. Exiting.")
             raise SystemExit
-
 
     def confirm_model_name(self) -> bool:
         """
         Raise an error if the model name from the API does not match the MODEL_DICT
         """
-        model_name = getattr(self.llm, 'model_name', getattr(self.llm, 'model', None))
+        model_name = getattr(
+            self.llm, 'model_name', getattr(
+                self.llm, 'model', None))
         if model_name is None:
             logger.error("Model name not found in model object")
             return False
-        
+
         # override-llama3 name
         if model_name == "llama3":
             logger.info("Model name override: llama3 -> local-ollama3")
             model_name = "local-ollama3"
-        
+
         if model_name != self.model_name:
             logger.error(
                 f"Model name from API: {model_name} does not match expected model name: {self.model_name}")
