@@ -37,11 +37,11 @@ RAG_COLLECTION_TO_SYSTEM_MESSAGE = {
 }
 
 LOCAL_MODELS = [
-    "get_ollama_llama3",
-    "get_ollama_mistral"
-    "get_local_model",
-    "get_ollama_local_embedder",
-    "get_lmstudio_local_embedder"]
+    "local-ollama3",
+    "mistral:7b-instruct-v0.3-q6_K",
+    "lmstudio-model",
+    "nomic-embed-text",
+    "lmstudio-embedding-model"]
 
 
 DEFAULT_QUERY = '''Name 5 strange vegetables that I am unlikely to see in Western countries.'''
