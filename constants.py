@@ -15,6 +15,7 @@ MODEL_CODES = {
     "arctic": "get_together_arctic",
     "llama3": "get_together_llama3",
     "deepseek": "get_together_deepseek_4k",
+    "quen": "get_together_quen",
     "opus": "get_claude_opus",
     "lmstudio": "get_local_model",
     "ollama3": "get_ollama_llama3",
@@ -41,7 +42,9 @@ LOCAL_MODELS = [
     "mistral:7b-instruct-v0.3-q6_K",
     "lmstudio-model",
     "nomic-embed-text",
-    "lmstudio-embedding-model"]
+    "lmstudio-embedding-model",
+    "local-hermes"
+]
 
 
 DEFAULT_QUERY = '''Name 5 strange vegetables that I am unlikely to see in Western countries.'''

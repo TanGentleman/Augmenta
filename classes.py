@@ -30,7 +30,8 @@ VALID_LLM = Literal[
     "get_claude_sonnet",
     "get_local_model",
     "get_ollama_llama3",
-    "get_ollama_mistral"
+    "get_ollama_mistral",
+    "get_local_hermes"
 ]
 
 VALID_EMBEDDER = Literal["get_openai_embedder_large",

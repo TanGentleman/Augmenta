@@ -24,6 +24,7 @@ OPENAI_API_KEY = getenv("OPENAI_API_KEY")
 assert TOGETHER_API_KEY and ANTHROPIC_API_KEY, "Please set API keys in .env file"
 logger = logging.getLogger(__name__)
 
+TOGETHER_BASE_URL = "https://api.together.xyz"
 
 # This model is the flagship for improved instruction following,
 # JSON mode, reproducible outputs, parallel function calling (training data up to Dec 2023)
@@ -44,7 +45,7 @@ def get_openai_gpt4(hyperparameters=None) -> ChatOpenAI:
 def get_together_dolphin(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
-        base_url="https://api.together.xyz",
+        base_url=TOGETHER_BASE_URL,
         api_key=TOGETHER_API_KEY,
         model="cognitivecomputations/dolphin-2.5-mixtral-8x7b",
         temperature=0,
@@ -57,9 +58,9 @@ def get_together_dolphin(hyperparameters=None) -> ChatOpenAI:
 def get_together_quen(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
-        base_url="https://api.together.xyz",
+        base_url=TOGETHER_BASE_URL,
         api_key=TOGETHER_API_KEY,
-        model="Qwen/Qwen1.5-72B-Chat",
+        model="Qwen/Qwen2-72B-Instruct",
         temperature=0,
         max_tokens=1000,
         streaming=True,
@@ -70,7 +71,7 @@ def get_together_quen(hyperparameters=None) -> ChatOpenAI:
 def get_together_nous_mix(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
-        base_url="https://api.together.xyz",
+        base_url=TOGETHER_BASE_URL,
         api_key=TOGETHER_API_KEY,
         model="NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
         temperature=0,
@@ -83,7 +84,7 @@ def get_together_nous_mix(hyperparameters=None) -> ChatOpenAI:
 def get_together_bigmix(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
-        base_url="https://api.together.xyz",
+        base_url=TOGETHER_BASE_URL,
         api_key=TOGETHER_API_KEY,
         model="mistralai/Mixtral-8x22B-Instruct-v0.1",
         temperature=0,
@@ -96,7 +97,7 @@ def get_together_bigmix(hyperparameters=None) -> ChatOpenAI:
 def get_together_dbrx(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
-        base_url="https://api.together.xyz",
+        base_url=TOGETHER_BASE_URL,
         api_key=TOGETHER_API_KEY,
         model="databricks/dbrx-instruct",
         temperature=0,
@@ -109,7 +110,7 @@ def get_together_dbrx(hyperparameters=None) -> ChatOpenAI:
 def get_together_arctic(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
-        base_url="https://api.together.xyz",
+        base_url=TOGETHER_BASE_URL,
         api_key=TOGETHER_API_KEY,
         model="Snowflake/snowflake-arctic-instruct",
         temperature=0,
@@ -122,7 +123,7 @@ def get_together_arctic(hyperparameters=None) -> ChatOpenAI:
 def get_together_llama3(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
-        base_url="https://api.together.xyz",
+        base_url=TOGETHER_BASE_URL,
         api_key=TOGETHER_API_KEY,
         model="meta-llama/Llama-3-70b-chat-hf",
         temperature=0,
@@ -135,7 +136,7 @@ def get_together_llama3(hyperparameters=None) -> ChatOpenAI:
 def get_together_fn_mix(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
-        base_url="https://api.together.xyz",
+        base_url=TOGETHER_BASE_URL,
         api_key=TOGETHER_API_KEY,
         model="mistralai/Mixtral-8x7B-Instruct-v0.1",
         temperature=0,
@@ -148,7 +149,7 @@ def get_together_fn_mix(hyperparameters=None) -> ChatOpenAI:
 def get_together_fn_mistral(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
-        base_url="https://api.together.xyz",
+        base_url=TOGETHER_BASE_URL,
         api_key=TOGETHER_API_KEY,
         model="mistralai/Mistral-7B-Instruct-v0.1",
         temperature=0,
@@ -161,7 +162,7 @@ def get_together_fn_mistral(hyperparameters=None) -> ChatOpenAI:
 def get_together_deepseek_4k(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
-        base_url="https://api.together.xyz",
+        base_url=TOGETHER_BASE_URL,
         api_key=TOGETHER_API_KEY,
         model="deepseek-ai/deepseek-llm-67b-chat",
         temperature=0,
@@ -174,7 +175,7 @@ def get_together_deepseek_4k(hyperparameters=None) -> ChatOpenAI:
 def get_together_deepseek_32k(hyperparameters=None) -> ChatOpenAI:
     assert TOGETHER_API_KEY, "Please set TOGETHER_API_KEY in .env file"
     return ChatOpenAI(
-        base_url="https://api.together.xyz",
+        base_url=TOGETHER_BASE_URL,
         api_key=TOGETHER_API_KEY,
         model="deepseek-ai/deepseek-coder-33b-instruct",
         temperature=0,
@@ -250,6 +251,16 @@ def get_ollama_mistral(hyperparameters=None) -> Ollama:
         num_predict=1000,
     )
 
+def get_local_hermes(hyperparameters=None) -> ChatOpenAI:
+    return ChatOpenAI(
+        base_url="http://localhost:8000/v1",
+        api_key='LOCAL-API-KEY',
+        model="local-hermes",
+        temperature=0,
+        max_tokens=1000,
+        streaming=True,
+        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+    )
 
 def get_ollama_local_embedder(hyperparameters=None) -> OllamaEmbeddings:
     return OllamaEmbeddings(
@@ -281,7 +292,7 @@ MODEL_DICT = {
     "get_together_quen": {
         "function": get_together_quen,
         "context_size": 4096,
-        "model_name": "Qwen/Qwen1.5-72B-Chat",
+        "model_name": "Qwen/Qwen2-72B-Instruct",
         "model_type": "llm"
     },
     "get_together_nous_mix": {
@@ -361,6 +372,12 @@ MODEL_DICT = {
         "function": get_ollama_mistral,
         "context_size": 4096,
         "model_name": "mistral:7b-instruct-v0.3-q6_K",
+        "model_type": "llm"
+    },
+    "get_local_hermes": {
+        "function": get_local_hermes,
+        "context_size": 4096,
+        "model_name": "local-hermes",
         "model_type": "llm"
     },
     "get_openai_embedder_large": {
