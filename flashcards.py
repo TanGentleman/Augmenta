@@ -57,9 +57,22 @@ class Flashcard:
             keys (Dict[str, str]): Mapping of field names to their corresponding keys.
             styles (List[Tuple[str, str]]): List of styles for each field.
         """
-        self.card_data: Dict[str, Any] = card_data
+        self.original_card_data: Dict[str, Any] = card_data
+        self.card_data: Dict[str, str] = {key: str(value) for key, value in card_data.items()}
         self.keys: Dict[str, str] = keys
         self.styles: List[Tuple[str, str]] = styles
+        self.cache_flashcard_types()
+    
+    def cache_flashcard_types(self):
+        """
+        Cache the types of flashcard fields.
+        """
+        self.field_types = {key: type(value) for key, value in self.card_data.items()}
+        # Convert types to string representations
+        new_card_data = {key: str(value) for key, value in self.card_data.items()}
+        self.original_card_data = self.card_data
+        self.card_data = new_card_data
+        # logger.warning(f"Field types have been converted. This means values are now compared to str(value). This may lead to unexpected behavior.")
 
     def create_flashcard(self, panel_name: str = "Question", include_answer=False) -> Panel:
         """
