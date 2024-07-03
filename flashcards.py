@@ -2,7 +2,7 @@ import json
 from rich import print
 from rich.panel import Panel
 from rich.text import Text
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 from rich.color import ANSI_COLOR_NAMES
 import logging
 from time import sleep
@@ -15,10 +15,10 @@ def generate_mapping_and_styles(data: List[Dict[str, Any]]) -> Tuple[Dict[str, s
     Generate field mapping and styles for flashcards based on the first item in the data.
 
     Args:
-        data (List[Dict[str, Any]]): List of dictionaries containing flashcard data.
+        data: List of dictionaries containing flashcard data.
 
     Returns:
-        Tuple[Dict[str, str], List[Tuple[str, str]]]: A tuple containing the field mapping and styles.
+        A tuple containing the field mapping and styles.
 
     Raises:
         ValueError: If the input data is empty or not a list of dictionaries.
@@ -46,37 +46,43 @@ class Flashcard:
         Initialize a Flashcard instance.
 
         Args:
-            card_data (Dict[str, Any]): The data for this flashcard.
-            keys (Dict[str, str]): Mapping of field names to their corresponding keys.
-            styles (List[Tuple[str, str]]): List of styles for each field.
+            card_data: The data for this flashcard.
+            keys: Mapping of field names to their corresponding keys.
+            styles: List of styles for each field.
         """
-        self.card_data = card_data
-        self.keys = keys
-        self.styles = styles
+        self.card_data: Dict[str, Any] = card_data
+        self.keys: Dict[str, str] = keys
+        self.styles: List[Tuple[str, str]] = styles
 
-    # def create_flashcard(self) -> Panel:
-    #     """
-    #     Create a Rich Panel representing the flashcard.
+    def create_flashcard(self, panel_name: str = "Flashcard") -> Panel:
+        """
+        Create a panel representing the question side of the flashcard.
 
-    #     Returns:
-    #         Panel: A Rich Panel object representing the flashcard.
-    #     """
-    #     flashcard_text = Text()
-    #     for i, (field, style) in enumerate(self.styles):
-    #         key_name = self.keys.get(field)
-    #         if key_name:
-    #             value = self.card_data.get(key_name, 'N/A')
-    #             flashcard_text.append(f"{key_name}: {value}", style=style)
-    #             if i < len(self.styles) - 1:
-    #                 flashcard_text.append("\n")
-    #     return Panel(flashcard_text, title="Flashcard", border_style="red")
-    def create_flashcard(self) -> Panel:
-        return self._create_panel("Question", include_answer=False)
+        Returns:
+            A Rich Panel object containing the formatted question.
+        """
+        return self._create_panel(panel_name, include_answer=False)
     
     def create_answer(self) -> Panel:
+        """
+        Create a panel representing the answer side of the flashcard.
+
+        Returns:
+            A Rich Panel object containing the formatted answer.
+        """
         return self._create_panel("Answer", include_answer=True)
 
     def _create_panel(self, title: str, include_answer: bool) -> Panel:
+        """
+        Create a panel with the flashcard content.
+
+        Args:
+            title: The title of the panel.
+            include_answer: Whether to include the answer in the panel.
+
+        Returns:
+            A Rich Panel object containing the formatted flashcard content.
+        """
         flashcard_text = Text()
         for i, (field, style) in enumerate(self.styles):
             key_name = self.keys.get(field)
@@ -88,13 +94,13 @@ class Flashcard:
                         flashcard_text.append("\n")
         return Panel(flashcard_text, title=title, border_style="cyan" if title == "Question" else "green")
 
-def display_flashcards(flashcards: List[Flashcard], delay: float = 0.1):
+def display_flashcards(flashcards: List[Flashcard], delay: float = 0.1) -> None:
     """
     Display a list of flashcards with a delay between each.
 
     Args:
-        flashcards (List[Flashcard]): List of Flashcard objects to display.
-        delay (float, optional): Delay in seconds between displaying each flashcard. Defaults to 0.1.
+        flashcards: List of Flashcard objects to display.
+        delay: Delay in seconds between displaying each flashcard. Defaults to 0.1.
     """
     for flashcard in flashcards:
         print(flashcard.create_flashcard())
@@ -105,10 +111,9 @@ def load_flashcards_from_json(file_path: str) -> Tuple[List[Flashcard], Dict[str
     Load flashcards from a JSON file.
 
     Args:
-        file_path (str): Path to the JSON file containing flashcard data.
+        file_path: Path to the JSON file containing flashcard data.
 
     Returns:
-        Tuple[List[Flashcard], Dict[str, str], List[Tuple[str, str]]]: 
         A tuple containing the list of Flashcard objects, field mapping, and styles.
 
     Raises:
