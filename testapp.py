@@ -1,4 +1,3 @@
-import json
 import click
 from rich.console import Console
 from rich.panel import Panel
@@ -22,79 +21,34 @@ logger = logging.getLogger(__name__)
 
 console = Console()
 
-class FlashcardError(Exception):
-    """Base exception class for Flashcard-related errors."""
-    pass
-
-class FlashcardLoadError(FlashcardError):
-    """Exception raised when there's an error loading flashcards."""
-    pass
-
-class FlashcardSaveError(FlashcardError):
-    """Exception raised when there's an error saving flashcards."""
-    pass
-
-class FlashcardNotFoundError(FlashcardError):
-    """Exception raised when a requested flashcard is not found."""
-    pass
-
 class MenuChoice(Enum):
-    """Enum representing the main menu choices."""
     STUDY = "1"
     SEARCH = "2"
     QUIT = "3"
 
 class TypedPrompt:
-    """Utility class for prompting user input with type checking."""
-
     @staticmethod
     def ask(prompt: str, type_: type, choices: Optional[List[str]] = None) -> Union[str, int]:
-        """
-        Prompt the user for input and validate the type.
-
-        Args:
-            prompt (str): The prompt to display to the user.
-            type_ (type): The expected type of the input.
-            choices (Optional[List[str]]): A list of valid choices, if applicable.
-
-        Returns:
-            Union[str, int]: The user's input, converted to the specified type.
-
-        Raises:
-            ValueError: If the input cannot be converted to the specified type.
-        """
         while True:
             result = RichPrompt.ask(prompt, choices=choices)
             try:
                 return type_(result)
             except ValueError:
                 console.print(f"[bold red]Invalid input. Please enter a {type_.__name__}.[/bold red]")
-                logger.warning(f"Invalid input received for prompt: {prompt}")
 
 class TerminalLayout:
-    """Manages the terminal layout for displaying flashcards."""
-
     def __init__(self) -> None:
-        """Initialize the TerminalLayout and update terminal size."""
         self.update_terminal_size()
 
     def update_terminal_size(self) -> None:
-        """Update the stored terminal size."""
         self.terminal_width, self.terminal_height = shutil.get_terminal_size()
 
     def render_flashcard(self, app: 'FlashcardApp') -> None:
-        """
-        Render the current flashcard in the terminal.
-
-        Args:
-            app (FlashcardApp): The FlashcardApp instance.
-        """
         self.update_terminal_size()
 
         card = app.flashcard_manager.get_current_card()
         if card is None:
             console.print("No flashcard to display.")
-            logger.warning("Attempted to render flashcard when none available")
             return
         
         flashcard_panel = card.create_flashcard()
@@ -103,49 +57,38 @@ class TerminalLayout:
         layout = Layout()
         layout.split_column(
             Layout(Panel(f"Card {app.flashcard_manager.current_index + 1} of {len(app.flashcard_manager.flashcards)}")),
-            Layout(flashcard_panel, name="flashcard"),
+            Layout(flashcard_panel, name="question"),
             Layout(answer_panel, name="answer"),
             Layout(Panel(app.create_menu(), title="Menu", border_style="blue"))
         )
-        layout["flashcard"].ratio = 2
+        layout["question"].ratio = 2
         layout["answer"].ratio = 2
 
         console.print(layout)
 
 class FlashcardManagerProtocol(Protocol):
-    """Protocol defining the interface for FlashcardManager."""
-
     @abstractmethod
     def load_flashcards(self, file_path: str) -> None:
-        """Load flashcards from a file."""
         pass
 
     @abstractmethod
     def save_flashcards(self, file_path: str) -> None:
-        """Save flashcards to a file."""
         pass
 
     @abstractmethod
     def get_current_card(self) -> Optional[Flashcard]:
-        """Get the current flashcard."""
         pass
 
     @abstractmethod
     def next_card(self) -> None:
-        """Move to the next flashcard."""
         pass
 
     @abstractmethod
     def previous_card(self) -> None:
-        """Move to the previous flashcard."""
         pass
 
 class FlashcardManager(FlashcardManagerProtocol):
-    """
-    Manages the flashcard deck, including loading, saving, and manipulating flashcards.
-    """
     def __init__(self) -> None:
-        """Initialize the FlashcardManager."""
         self.flashcards: List[Flashcard] = []
         self.current_index: int = 0
         self.keys: Dict[str, str] = {}
@@ -153,176 +96,78 @@ class FlashcardManager(FlashcardManagerProtocol):
 
     @typechecked
     def load_flashcards(self, file_path: str) -> None:
-        """
-        Load flashcards from a JSON file.
-
-        Args:
-            file_path (str): Path to the JSON file containing flashcard data.
-
-        Raises:
-            FlashcardLoadError: If there's an error loading the flashcards.
-        """
         try:
             self.flashcards, self.keys, self.styles = load_flashcards_from_json(file_path)
             logger.info(f"Loaded {len(self.flashcards)} flashcards from {file_path}")
-        except FileNotFoundError:
-            logger.error(f"Flashcard file not found: {file_path}")
-            raise FlashcardLoadError(f"Flashcard file not found: {file_path}")
-        except json.JSONDecodeError:
-            logger.error(f"Invalid JSON format in file: {file_path}")
-            raise FlashcardLoadError(f"Invalid JSON format in file: {file_path}")
         except Exception as e:
             logger.error(f"Failed to load flashcards: {str(e)}")
-            raise FlashcardLoadError(f"Failed to load flashcards: {str(e)}")
+            raise
 
     @typechecked
     def save_flashcards(self, file_path: str) -> None:
-        """
-        Save flashcards to a JSON file.
-
-        Args:
-            file_path (str): Path to save the JSON file.
-
-        Raises:
-            FlashcardSaveError: If there's an error saving the flashcards.
-        """
-        try:
-            save_flashcards_to_json(self.flashcards, file_path)
-            logger.info(f"Saved {len(self.flashcards)} flashcards to {file_path}")
-        except Exception as e:
-            logger.error(f"Failed to save flashcards: {str(e)}")
-            raise FlashcardSaveError(f"Failed to save flashcards: {str(e)}")
+        save_flashcards_to_json(self.flashcards, file_path)
 
     def ensure_valid_index(self) -> None:
-        """Ensure that the current index is within the valid range."""
         if self.flashcards:
             self.current_index = max(0, min(self.current_index, len(self.flashcards) - 1))
         else:
             self.current_index = 0
     
     def get_current_card(self) -> Optional[Flashcard]:
-        """
-        Get the current flashcard.
-
-        Returns:
-            Optional[Flashcard]: The current flashcard, or None if no flashcards are available.
-        """
         if self.flashcards and 0 <= self.current_index < len(self.flashcards):
             return self.flashcards[self.current_index]
         return None
 
     def next_card(self) -> None:
-        """Move to the next flashcard."""
         if self.current_index < len(self.flashcards) - 1:
             self.current_index += 1
-            logger.debug(f"Moved to next card: {self.current_index + 1}")
         else:
             console.print("You've reached the end of the deck.")
-            logger.info("Attempted to move past the last card")
 
     def previous_card(self) -> None:
-        """Move to the previous flashcard."""
         if self.current_index > 0:
             self.current_index -= 1
-            logger.debug(f"Moved to previous card: {self.current_index + 1}")
         else:
             console.print("You're at the beginning of the deck.")
-            logger.info("Attempted to move before the first card")
 
     @typechecked
     def jump_to_card(self, index: int) -> None:
-        """
-        Jump to a specific flashcard.
-
-        Args:
-            index (int): The index of the flashcard to jump to.
-
-        Raises:
-            FlashcardNotFoundError: If the specified index is invalid.
-        """
         if 0 <= index < len(self.flashcards):
             self.current_index = index
-            logger.debug(f"Jumped to card: {index + 1}")
         else:
-            logger.warning(f"Attempted to jump to invalid card index: {index}")
-            raise FlashcardNotFoundError(f"Invalid card number: {index + 1}")
+            console.print("Invalid card number.")
 
     @typechecked
     def add_flashcard(self, card_data: Dict[str, str]) -> None:
-        """
-        Add a new flashcard to the deck.
-
-        Args:
-            card_data (Dict[str, str]): The data for the new flashcard.
-        """
         new_card = Flashcard(card_data, self.keys, self.styles)
         self.flashcards.append(new_card)
-        logger.info(f"Added new flashcard: {card_data}")
 
     @typechecked
     def edit_flashcard(self, index: int, card_data: Dict[str, str]) -> None:
-        """
-        Edit an existing flashcard.
-
-        Args:
-            index (int): The index of the flashcard to edit.
-            card_data (Dict[str, str]): The updated data for the flashcard.
-
-        Raises:
-            FlashcardNotFoundError: If the specified index is invalid.
-        """
         if 0 <= index < len(self.flashcards):
             for key, value in card_data.items():
                 self.flashcards[index].card_data[key] = value
-            logger.info(f"Edited flashcard at index {index}: {card_data}")
         else:
-            logger.warning(f"Attempted to edit invalid card index: {index}")
-            raise FlashcardNotFoundError(f"Invalid card number: {index + 1}")
+            console.print("Invalid card number.")
 
     @typechecked
     def delete_flashcard(self, index: int) -> bool:
-        """
-        Delete a flashcard from the deck.
-
-        Args:
-            index (int): The index of the flashcard to delete.
-
-        Returns:
-            bool: True if the flashcard was successfully deleted, False otherwise.
-
-        Raises:
-            FlashcardNotFoundError: If the specified index is invalid.
-        """
         if 0 <= index < len(self.flashcards):
             del self.flashcards[index]
             if self.current_index >= len(self.flashcards):
                 self.current_index = max(0, len(self.flashcards) - 1)
-            logger.info(f"Deleted flashcard at index {index}")
             return True
         else:
-            logger.warning(f"Attempted to delete invalid card index: {index}")
-            raise FlashcardNotFoundError(f"Invalid card number: {index + 1}")
+            console.print("Invalid card number.")
+            return False
 
     def study_random(self) -> None:
-        """Randomize the order of flashcards for studying."""
         random.shuffle(self.flashcards)
         self.current_index = 0
-        logger.info("Shuffled flashcards for random study")
 
     @typechecked
     def search_flashcards(self, keyword: str) -> List[Flashcard]:
-        """
-        Search for flashcards containing a specific keyword.
-
-        Args:
-            keyword (str): The keyword to search for.
-
-        Returns:
-            List[Flashcard]: A list of flashcards that match the search criteria.
-        """
-        results = [card for card in self.flashcards if any(keyword.lower() in str(value).lower() for value in card.card_data.values())]
-        logger.info(f"Searched for keyword '{keyword}', found {len(results)} results")
-        return results
+        return [card for card in self.flashcards if any(keyword.lower() in str(value).lower() for value in card.card_data.values())]
 
 class KeyboardHandler:
     def __init__(self, app: 'FlashcardApp'):
@@ -512,19 +357,17 @@ class FlashcardApp:
             self.keyboard_handler.handle_input(choice)
         return False
 
+def display_menu(title: str, options: List[str]) -> Panel:
+    menu_text = "\n".join(f"[{i+1}] {option}" for i, option in enumerate(options))
+    return Panel(menu_text, title=title, expand=False)
+
 @click.command()
 @click.option('--file', default='flashcards.json', help='Path to the flashcards JSON file.')
 def main(file: str) -> None:
-    """
-    Main entry point for the Flashcard Study App.
-
-    Args:
-        file (str): Path to the flashcards JSON file.
-    """
     app = FlashcardApp()
     try:
         app.load_flashcards(file)
-    except FlashcardLoadError as e:
+    except Exception as e:
         console.print(f"[bold red]Error loading flashcards: {str(e)}")
         return
     
@@ -544,13 +387,9 @@ def main(file: str) -> None:
             app.search_flashcards()
             TypedPrompt.ask("Press Enter to continue", str)
         elif choice == MenuChoice.QUIT.value:
-            try:
-                app.save_flashcards(file)
-                console.print("Flashcards saved. Goodbye!")
-                break
-            except FlashcardSaveError as e:
-                console.print(f"[bold red]Error saving flashcards: {str(e)}")
-                logger.error(f"Failed to save flashcards: {str(e)}")
+            app.save_flashcards(file)
+            console.print("Flashcards saved. Goodbye!")
+            break
 
 if __name__ == "__main__":
     main()
