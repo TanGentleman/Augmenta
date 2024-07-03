@@ -1,17 +1,15 @@
 import click
 from rich.console import Console
 from rich.panel import Panel
-from rich import box
 from rich.prompt import Prompt
 from rich.layout import Layout
 from rich.table import Table
 from typing import List, Dict, Tuple
 import random
-import json
 import logging
 import shutil
 
-from flashcards import load_flashcards_from_json, Flashcard
+from flashcards import load_flashcards_from_json, Flashcard, save_flashcards_to_json
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -49,7 +47,7 @@ class TerminalLayout:
         
         layout = Layout()
         layout.split_column(
-            Layout(Panel(f"Card {app.flashcard_manager.current_index + 1} of {len(app.flashcard_manager.flashcards)}", box=box.ROUNDED)),
+            Layout(Panel(f"Card {app.flashcard_manager.current_index + 1} of {len(app.flashcard_manager.flashcards)}")),
             Layout(flashcard_panel, name="question"),
             Layout(answer_panel, name="answer"),
             Layout(Panel(app.create_menu(), title="Menu", border_style="blue"))
@@ -96,14 +94,7 @@ class FlashcardManager:
         Raises:
             Exception: If there's an error saving the flashcards.
         """
-        try:
-            data = [card.card_data for card in self.flashcards]
-            with open(file_path, 'w') as f:
-                json.dump(data, f, indent=2)
-            logger.info(f"Saved {len(self.flashcards)} flashcards to {file_path}")
-        except Exception as e:
-            logger.error(f"Failed to save flashcards: {str(e)}")
-            raise
+        save_flashcards_to_json(self.flashcards, file_path)
 
     def ensure_valid_index(self) -> None:
         """Ensure that the current_index is valid."""
