@@ -159,19 +159,24 @@ class FlashcardManager:
         else:
             console.print("Invalid card number.")
 
-    def delete_flashcard(self, index: int) -> None:
+    def delete_flashcard(self, index: int) -> bool:
         """
         Delete a flashcard from the deck.
 
         Args:
             index (int): The index of the card to delete.
+
+        Returns:
+            bool: True if the card was successfully deleted, False otherwise.
         """
         if 0 <= index < len(self.flashcards):
             del self.flashcards[index]
             if self.current_index >= len(self.flashcards):
                 self.current_index = max(0, len(self.flashcards) - 1)
+            return True
         else:
             console.print("Invalid card number.")
+            return False
 
     def study_random(self) -> None:
         """Shuffle the flashcards and start studying from the beginning."""
@@ -267,14 +272,25 @@ class FlashcardApp:
 
     def jump_to_card(self) -> None:
         """Jump to a specific card in the deck."""
-        card_number = int(Prompt.ask("Enter card number", default="1"))
-        self.flashcard_manager.jump_to_card(card_number - 1)
-        self.show_answer = False
-        self.display_current_card()
+        try:
+            card_number = int(Prompt.ask("Enter card number", default="1"))
+            self.flashcard_manager.jump_to_card(card_number - 1)
+            self.show_answer = False
+            self.display_current_card()
+        except ValueError:
+            console.print("[bold red]Error: Please enter a valid number.[/bold red]")
 
     def add_flashcard(self) -> None:
         """Add a new flashcard to the deck."""
-        new_card_data = {key: Prompt.ask(f"Enter the {key}") for key in self.flashcard_manager.keys.values()}
+        new_card_data = {}
+        for key in self.flashcard_manager.keys.values():
+            while True:
+                value = Prompt.ask(f"Enter the {key}")
+                if value.strip():
+                    new_card_data[key] = value
+                    break
+                else:
+                    console.print(f"[bold red]Error: {key} cannot be empty. Please try again.[/bold red]")
         self.flashcard_manager.add_flashcard(new_card_data)
         console.print("Flashcard added successfully!")
 
@@ -285,7 +301,13 @@ class FlashcardApp:
             card = self.flashcard_manager.flashcards[index]
             updated_data = {}
             for key in self.flashcard_manager.keys.values():
-                updated_data[key] = Prompt.ask(f"Enter the new {key}", default=card.card_data.get(key, ""))
+                while True:
+                    value = Prompt.ask(f"Enter the new {key}", default=card.card_data.get(key, ""))
+                    if value.strip():
+                        updated_data[key] = value
+                        break
+                    else:
+                        console.print(f"[bold red]Error: {key} cannot be empty. Please try again.[/bold red]")
             self.flashcard_manager.edit_flashcard(index, updated_data)
             console.print("Flashcard updated successfully!")
         else:
@@ -293,9 +315,30 @@ class FlashcardApp:
 
     def delete_flashcard(self) -> None:
         """Delete a flashcard from the deck."""
-        index = int(Prompt.ask("Enter the card number to delete")) - 1
-        self.flashcard_manager.delete_flashcard(index)
-        console.print("Flashcard deleted successfully!")
+        try:
+            index = int(Prompt.ask("Enter the card number to delete")) - 1
+            success = self.flashcard_manager.delete_flashcard(index)
+            if success:
+                console.print("Flashcard deleted successfully!")
+        except ValueError:
+            console.print("[bold red]Error: Please enter a valid number.[/bold red]")
+    
+    # confirmation implementation
+    # def delete_flashcard(self) -> None:
+    #     """Delete a flashcard from the deck."""
+    #     try:
+    #         index = int(Prompt.ask("Enter the card number to delete")) - 1
+    #         if 0 <= index < len(self.flashcard_manager.flashcards):
+    #             confirm = Prompt.ask("Are you sure you want to delete this flashcard? (y/n)", choices=["y", "n"])
+    #             if confirm.lower() == "y":
+    #                 self.flashcard_manager.delete_flashcard(index)
+    #                 console.print("Flashcard deleted successfully!")
+    #             else:
+    #                 console.print("Deletion cancelled.")
+    #         else:
+    #             console.print("Invalid card number.")
+    #     except ValueError:
+    #         console.print("[bold red]Error: Please enter a valid number.[/bold red]")
 
     def study_random(self) -> None:
         """Shuffle the flashcards and start studying from the beginning."""
@@ -305,18 +348,23 @@ class FlashcardApp:
 
     def search_flashcards(self) -> None:
         """Search for flashcards containing a specific keyword."""
-        keyword = Prompt.ask("Enter search keyword")
-        results = self.flashcard_manager.search_flashcards(keyword)
-        if results:
-            table = Table(title=f"Search Results for '{keyword}'")
-            table.add_column("Card #", style="cyan")
-            for key in self.flashcard_manager.keys.values():
-                table.add_column(key.capitalize(), style="magenta")
-            for i, card in enumerate(results):
-                table.add_row(str(i+1), *[str(card.card_data.get(key, "N/A")) for key in self.flashcard_manager.keys.values()])
-            console.print(table)
-        else:
-            console.print("No matching flashcards found.")
+        while True:
+            keyword = Prompt.ask("Enter search keyword")
+            if keyword.strip():
+                results = self.flashcard_manager.search_flashcards(keyword)
+                if results:
+                    table = Table(title=f"Search Results for '{keyword}'")
+                    table.add_column("Card #", style="cyan")
+                    for key in self.flashcard_manager.keys.values():
+                        table.add_column(key.capitalize(), style="magenta")
+                    for i, card in enumerate(results):
+                        table.add_row(str(i+1), *[str(card.card_data.get(key, "N/A")) for key in self.flashcard_manager.keys.values()])
+                    console.print(table)
+                else:
+                    console.print("No matching flashcards found.")
+                break
+            else:
+                console.print("[bold red]Error: Search keyword cannot be empty. Please try again.[/bold red]")
     
     def display_current_card(self) -> None:
         """Display the current flashcard."""
@@ -356,6 +404,11 @@ class FlashcardApp:
         Returns:
             bool: True if the user chooses to save and quit, False otherwise.
         """
+        if not self.flashcard_manager.flashcards:
+            console.print("[bold yellow]No flashcards available. Please add some flashcards first.[/bold yellow]")
+            Prompt.ask("Press Enter to continue")
+            return False
+
         while True:
             self.display_current_card()
             choice = Prompt.ask("Choose an option", choices=list(self.keyboard_handler.key_bindings.keys()))
