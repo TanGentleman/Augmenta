@@ -1,22 +1,24 @@
 {
-    "rag_config": {
+    "RAG": {
         "rag_mode": false,
-        "collection_name": "sample_paper_collection",
-        "embedding_model": "get_openai_embedder_large",
+        "collection_name": "deepseek_example_collection",
+        "embedding_model": "get_together_embedder_large",
         "method": "faiss",
-        "chunk_size": 256,
-        "chunk_overlap": 50,
-        "k_excerpts": 4,
-        "rag_llm": "get_together_llama3",
+        "chunk_size": 1000,
+        "chunk_overlap": 100,
+        "k_excerpts": 3,
+        "rag_llm": "qwen",
         "inputs": [
-            "paper.txt"
+            "https://platform.deepseek.com/api-docs/",
+            "https://platform.deepseek.com/api-docs/pricing",
+            "https://platform.deepseek.com/api-docs/api/list-models"
         ],
         "multivector_enabled": false,
         "multivector_method": "summary"
     },
-    "chat_config": {
-        "primary_model": "get_together_llama3",
-        "backup_model": "get_ollama_local_model",
+    "chat": {
+        "primary_model": "code",
+        "backup_model": "llama",
         "enable_system_message": true,
         "system_message": "You are a helpful AI."
     },

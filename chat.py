@@ -219,8 +219,8 @@ class Chatbot:
             # Reload config from settings.json
             # Override with the current rag_mode setting
             config_override = {}
-            config_override["rag_config"] = {}
-            config_override["rag_config"]["rag_mode"] = self.config.rag_settings.rag_mode
+            config_override["RAG"] = {}
+            config_override["RAG"]["rag_mode"] = self.config.rag_settings.rag_mode
             config = Config(config_override=config_override)
         self.config = config
         self.backup_model = None
@@ -259,7 +259,7 @@ class Chatbot:
             self.rag_model, LLM), "RAG LLM not initialized"
         # When qa is supported, this will check method
         assert self.parent_docs and len(
-            self.parent_docs) < MAX_PARENT_DOCS, "Temporary limit of 8 parent Documents"
+            self.parent_docs) < MAX_PARENT_DOCS, f"Temporary limit of {MAX_PARENT_DOCS} parent Documents"
         print('Now estimating token usage for child documents')
         for doc in self.parent_docs:
             if "char_count" not in doc.metadata:
@@ -323,18 +323,8 @@ class Chatbot:
             print('No documents generated!')
             return []
         return docs
-        if self.config.rag_settings.multivector_enabled:
-            # This should only be if the DB does not exist
-            for doc in docs:
-                if doc.metadata["char_count"] > 20000:
-                    raise ValueError('Document too long, split before making child documents')
-            self.parent_docs = docs
-            self._set_doc_ids() # These are new doc IDs
-            docs = self._get_child_docs()
-        return docs
-        
 
-    def _get_vectorstore(self, processing_docs_fn=PROCESSING_DOCS_FN) -> Chroma | FAISS:
+    def _get_vectorstore(self) -> Chroma | FAISS:
         """
         Retrieves or creates a vectorstore.
 
@@ -370,13 +360,16 @@ class Chatbot:
                 assert len(self.parent_docs) == len(self.doc_ids), "Parent docs and doc IDs do not match length"
                 for doc in docs:
                     if doc.metadata["char_count"] > 20000:
-                        raise ValueError('Document too long, split before making child documents')
+                        print('WARNING: Parent documents very long, split to avoid expensive large contexts')
                 self.parent_docs = docs
             return vectorstore
         else:
             print('No collection found, now ingesting documents')
             docs = self.index_docs()
             if self.config.rag_settings.multivector_enabled:
+                for doc in docs:
+                    if doc.metadata["char_count"] > 20000:
+                        raise ValueError('Document too long, split before making child documents')
                 self.parent_docs = docs
                 self._set_doc_ids() # These are new doc IDs
                 child_docs = self._get_child_docs()
@@ -436,7 +429,7 @@ class Chatbot:
             index = docs[0].metadata["index"]
             new_index = index + 1 if index < len(docs) - 1 else index - 1
             temp_search_kwargs = {"k": 1, "filter": {"index": new_index}}
-            new_docs = vectorstore.similarity_search("", search_kwargs=temp_search_kwargs)
+            new_docs: list[Document] = vectorstore.similarity_search("", search_kwargs=temp_search_kwargs)
             if new_docs:
                 print_adjusted(new_docs[0].page_content)
                 eval_dict["excerpt"] = new_docs[0].page_content
@@ -938,30 +931,30 @@ def main_cli():
     config_override = {}
     # How can I make sure this typechecks correctly?
 
-    config_override["rag_config"] = {}
-    config_override["chat_config"] = {}
+    config_override["RAG"] = {}
+    config_override["chat"] = {}
 
     if args.collection:
         args.rag_mode = True
-        config_override["rag_config"]["collection_name"] = args.collection
+        config_override["RAG"]["collection_name"] = args.collection
 
     if args.inputs:
         print('Found inputs. RAG mode enabled')
         assert isinstance(args.inputs, list)
         # assert all(isinstance(i, str) for i in args.inputs)
         args.rag_mode = True
-        config_override["rag_config"]["inputs"] = args.inputs
+        config_override["RAG"]["inputs"] = args.inputs
 
     if args.rag_mode:
         # Currently no way to disable rag mode from CLI if True in
         # settings.json
-        config_override["rag_config"]["rag_mode"] = args.rag_mode
+        config_override["RAG"]["rag_mode"] = args.rag_mode
 
     if args.model:
         if args.rag_mode:
-            config_override["rag_config"]["rag_llm"] = args.model
+            config_override["RAG"]["rag_llm"] = args.model
         else:
-            config_override["chat_config"]["primary_model"] = args.model
+            config_override["chat"]["primary_model"] = args.model
 
     config = Config(config_override=config_override)
     prompt = args.prompt

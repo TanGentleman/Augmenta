@@ -17,7 +17,7 @@ ACTIVE_JSON_FILE = "active.json"
 VALID_LLM = Literal[
     "get_openai_gpt4",
     "get_together_dolphin",
-    "get_together_quen",
+    "get_together_qwen",
     "get_together_nous_mix",
     "get_together_fn_mix",
     "get_together_bigmix",
@@ -28,6 +28,7 @@ VALID_LLM = Literal[
     "get_together_deepseek_32k",
     "get_claude_opus",
     "get_claude_sonnet",
+    "get_deepseek_coder",
     "get_local_model",
     "get_ollama_llama3",
     "get_ollama_mistral",
@@ -245,7 +246,7 @@ class RagSettings:
         Make sure documents folder and manifest.json initialized correctly.
         """
         # Check if the collection exists in manifest.json/vector DB
-        # Adjust rag_config with correct fields (include print statements)
+        # Adjust RAG settings with correct fields (include print statements)
         if override_all:
             assert self.database_exists is True, "DB must exist to override all settings"
         with open("manifest.json", "r") as f:
@@ -539,17 +540,17 @@ class ChatSettings:
         self.__enable_system_message = value
 
     @property
-    def system_message(self):
+    def system_message(self) -> str:
         return self.__system_message
 
     @system_message.setter
     def system_message(self, value):
         if not value:
             raise ValueError("System message cannot be empty")
-        if not isinstance(value, str):
-            raise ValueError("System message must be a string")
         if value in SYSTEM_MESSAGE_CODES:
             value = SYSTEM_MESSAGE_CODES[value]
+        if not isinstance(value, str):
+            raise ValueError("System message must be a string")
         logger.info(f"System message set to {value}")
         self.__system_message = value
 
@@ -583,30 +584,30 @@ class Config:
         config = read_settings(config_file)
 
         if config_override is not None:
-            if "rag_config" in config_override:
-                for key in config_override["rag_config"]:
-                    if key in config["rag_config"]:
-                        config["rag_config"][key] = config_override["rag_config"][key]
+            if "RAG" in config_override:
+                for key in config_override["RAG"]:
+                    if key in config["RAG"]:
+                        config["RAG"][key] = config_override["RAG"][key]
                         logger.info(f"Rag config key {key} overridden")
                     else:
-                        raise ValueError(f"Key {key} not found in rag_config")
-            if "chat_config" in config_override:
-                for key in config_override["chat_config"]:
-                    if key in config["chat_config"]:
-                        config["chat_config"][key] = config_override["chat_config"][key]
+                        raise ValueError(f"Key {key} not found in RAG settings")
+            if "chat" in config_override:
+                for key in config_override["chat"]:
+                    if key in config["chat"]:
+                        config["chat"][key] = config_override["chat"][key]
                         logger.info(f"Chat config key {key} overridden")
                     else:
-                        raise ValueError(f"Key {key} not found in chat_config")
+                        raise ValueError(f"Key {key} not found in chat settings")
         # Replace the LLM codes with the function name
-        if config["chat_config"]["primary_model"] in MODEL_CODES:
-            config["chat_config"]["primary_model"] = MODEL_CODES[config["chat_config"]["primary_model"]]
-        if config["chat_config"]["backup_model"] in MODEL_CODES:
-            config["chat_config"]["backup_model"] = MODEL_CODES[config["chat_config"]["backup_model"]]
-        if config["rag_config"]["rag_llm"] in MODEL_CODES:
-            config["rag_config"]["rag_llm"] = MODEL_CODES[config["rag_config"]["rag_llm"]]
+        if config["chat"]["primary_model"] in MODEL_CODES:
+            config["chat"]["primary_model"] = MODEL_CODES[config["chat"]["primary_model"]]
+        if config["chat"]["backup_model"] in MODEL_CODES:
+            config["chat"]["backup_model"] = MODEL_CODES[config["chat"]["backup_model"]]
+        if config["RAG"]["rag_llm"] in MODEL_CODES:
+            config["RAG"]["rag_llm"] = MODEL_CODES[config["RAG"]["rag_llm"]]
 
-        self.rag_settings = RagSettings(**config["rag_config"])
-        self.chat_settings = ChatSettings(**config["chat_config"])
+        self.rag_settings = RagSettings(**config["RAG"])
+        self.chat_settings = ChatSettings(**config["chat"])
 
         HyperparameterSchema(**config["hyperparameters"])
         self.hyperparameters = config["hyperparameters"]
@@ -617,11 +618,11 @@ class Config:
                 self.chat_settings.system_message = SYSTEM_MSG_MAP[model_name]
                 logger.info(f"System message adjusted for model {model_name}.")
 
-        self.__validate_rag_config()
+        self.__validate_rag_settings()
         self.save_to_json()
         logger.info(f"Config initialized and set in {ACTIVE_JSON_FILE}.")
 
-    def __validate_rag_config(self):
+    def __validate_rag_settings(self):
         """
         Validate the RAG settings
         """
@@ -637,8 +638,8 @@ class Config:
         Save the current config to a JSON file
         """
         data = {
-            "rag_config": self.rag_settings.to_dict(),
-            "chat_config": self.chat_settings.to_dict(),
+            "RAG": self.rag_settings.to_dict(),
+            "chat": self.chat_settings.to_dict(),
         }
         with open(filename, "w") as f:
             json_dump(data, f, indent=2)
@@ -651,14 +652,14 @@ class Config:
 
     def props(self) -> str:
         """
-        Return the keys and values for each item in rag_config and chat_config
+        Return the keys and values for each item in RAG settings and chat settings
         """
-        rag_config_str = "\n".join(
+        RAG_settings_str = "\n".join(
             f"{k}: {v}" for k,
             v in self.rag_settings.props().items())
-        chat_config_str = "\n".join(
+        chat_settings_str = "\n".join(
             f"{k}: {v}" for k,
             v in self.chat_settings.props().items())
         hyperparameters_str = "\n".join(
             f"{k}: {v}" for k, v in self.hyperparameters.items())
-        return f"Rag Config:\n{rag_config_str}\n\nChat Config:\n{chat_config_str}\n\nHyperparameters:\n{hyperparameters_str}"
+        return f"Rag Config:\n{RAG_settings_str}\n\nChat Config:\n{chat_settings_str}\n\nHyperparameters:\n{hyperparameters_str}"

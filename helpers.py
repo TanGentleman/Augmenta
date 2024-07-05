@@ -1,7 +1,7 @@
-from config import VECTOR_DB_SUFFIX
+from constants import VECTOR_DB_SUFFIX
 from json import JSONDecodeError, load as json_load
 from json import dump as json_dump
-from re import sub as re_sub
+from re import sub as regex_sub
 from uuid import uuid4
 from langchain_core.documents import Document
 from datetime import datetime
@@ -10,8 +10,33 @@ from datetime import datetime
 from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 
+def copy_string_to_clipboard(string: str) -> str | None:
+    """
+    Copy a string to the clipboard.
 
-def save_response_to_markdown_file(
+    Parameters:
+    - string (str): The string to be copied.
+    """
+    try:
+        from pyperclip import copy
+        copy(string)
+        return string
+    except ImportError:
+        print("pyperclip is not installed. Install it using 'pip install pyperclip'")
+        return None
+    
+def get_clipboard_contents() -> str | None:
+    """
+    Get the contents of the clipboard.
+    """
+    try:
+        from pyperclip import paste
+        return paste()
+    except ImportError:
+        print("pyperclip is not installed. Install it using 'pip install pyperclip'")
+        return None
+
+def save_string_as_markdown_file(
         response_string: str,
         filename="response.md"):
     """
@@ -22,34 +47,31 @@ def save_response_to_markdown_file(
     - filename (str, optional): The name of the file. Defaults to "response.md".
     """
     filepath = ROOT / filename
+    if not filepath.exists():
+        print(f"Creating new file: {filepath}")
     with open(filepath, "w", encoding="utf-8") as file:
         file.write(response_string)
 
 
-def save_history_to_markdown_file(messages: list[str], filename="history.md"):
+def read_text_file(filename: str = "sample.txt") -> str:
     """
-    Save a list of messages to a markdown file.
+    Read a text file and return the contents as a string.
 
     Parameters:
-    - messages (list[str]): The list of messages to be saved.
-    - filename (str, optional): The name of the file. Defaults to "history.md".
+    - filename (str): The name of the file to be read.
     """
     filepath = ROOT / filename
-    with open(filepath, "w", encoding="utf-8") as file:
-        for message in messages:
-            file.write(f"{message}\n\n")
-
+    if not filepath.exists():
+        print(f"File not found: {filepath}")
+        return ""
+    with open(filepath, "r") as file:
+        return file.read()
 
 def read_sample():
     """
     Read the sample.txt file and return the excerpt.
     """
-    excerpt = ''
-    filepath = ROOT / 'sample.txt'
-    with open(filepath, 'r') as file:
-        excerpt = file.read()
-        assert len(excerpt) > 0, "File is empty"
-    return excerpt
+    return read_text_file("sample.txt")
 
 
 def read_settings(config_file="settings.json") -> dict:
@@ -58,6 +80,12 @@ def read_settings(config_file="settings.json") -> dict:
     """
     settings = {}
     filepath = ROOT / config_file
+    if not filepath.exists():
+        print(f"File not found: {filepath}")
+        raise FileNotFoundError
+    if not filepath.suffix == ".json":
+        print("CRITICAL: settings file is not a .json file")
+        raise ValueError
     with open(filepath, 'r') as file:
         try:
             settings = json_load(file)
@@ -71,10 +99,14 @@ def read_settings(config_file="settings.json") -> dict:
 
 def clean_text(text):
     """
-    Clean text, return str
+    Clean text while preserving important symbols and punctuation, return str
     """
-    cleaned_text = re_sub(r'\s+', ' ', text)
-    cleaned_text = re_sub(r'[^a-zA-Z0-9(),.\-! ]', '', cleaned_text)
+    # Replace multiple whitespace characters with a single space
+    cleaned_text = regex_sub(r'\s+', ' ', text)
+    
+    # Keep important symbols and punctuation, remove unwanted characters
+    cleaned_text = regex_sub(r'[^a-zA-Z0-9(),.!?;:\-@#$%^&*_+={}|[\]<>/`~ ]', '', cleaned_text)
+    
     return cleaned_text
 
 
