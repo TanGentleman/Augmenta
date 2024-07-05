@@ -99,6 +99,7 @@ def main(keys: dict[str, str]):
     count = 0
     prompt_prefix = ""
     if not chatbot.config.chat_settings.enable_system_message:
+        print("Appending system message to prompt")
         prompt_prefix = chatbot.config.chat_settings.system_message + "\n"
     while count < MAX_COUNT:
         default_text = "Reading from clipboard:"

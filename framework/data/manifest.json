@@ -1,0 +1,908 @@
+{
+    "databases": [
+        {
+            "id": "bec131f2-3db1-40e6-8324-ac4ec798f7e9",
+            "collection_name": "12_angry_men_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "256",
+                "chunk_overlap": "50",
+                "inputs": [
+                    "12AngryMen.pdf"
+                ],
+                "timestamp": "2024-04-27",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "193c0bc6-767d-4e6d-ad86-a675f8211424",
+            "collection_name": "inquirer_collection",
+            "metadata": {
+                "embedding_model": "nomic-embed-text",
+                "method": "faiss",
+                "chunk_size": "1024",
+                "chunk_overlap": "100",
+                "inputs": [
+                    "https://pypi.org/project/inquirer/"
+                ],
+                "timestamp": "2024-04-27",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "f3c84ed6-3d82-4a71-a80d-71007f9db7e1",
+            "collection_name": "best_reference_prompt_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "1024",
+                "chunk_overlap": "100",
+                "inputs": [],
+                "timestamp": "2024-04-27",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "28395b5d-441c-40cd-9aef-a9795bf39be5",
+            "collection_name": "hw18_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "256",
+                "chunk_overlap": "20",
+                "inputs": [
+                    "Homework_18.pdf"
+                ],
+                "timestamp": "2024-04-27",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "970e7d63-bcd8-453c-aaf5-9171b5520d93",
+            "collection_name": "hw18_chroma_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "chroma",
+                "chunk_size": "256",
+                "chunk_overlap": "20",
+                "inputs": [
+                    "Homework_18.pdf"
+                ],
+                "timestamp": "2024-04-27",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "4fdf372a-6253-452c-b73b-31fe890f5656",
+            "collection_name": "metacognition_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "512",
+                "chunk_overlap": "100",
+                "inputs": [
+                    "metacognition_learning.pdf"
+                ],
+                "timestamp": "2024-04-27",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "8b70afee-1a1d-4177-bfad-fc0d1c15d85d",
+            "collection_name": "metacognition_nomic_collection",
+            "metadata": {
+                "embedding_model": "nomic-embed-text",
+                "method": "faiss",
+                "chunk_size": "512",
+                "chunk_overlap": "100",
+                "inputs": [
+                    "metacognition_learning.pdf"
+                ],
+                "timestamp": "2024-04-27",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "fc128d74-601a-40ca-b1fe-d086b36fd38f",
+            "collection_name": "metacognition_together_collection",
+            "metadata": {
+                "embedding_model": "BAAI/bge-large-en-v1.5",
+                "method": "faiss",
+                "chunk_size": "512",
+                "chunk_overlap": "100",
+                "inputs": [
+                    "metacognition_learning.pdf"
+                ],
+                "timestamp": "2024-04-27",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "b1720f0f-508a-43ee-9203-5fbd8a0518d2",
+            "collection_name": "unstructured_chromosome_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "512",
+                "chunk_overlap": "100",
+                "inputs": [
+                    "chromosome.pdf"
+                ],
+                "timestamp": "2024-04-27",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "65f78690-c522-4619-83dd-22822e3b0a0e",
+            "collection_name": "unstructured_chromosome_compressed_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "512",
+                "chunk_overlap": "100",
+                "inputs": [
+                    "chromosome.pdf"
+                ],
+                "timestamp": "2024-04-27",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "5b0ce8fa-7237-4439-b80c-867af098ab10",
+            "collection_name": "testing_paper_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "512",
+                "chunk_overlap": "100",
+                "inputs": [
+                    "paper.txt"
+                ],
+                "timestamp": "2024-04-27",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "e32ed6c1-f166-4a51-b5b3-b13e529d893d",
+            "collection_name": "ph_insights_chunked_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "512",
+                "chunk_overlap": "100",
+                "inputs": [],
+                "timestamp": "2024-04-27",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "82598424-df25-4bb5-a50c-524f510145bf",
+            "collection_name": "ph_insights_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "512",
+                "chunk_overlap": "100",
+                "inputs": [],
+                "timestamp": "2024-04-27",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "df50aac2-cb0c-4cd2-b4f4-a953739971c1",
+            "collection_name": "elevenlabs_github_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "100000",
+                "chunk_overlap": "0",
+                "inputs": [
+                    "https://github.com/elevenlabs/elevenlabs-python"
+                ],
+                "timestamp": "2024-04-30",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "cb661e8f-7ca4-4c02-9a64-403a8ea5fe73",
+            "collection_name": "CEMS_nomic_collection",
+            "metadata": {
+                "embedding_model": "nomic-embed-text",
+                "method": "faiss",
+                "chunk_size": "512",
+                "chunk_overlap": "100",
+                "inputs": [
+                    "CEMS.pdf"
+                ],
+                "timestamp": "2024-04-30",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "aeb52000-8473-41bd-8a02-0e491c421f05",
+            "collection_name": "reference_prompt_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "4000",
+                "chunk_overlap": "0",
+                "inputs": [
+                    "https://docs.anthropic.com/claude/page/cosmic-keystrokes",
+                    "https://docs.anthropic.com/claude/page/corporate-clairvoyant",
+                    "https://docs.anthropic.com/claude/page/website-wizard",
+                    "https://docs.anthropic.com/claude/page/excel-formula-expert",
+                    "https://docs.anthropic.com/claude/page/google-apps-scripter",
+                    "https://docs.anthropic.com/claude/page/python-bug-buster",
+                    "https://docs.anthropic.com/claude/page/time-travel-consultant",
+                    "https://docs.anthropic.com/claude/page/storytelling-sidekick",
+                    "https://docs.anthropic.com/claude/page/cite-your-sources",
+                    "https://docs.anthropic.com/claude/page/sql-sorcerer",
+                    "https://docs.anthropic.com/claude/page/dream-interpreter",
+                    "https://docs.anthropic.com/claude/page/pun-dit",
+                    "https://docs.anthropic.com/claude/page/culinary-creator",
+                    "https://docs.anthropic.com/claude/page/portmanteau-poet",
+                    "https://docs.anthropic.com/claude/page/hal-the-humorous-helper",
+                    "https://docs.anthropic.com/claude/page/latex-legend",
+                    "https://docs.anthropic.com/claude/page/mood-colorizer",
+                    "https://docs.anthropic.com/claude/page/git-gud",
+                    "https://docs.anthropic.com/claude/page/simile-savant",
+                    "https://docs.anthropic.com/claude/page/ethical-dilemma-navigator",
+                    "https://docs.anthropic.com/claude/page/meeting-scribe",
+                    "https://docs.anthropic.com/claude/page/idiom-illuminator",
+                    "https://docs.anthropic.com/claude/page/code-consultant",
+                    "https://docs.anthropic.com/claude/page/function-fabricator",
+                    "https://docs.anthropic.com/claude/page/neologism-creator",
+                    "https://docs.anthropic.com/claude/page/csv-converter",
+                    "https://docs.anthropic.com/claude/page/emoji-encoder",
+                    "https://docs.anthropic.com/claude/page/prose-polisher",
+                    "https://docs.anthropic.com/claude/page/perspectives-ponderer",
+                    "https://docs.anthropic.com/claude/page/trivia-generator",
+                    "https://docs.anthropic.com/claude/page/mindfulness-mentor",
+                    "https://docs.anthropic.com/claude/page/second-grade-simplifier",
+                    "https://docs.anthropic.com/claude/page/vr-fitness-innovator",
+                    "https://docs.anthropic.com/claude/page/pii-purifier",
+                    "https://docs.anthropic.com/claude/page/memo-maestro",
+                    "https://docs.anthropic.com/claude/page/career-coach",
+                    "https://docs.anthropic.com/claude/page/grading-guru",
+                    "https://docs.anthropic.com/claude/page/tongue-twister",
+                    "https://docs.anthropic.com/claude/page/interview-question-crafter",
+                    "https://docs.anthropic.com/claude/page/grammar-genie",
+                    "https://docs.anthropic.com/claude/page/riddle-me-this",
+                    "https://docs.anthropic.com/claude/page/code-clarifier",
+                    "https://docs.anthropic.com/claude/page/alien-anthropologist",
+                    "https://docs.anthropic.com/claude/page/data-organizer",
+                    "https://docs.anthropic.com/claude/page/brand-builder",
+                    "https://docs.anthropic.com/claude/page/efficiency-estimator",
+                    "https://docs.anthropic.com/claude/page/review-classifier",
+                    "https://docs.anthropic.com/claude/page/direction-decoder",
+                    "https://docs.anthropic.com/claude/page/motivational-muse",
+                    "https://docs.anthropic.com/claude/page/email-extractor",
+                    "https://docs.anthropic.com/claude/page/master-moderator",
+                    "https://docs.anthropic.com/claude/page/lesson-planner",
+                    "https://docs.anthropic.com/claude/page/socratic-sage",
+                    "https://docs.anthropic.com/claude/page/alliteration-alchemist",
+                    "https://docs.anthropic.com/claude/page/futuristic-fashion-advisor",
+                    "https://docs.anthropic.com/claude/page/polyglot-superpowers",
+                    "https://docs.anthropic.com/claude/page/product-naming-pro",
+                    "https://docs.anthropic.com/claude/page/philosophical-musings",
+                    "https://docs.anthropic.com/claude/page/spreadsheet-sorcerer",
+                    "https://docs.anthropic.com/claude/page/sci-fi-scenario-simulator",
+                    "https://docs.anthropic.com/claude/page/adaptive-editor",
+                    "https://docs.anthropic.com/claude/page/babels-broadcasts",
+                    "https://docs.anthropic.com/claude/page/tweet-tone-detector",
+                    "https://docs.anthropic.com/claude/page/airport-code-analyst"
+                ],
+                "timestamp": "2024-04-30",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "f99a62f6-d35a-4135-8638-f7b173ca564a",
+            "collection_name": "temporary_collection",
+            "metadata": {
+                "embedding_model": "nomic-embed-text",
+                "method": "faiss",
+                "chunk_size": "512",
+                "chunk_overlap": "100",
+                "inputs": [
+                    "https://github.com/xuelink/sayserver/raw/master/README.md"
+                ],
+                "timestamp": "2024-05-01",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "6bf819f7-a22c-4e42-942e-cb627c255e55",
+            "collection_name": "reference_nomic_prompt_collection",
+            "metadata": {
+                "embedding_model": "nomic-embed-text",
+                "method": "faiss",
+                "chunk_size": "4000",
+                "chunk_overlap": "0",
+                "inputs": [
+                    "https://docs.anthropic.com/claude/page/cosmic-keystrokes",
+                    "https://docs.anthropic.com/claude/page/corporate-clairvoyant",
+                    "https://docs.anthropic.com/claude/page/website-wizard",
+                    "https://docs.anthropic.com/claude/page/excel-formula-expert",
+                    "https://docs.anthropic.com/claude/page/google-apps-scripter",
+                    "https://docs.anthropic.com/claude/page/python-bug-buster",
+                    "https://docs.anthropic.com/claude/page/time-travel-consultant",
+                    "https://docs.anthropic.com/claude/page/storytelling-sidekick",
+                    "https://docs.anthropic.com/claude/page/cite-your-sources",
+                    "https://docs.anthropic.com/claude/page/sql-sorcerer",
+                    "https://docs.anthropic.com/claude/page/dream-interpreter",
+                    "https://docs.anthropic.com/claude/page/pun-dit",
+                    "https://docs.anthropic.com/claude/page/culinary-creator",
+                    "https://docs.anthropic.com/claude/page/portmanteau-poet",
+                    "https://docs.anthropic.com/claude/page/hal-the-humorous-helper",
+                    "https://docs.anthropic.com/claude/page/latex-legend",
+                    "https://docs.anthropic.com/claude/page/mood-colorizer",
+                    "https://docs.anthropic.com/claude/page/git-gud",
+                    "https://docs.anthropic.com/claude/page/simile-savant",
+                    "https://docs.anthropic.com/claude/page/ethical-dilemma-navigator",
+                    "https://docs.anthropic.com/claude/page/meeting-scribe",
+                    "https://docs.anthropic.com/claude/page/idiom-illuminator",
+                    "https://docs.anthropic.com/claude/page/code-consultant",
+                    "https://docs.anthropic.com/claude/page/function-fabricator",
+                    "https://docs.anthropic.com/claude/page/neologism-creator",
+                    "https://docs.anthropic.com/claude/page/csv-converter",
+                    "https://docs.anthropic.com/claude/page/emoji-encoder",
+                    "https://docs.anthropic.com/claude/page/prose-polisher",
+                    "https://docs.anthropic.com/claude/page/perspectives-ponderer",
+                    "https://docs.anthropic.com/claude/page/trivia-generator",
+                    "https://docs.anthropic.com/claude/page/mindfulness-mentor",
+                    "https://docs.anthropic.com/claude/page/second-grade-simplifier",
+                    "https://docs.anthropic.com/claude/page/vr-fitness-innovator",
+                    "https://docs.anthropic.com/claude/page/pii-purifier",
+                    "https://docs.anthropic.com/claude/page/memo-maestro",
+                    "https://docs.anthropic.com/claude/page/career-coach",
+                    "https://docs.anthropic.com/claude/page/grading-guru",
+                    "https://docs.anthropic.com/claude/page/tongue-twister",
+                    "https://docs.anthropic.com/claude/page/interview-question-crafter",
+                    "https://docs.anthropic.com/claude/page/grammar-genie",
+                    "https://docs.anthropic.com/claude/page/riddle-me-this",
+                    "https://docs.anthropic.com/claude/page/code-clarifier",
+                    "https://docs.anthropic.com/claude/page/alien-anthropologist",
+                    "https://docs.anthropic.com/claude/page/data-organizer",
+                    "https://docs.anthropic.com/claude/page/brand-builder",
+                    "https://docs.anthropic.com/claude/page/efficiency-estimator",
+                    "https://docs.anthropic.com/claude/page/review-classifier",
+                    "https://docs.anthropic.com/claude/page/direction-decoder",
+                    "https://docs.anthropic.com/claude/page/motivational-muse",
+                    "https://docs.anthropic.com/claude/page/email-extractor",
+                    "https://docs.anthropic.com/claude/page/master-moderator",
+                    "https://docs.anthropic.com/claude/page/lesson-planner",
+                    "https://docs.anthropic.com/claude/page/socratic-sage",
+                    "https://docs.anthropic.com/claude/page/alliteration-alchemist",
+                    "https://docs.anthropic.com/claude/page/futuristic-fashion-advisor",
+                    "https://docs.anthropic.com/claude/page/polyglot-superpowers",
+                    "https://docs.anthropic.com/claude/page/product-naming-pro",
+                    "https://docs.anthropic.com/claude/page/philosophical-musings",
+                    "https://docs.anthropic.com/claude/page/spreadsheet-sorcerer",
+                    "https://docs.anthropic.com/claude/page/sci-fi-scenario-simulator",
+                    "https://docs.anthropic.com/claude/page/adaptive-editor",
+                    "https://docs.anthropic.com/claude/page/babels-broadcasts",
+                    "https://docs.anthropic.com/claude/page/tweet-tone-detector",
+                    "https://docs.anthropic.com/claude/page/airport-code-analyst"
+                ],
+                "timestamp": "2024-05-01",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "227f4740-36e3-4267-a47f-6e7ea8c8f0b6",
+            "collection_name": "fixed_reference_nomic_prompt_collection",
+            "metadata": {
+                "embedding_model": "nomic-embed-text",
+                "method": "faiss",
+                "chunk_size": "4000",
+                "chunk_overlap": "0",
+                "inputs": [
+                    "https://docs.anthropic.com/claude/page/cosmic-keystrokes",
+                    "https://docs.anthropic.com/claude/page/corporate-clairvoyant",
+                    "https://docs.anthropic.com/claude/page/website-wizard",
+                    "https://docs.anthropic.com/claude/page/excel-formula-expert",
+                    "https://docs.anthropic.com/claude/page/google-apps-scripter",
+                    "https://docs.anthropic.com/claude/page/python-bug-buster",
+                    "https://docs.anthropic.com/claude/page/time-travel-consultant",
+                    "https://docs.anthropic.com/claude/page/storytelling-sidekick",
+                    "https://docs.anthropic.com/claude/page/cite-your-sources",
+                    "https://docs.anthropic.com/claude/page/sql-sorcerer",
+                    "https://docs.anthropic.com/claude/page/dream-interpreter",
+                    "https://docs.anthropic.com/claude/page/pun-dit",
+                    "https://docs.anthropic.com/claude/page/culinary-creator",
+                    "https://docs.anthropic.com/claude/page/portmanteau-poet",
+                    "https://docs.anthropic.com/claude/page/hal-the-humorous-helper",
+                    "https://docs.anthropic.com/claude/page/latex-legend",
+                    "https://docs.anthropic.com/claude/page/mood-colorizer",
+                    "https://docs.anthropic.com/claude/page/git-gud",
+                    "https://docs.anthropic.com/claude/page/simile-savant",
+                    "https://docs.anthropic.com/claude/page/ethical-dilemma-navigator",
+                    "https://docs.anthropic.com/claude/page/meeting-scribe",
+                    "https://docs.anthropic.com/claude/page/idiom-illuminator",
+                    "https://docs.anthropic.com/claude/page/code-consultant",
+                    "https://docs.anthropic.com/claude/page/function-fabricator",
+                    "https://docs.anthropic.com/claude/page/neologism-creator",
+                    "https://docs.anthropic.com/claude/page/csv-converter",
+                    "https://docs.anthropic.com/claude/page/emoji-encoder",
+                    "https://docs.anthropic.com/claude/page/prose-polisher",
+                    "https://docs.anthropic.com/claude/page/perspectives-ponderer",
+                    "https://docs.anthropic.com/claude/page/trivia-generator",
+                    "https://docs.anthropic.com/claude/page/mindfulness-mentor",
+                    "https://docs.anthropic.com/claude/page/second-grade-simplifier",
+                    "https://docs.anthropic.com/claude/page/vr-fitness-innovator",
+                    "https://docs.anthropic.com/claude/page/pii-purifier",
+                    "https://docs.anthropic.com/claude/page/memo-maestro",
+                    "https://docs.anthropic.com/claude/page/career-coach",
+                    "https://docs.anthropic.com/claude/page/grading-guru",
+                    "https://docs.anthropic.com/claude/page/tongue-twister",
+                    "https://docs.anthropic.com/claude/page/interview-question-crafter",
+                    "https://docs.anthropic.com/claude/page/grammar-genie",
+                    "https://docs.anthropic.com/claude/page/riddle-me-this",
+                    "https://docs.anthropic.com/claude/page/code-clarifier",
+                    "https://docs.anthropic.com/claude/page/alien-anthropologist",
+                    "https://docs.anthropic.com/claude/page/data-organizer",
+                    "https://docs.anthropic.com/claude/page/brand-builder",
+                    "https://docs.anthropic.com/claude/page/efficiency-estimator",
+                    "https://docs.anthropic.com/claude/page/review-classifier",
+                    "https://docs.anthropic.com/claude/page/direction-decoder",
+                    "https://docs.anthropic.com/claude/page/motivational-muse",
+                    "https://docs.anthropic.com/claude/page/email-extractor",
+                    "https://docs.anthropic.com/claude/page/master-moderator",
+                    "https://docs.anthropic.com/claude/page/lesson-planner",
+                    "https://docs.anthropic.com/claude/page/socratic-sage",
+                    "https://docs.anthropic.com/claude/page/alliteration-alchemist",
+                    "https://docs.anthropic.com/claude/page/futuristic-fashion-advisor",
+                    "https://docs.anthropic.com/claude/page/polyglot-superpowers",
+                    "https://docs.anthropic.com/claude/page/product-naming-pro",
+                    "https://docs.anthropic.com/claude/page/philosophical-musings",
+                    "https://docs.anthropic.com/claude/page/spreadsheet-sorcerer",
+                    "https://docs.anthropic.com/claude/page/sci-fi-scenario-simulator",
+                    "https://docs.anthropic.com/claude/page/adaptive-editor",
+                    "https://docs.anthropic.com/claude/page/babels-broadcasts",
+                    "https://docs.anthropic.com/claude/page/tweet-tone-detector",
+                    "https://docs.anthropic.com/claude/page/airport-code-analyst"
+                ],
+                "timestamp": "2024-05-01",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "8ea507d9-c202-4094-93b8-79bbe8d820ad",
+            "collection_name": "all_exam3_256_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "2000",
+                "chunk_overlap": "100",
+                "inputs": [
+                    "Wegner.pdf",
+                    "Sleek_IAT_20_years.pdf",
+                    "Schechtman-Stickgold-Paller.pdf",
+                    "Feld&Diekelman.pdf",
+                    "Gelitz_LieDetection.pdf",
+                    "BrennanMagnussen_lie_detect.pdf",
+                    "Matz_Persuasion.pdf",
+                    "Poels_Dewitte_Emotion_Ads.pdf",
+                    "Simons_brain_training_excerpt.pdf",
+                    "EsgateGroomeChapter6.pdf",
+                    "RossThe Expert Mind.pdf",
+                    "Lee_etal_choking_2019.pdf",
+                    "GordonNYT.pdf"
+                ],
+                "timestamp": "2024-05-02",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "5b379f5b-adec-49b6-bf10-3998a69b27ac",
+            "collection_name": "all_exam3_2000_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "2000",
+                "chunk_overlap": "100",
+                "inputs": [
+                    "Wegner.pdf",
+                    "Sleek_IAT_20_years.pdf",
+                    "Schechtman-Stickgold-Paller.pdf",
+                    "Feld&Diekelman.pdf",
+                    "Gelitz_LieDetection.pdf",
+                    "BrennanMagnussen_lie_detect.pdf",
+                    "Matz_Persuasion.pdf",
+                    "Poels_Dewitte_Emotion_Ads.pdf",
+                    "Simons_brain_training_excerpt.pdf",
+                    "EsgateGroomeChapter6.pdf",
+                    "RossThe Expert Mind.pdf",
+                    "Lee_etal_choking_2019.pdf",
+                    "GordonNYT.pdf"
+                ],
+                "timestamp": "2024-05-02",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "f66fb98b-ae57-4b8b-9405-0807e5a01d18",
+            "collection_name": "test_unstructured_collection",
+            "metadata": {
+                "embedding_model": "nomic-embed-text",
+                "method": "faiss",
+                "chunk_size": "2000",
+                "chunk_overlap": "100",
+                "inputs": [
+                    "GordonNYT.pdf"
+                ],
+                "timestamp": "2024-05-04",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "2cd281fa-e6fa-49b5-9aea-1c096038eb1e",
+            "collection_name": "empty_collection",
+            "metadata": {
+                "embedding_model": "nomic-embed-text",
+                "method": "faiss",
+                "chunk_size": "2000",
+                "chunk_overlap": "100",
+                "inputs": [
+                    "z.txt"
+                ],
+                "timestamp": "2024-05-05",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "96730cfa-0702-4248-916d-21d286a8fad5",
+            "collection_name": "sample_paper_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "256",
+                "chunk_overlap": "50",
+                "inputs": [
+                    "paper.txt"
+                ],
+                "timestamp": "2024-05-05",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "c79b4dac-6196-4380-b2fb-2869e5da2c79",
+            "collection_name": "expert_multivector_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "19999",
+                "chunk_overlap": "0",
+                "inputs": [
+                    "Ross The Expert Mind.pdf"
+                ],
+                "timestamp": "2024-05-06",
+                "doc_ids": [
+                    "005e3009-18f1-4d7c-b5b1-4d95feb37e7a",
+                    "4866ea97-88ba-408c-9e06-9fca6ce3346a",
+                    "63df2e98-a782-44f1-a60b-16692fcaecfd",
+                    "1a7baa5d-3732-410a-8f60-fa5e45e563af",
+                    "32ddee97-b35c-478a-8369-71ff1668c0c9"
+                ]
+            }
+        },
+        {
+            "id": "22bc96b9-a9bc-45c1-8710-55979b32910a",
+            "collection_name": "evie_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "8000",
+                "chunk_overlap": "100",
+                "inputs": [
+                    "evie.pdf"
+                ],
+                "timestamp": "2024-05-06",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "71d29bc7-7eb5-4645-8db0-a6d08bebf899",
+            "collection_name": "evie_256_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "256",
+                "chunk_overlap": "30",
+                "inputs": [
+                    "evie.pdf"
+                ],
+                "timestamp": "2024-05-06",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "5d844a60-f3e9-46d8-b789-3febdcfd0a25",
+            "collection_name": "zzz",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "200",
+                "chunk_overlap": "100",
+                "inputs": [
+                    "https://example.com"
+                ],
+                "timestamp": "2024-05-09",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "117e320a-9e4d-45c9-8c4d-0fd9ae219b65",
+            "collection_name": "ethan_food_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "200",
+                "chunk_overlap": "100",
+                "inputs": [
+                    "https://www.pittsburghmagazine.com/here-are-the-25-best-restaurants-in-pittsburgh/"
+                ],
+                "timestamp": "2024-05-13",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "6320004d-6c51-4ea1-8159-67aacc9c2874",
+            "collection_name": "ethan_512_food_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "512",
+                "chunk_overlap": "100",
+                "inputs": [
+                    "https://www.pittsburghmagazine.com/here-are-the-25-best-restaurants-in-pittsburgh/"
+                ],
+                "timestamp": "2024-05-13",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "d7a8e30b-5e84-48a9-a87d-706a761b833a",
+            "collection_name": "spotify_docs_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "4000",
+                "chunk_overlap": "100",
+                "inputs": [
+                    "https://developer.spotify.com/documentation/web-api/reference/get-playlist"
+                ],
+                "timestamp": "2024-05-19",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "443ebb9b-045e-4a0e-9036-e09887de3731",
+            "collection_name": "aunty_demo_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "3000",
+                "chunk_overlap": "100",
+                "inputs": [
+                    "https://news.vmware.com/leadership/purnima-padmanabhan-leadership-profile"
+                ],
+                "timestamp": "2024-05-26",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "fc936459-8cdd-4c02-9369-87f9114f7da7",
+            "collection_name": "z",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "3000",
+                "chunk_overlap": "100",
+                "inputs": [
+                    "https://www.reddit.com/r/Python/comments/4796gy/best_midi_libraries_for_python/"
+                ],
+                "timestamp": "2024-05-27",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "5c88a612-199c-4f49-aa64-c4f9c07f242f",
+            "collection_name": "my_story_256_50_collection",
+            "metadata": {
+                "embedding_model": "nomic-embed-text",
+                "method": "faiss",
+                "chunk_size": "256",
+                "chunk_overlap": "50",
+                "inputs": [
+                    "Beyond Earth Science Fiction Final.pdf"
+                ],
+                "timestamp": "2024-05-27",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "8c94021b-ce81-4785-82fd-a7a814243201",
+            "collection_name": "resanitized_story_256_50_collection",
+            "metadata": {
+                "embedding_model": "nomic-embed-text",
+                "method": "faiss",
+                "chunk_size": "256",
+                "chunk_overlap": "50",
+                "inputs": [
+                    "Beyond Earth Science Fiction Final.pdf"
+                ],
+                "timestamp": "2024-05-27",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "35392af4-288b-4328-856d-2a422488ca5c",
+            "collection_name": "my_story_1000_100_collection",
+            "metadata": {
+                "embedding_model": "nomic-embed-text",
+                "method": "faiss",
+                "chunk_size": "1000",
+                "chunk_overlap": "100",
+                "inputs": [
+                    "Beyond Earth Science Fiction Final.pdf"
+                ],
+                "timestamp": "2024-05-27",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "5b52a485-9357-414a-a8cb-1f46a65c6d32",
+            "collection_name": "adguard_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "10000",
+                "chunk_overlap": "0",
+                "inputs": [
+                    "https://github.com/AdguardTeam/AdGuardHome/wiki/Configuration"
+                ],
+                "timestamp": "2024-05-31",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "1d4419de-6359-4994-8b43-960a624a9717",
+            "collection_name": "flashcards_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "10000",
+                "chunk_overlap": "0",
+                "inputs": [
+                    "https://example.com"
+                ],
+                "timestamp": "2024-06-26",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "8d75bfd3-8d29-4681-99b7-c134d8c5f0a1",
+            "collection_name": "russian-flashcards_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "10000",
+                "chunk_overlap": "0",
+                "inputs": [
+                    "russian-notes.pdf"
+                ],
+                "timestamp": "2024-06-26",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "bb09a38c-9213-46a8-a439-b9b2182497d1",
+            "collection_name": "russian-flashcards-text_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "10000",
+                "chunk_overlap": "0",
+                "inputs": [
+                    "russian.txt"
+                ],
+                "timestamp": "2024-06-26",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "db028be7-cc85-4b53-8608-be756321ac8a",
+            "collection_name": "adguard_collection_new",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "100",
+                "chunk_overlap": "0",
+                "inputs": [
+                    "https://github.com/AdguardTeam/AdGuardHome/wiki/Configuration"
+                ],
+                "timestamp": "2024-07-04",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "c082550b-a497-4895-9dbf-b8594de64f26",
+            "collection_name": "deepseek_docs_collection",
+            "metadata": {
+                "embedding_model": "text-embedding-3-large",
+                "method": "faiss",
+                "chunk_size": "1000",
+                "chunk_overlap": "100",
+                "inputs": [
+                    "https://platform.deepseek.com/api-docs/"
+                ],
+                "timestamp": "2024-07-05",
+                "doc_ids": [
+                    "99d0e05e-64ea-4d0d-b61c-910dd98b15e7",
+                    "de1c1d88-ad96-4ab5-b484-dca717f10b96",
+                    "4b587fca-bc8d-48f8-b136-ea5b1b66ff54",
+                    "cc8ab0d7-58c8-47eb-9d5b-6ec193d9c7c5",
+                    "ab36b8b1-6a7a-4a5a-91e0-95606046ea20",
+                    "4b310fc5-6dbd-4885-9b1e-27fed1806fc8"
+                ]
+            }
+        },
+        {
+            "id": "3571e68a-a842-4862-bf68-3d6cf0780e1c",
+            "collection_name": "deepseek_docs_collection_1",
+            "metadata": {
+                "embedding_model": "BAAI/bge-large-en-v1.5",
+                "method": "faiss",
+                "chunk_size": "1000",
+                "chunk_overlap": "100",
+                "inputs": [
+                    "https://platform.deepseek.com/api-docs/"
+                ],
+                "timestamp": "2024-07-05",
+                "doc_ids": [
+                    "3af58d65-b106-4f24-a77f-392f86e54546",
+                    "42e821aa-2120-43c0-a958-ab20216f2dcb",
+                    "b26ba99c-f4a6-4e09-81c6-2dfa7cabb500",
+                    "fc0efdf4-5e99-4482-a843-271acb583f33",
+                    "1ced7f0c-ca74-4778-9cfa-bb0eb7564691",
+                    "0a0772ec-ffc4-41d1-8ee2-be33c8ce42ca"
+                ]
+            }
+        },
+        {
+            "id": "f5b39823-e7e8-4950-90cf-57aff7e4885f",
+            "collection_name": "deepseek_2_docs_collection",
+            "metadata": {
+                "embedding_model": "BAAI/bge-large-en-v1.5",
+                "method": "faiss",
+                "chunk_size": "1000",
+                "chunk_overlap": "100",
+                "inputs": [
+                    "https://platform.deepseek.com/api-docs/",
+                    "https://platform.deepseek.com/api-docs/pricing",
+                    "https://platform.deepseek.com/api-docs/api/list-models"
+                ],
+                "timestamp": "2024-07-05",
+                "doc_ids": []
+            }
+        },
+        {
+            "id": "2f3b0cc6-75c7-4454-9f4b-230d71ff6bb6",
+            "collection_name": "0",
+            "metadata": {
+                "embedding_model": "BAAI/bge-large-en-v1.5",
+                "method": "faiss",
+                "chunk_size": "1000",
+                "chunk_overlap": "100",
+                "inputs": [
+                    "https://docs.anthropic.com/en/docs/about-claude/models"
+                ],
+                "timestamp": "2024-07-05",
+                "doc_ids": []
+            }
+        }
+    ]
+}

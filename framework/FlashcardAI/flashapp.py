@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 import click
 from rich.console import Console
 from rich.panel import Panel
@@ -14,8 +15,9 @@ from typeguard import typechecked
 from abc import ABC, abstractmethod
 from typing_extensions import Protocol
 
-from flashcards import load_flashcards_from_json, Flashcard, save_flashcards_to_json
-
+from .flashcards import load_flashcards_from_json, Flashcard, save_flashcards_to_json
+ROOT = Path(__file__).parent
+FLASHCARD_FILEPATH = ROOT / "flashcards.json"
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -636,7 +638,7 @@ class FlashcardApp:
         return False
 
 @click.command()
-@click.option('--file', default='flashcards.json', help='Path to the flashcards JSON file.')
+@click.option('--file', default= FLASHCARD_FILEPATH, help='Path to the flashcards JSON file.')
 def main(file: str) -> None:
     """
     Main entry point for the Flashcard Study App.

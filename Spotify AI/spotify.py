@@ -782,13 +782,13 @@ def audio_analysis_from_query(query: str):
 
 if __name__ == "__main__":
     # run_tests()
-    # main()
+    main()
     # test_functions()
     # tracks = add_track_from_query("every breath you take")
     # if tracks:
     #     print_items(tracks, from_playlist=True)
     # print_my_library()
-    audio_analysis_from_query("dandelions ruth")
+    # audio_analysis_from_query("dandelions ruth")
 
 
 # Example payload
