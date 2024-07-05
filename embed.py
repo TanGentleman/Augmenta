@@ -8,17 +8,17 @@ from chromadb.config import Settings
 from os.path import exists, join
 from langchain_community.document_loaders import PyPDFLoader, ArxivLoader
 from langchain_community.vectorstores import FAISS
-from config import CHROMA_FOLDER, EXPERIMENTAL_UNSTRUCTURED, FAISS_FOLDER, METADATA_MAP
+from config import EXPERIMENTAL_UNSTRUCTURED, METADATA_MAP
+from constants import CHROMA_FOLDER, FAISS_FOLDER
 from helpers import database_exists
-from models import Embedder
 
-if EXPERIMENTAL_UNSTRUCTURED:
-    try:
-        from unstructured.cleaners.core import clean_extra_whitespace
-        from langchain_community.document_loaders import UnstructuredPDFLoader
-    except ImportError:
-        print("ImportError: Unstructured functions in embed.py not be accessible")
-        raise ValueError("Set EXPERIMENTAL_UNSTRUCTURED to False to continue")
+# if EXPERIMENTAL_UNSTRUCTURED:
+#     try:
+#         from unstructured.cleaners.core import clean_extra_whitespace
+#         from langchain_community.document_loaders import UnstructuredPDFLoader
+#     except ImportError:
+#         print("ImportError: Unstructured functions in embed.py not be accessible")
+#         raise ValueError("Set EXPERIMENTAL_UNSTRUCTURED to False to continue")
 
 
 def loader_from_arxiv_url(url: str) -> ArxivLoader:
@@ -34,24 +34,24 @@ def loader_from_arxiv_url(url: str) -> ArxivLoader:
     return loader
 
 
-def loader_from_file_unstructured(filepath: str):
-    """
-    Load documents from any file, return List[Document]
-    """
-    assert filepath.endswith(
-        ".pdf"), "Unstructured temporarily only supports PDFs"
-    LOAD_ELEMENTS = False
-    if LOAD_ELEMENTS:
-        element_loader = UnstructuredPDFLoader(
-            filepath,
-            mode="elements",
-            post_processors=[clean_extra_whitespace])
-        loader = element_loader
-    else:
-        loader = UnstructuredPDFLoader(
-            filepath,
-            post_processors=[clean_extra_whitespace])
-    return loader
+# def loader_from_file_unstructured(filepath: str):
+#     """
+#     Load documents from any file, return List[Document]
+#     """
+#     assert filepath.endswith(
+#         ".pdf"), "Unstructured temporarily only supports PDFs"
+#     LOAD_ELEMENTS = False
+#     if LOAD_ELEMENTS:
+#         element_loader = UnstructuredPDFLoader(
+#             filepath,
+#             mode="elements",
+#             post_processors=[clean_extra_whitespace])
+#         loader = element_loader
+#     else:
+#         loader = UnstructuredPDFLoader(
+#             filepath,
+#             post_processors=[clean_extra_whitespace])
+#     return loader
 
 
 def loader_from_notebook_url(url: str) -> NotebookLoader:
@@ -123,18 +123,18 @@ def documents_from_local_pdf(filepath) -> list[Document]:
     return docs
 
 
-def documents_from_arbitrary_file(filepath: str) -> list[Document]:
-    """
-    Load a pdf from the "documents" folder
-    Returns List[Document]
-    """
-    filepath = join("documents", filepath)
-    assert exists(filepath), "Local file not found"
-    element_loader = loader_from_file_unstructured(filepath)
-    docs = element_loader.load()
-    if not docs:
-        raise ValueError(f"Did not get docs from local document at {filepath}")
-    return docs
+# def documents_from_arbitrary_file(filepath: str) -> list[Document]:
+#     """
+#     Load a pdf from the "documents" folder
+#     Returns List[Document]
+#     """
+#     filepath = join("documents", filepath)
+#     assert exists(filepath), "Local file not found"
+#     element_loader = loader_from_file_unstructured(filepath)
+#     docs = element_loader.load()
+#     if not docs:
+#         raise ValueError(f"Did not get docs from local document at {filepath}")
+#     return docs
 
 
 def documents_from_text_file(filepath: str = "sample.txt") -> list[Document]:
@@ -178,7 +178,7 @@ def split_documents(
 
 def get_chroma_vectorstore(
         collection_name: str,
-        embedder: Embedder,
+        embedder,
         exists=False):
     """
     Get a Chroma vectorstore from a collection name, folder is created if it doesn't exist
@@ -200,7 +200,7 @@ def get_chroma_vectorstore(
 
 def get_chroma_vectorstore_from_docs(
         collection_name: str,
-        embedder: Embedder,
+        embedder,
         docs: list[Document]):
     assert not database_exists(
         collection_name, "chroma"), "Collection already exists"
@@ -225,7 +225,7 @@ def load_existing_chroma_vectorstore(collection_name, embedder):
 
 def get_faiss_vectorstore_from_docs(
         collection_name: str,
-        embedder: Embedder,
+        embedder,
         docs: list[Document]):
     assert not database_exists(
         collection_name, "faiss"), "Collection already exists"
@@ -240,7 +240,7 @@ def get_faiss_vectorstore_from_docs(
     return vectorstore
 
 
-def load_existing_faiss_vectorstore(collection_name: str, embedder: Embedder):
+def load_existing_faiss_vectorstore(collection_name: str, embedder):
     assert database_exists(
         collection_name, "faiss"), "Collection does not exist"
     filename = join(FAISS_FOLDER, collection_name)
