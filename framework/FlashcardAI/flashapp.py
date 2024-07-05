@@ -19,26 +19,33 @@ from .flashcards import load_flashcards_from_json, Flashcard, save_flashcards_to
 ROOT = Path(__file__).parent
 FLASHCARD_FILEPATH = ROOT / "flashcards.json"
 # Set up logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 console = Console()
+
 
 class FlashcardError(Exception):
     """Base exception class for Flashcard-related errors."""
     pass
 
+
 class FlashcardLoadError(FlashcardError):
     """Exception raised when there's an error loading flashcards."""
     pass
+
 
 class FlashcardSaveError(FlashcardError):
     """Exception raised when there's an error saving flashcards."""
     pass
 
+
 class FlashcardNotFoundError(FlashcardError):
     """Exception raised when a requested flashcard is not found."""
     pass
+
 
 class MenuChoice(Enum):
     """Enum representing the main menu choices."""
@@ -47,11 +54,16 @@ class MenuChoice(Enum):
     CONFIGURE = "3"
     QUIT = "4"
 
+
 class TypedPrompt:
     """Utility class for prompting user input with type checking."""
 
     @staticmethod
-    def ask(prompt: str, type_: type, choices: Optional[List[str]] = None, default: Optional[str] = None) -> Union[str, int]:
+    def ask(prompt: str,
+            type_: type,
+            choices: Optional[List[str]] = None,
+            default: Optional[str] = None) -> Union[str,
+                                                    int]:
         """
         Prompt the user for input and validate the type.
 
@@ -67,22 +79,27 @@ class TypedPrompt:
             ValueError: If the input cannot be converted to the specified type.
         """
         assert type_ in (str, int), "Only str and int types are supported"
-        assert choices is None or isinstance(choices, list), "Choices must be a list or None"
-        assert default is None or isinstance(default, str), "Default value must be a string or None"
+        assert choices is None or isinstance(
+            choices, list), "Choices must be a list or None"
+        assert default is None or isinstance(
+            default, str), "Default value must be a string or None"
         while True:
             if default is not None:
-                result = RichPrompt.ask(prompt + f" [default: {default}]", choices=choices)
+                result = RichPrompt.ask(
+                    prompt + f" [default: {default}]", choices=choices)
             else:
                 result = RichPrompt.ask(prompt, choices=choices)
             try:
                 return type_(result)
             except ValueError:
-                console.print(f"[bold red]Invalid input. Please enter a {type_.__name__}.[/bold red]")
+                console.print(
+                    f"[bold red]Invalid input. Please enter a {type_.__name__}.[/bold red]")
                 logger.warning(f"Invalid input received for prompt: {prompt}")
-    
+
     # NOTE: These can be combined into a single method with a default value
     @staticmethod
-    def get_input_with_default(prompt: str, type_: type, default: str) -> Union[str, int]:
+    def get_input_with_default(
+            prompt: str, type_: type, default: str) -> Union[str, int]:
         """
         Prompt the user for input with a default value.
 
@@ -101,8 +118,11 @@ class TypedPrompt:
             try:
                 return type_(result)
             except ValueError:
-                console.print(f"[bold red]Invalid input. Please enter a {type_.__name__}.[/bold red]")
+                console.print(
+                    f"[bold red]Invalid input. Please enter a {type_.__name__}.[/bold red]")
                 logger.warning(f"Invalid input received for prompt: {prompt}")
+
+
 class TerminalLayout:
     """Manages the terminal layout for displaying flashcards."""
 
@@ -129,25 +149,43 @@ class TerminalLayout:
             return
 
         flashcard_panel = card.create_flashcard()
-        answer_panel = card.create_answer() if app.show_answer else Panel("Press 'S' to show answer", title="Answer", border_style="green")
-        menu_panel = Panel(app.create_menu(), title="Menu", border_style="blue")
+        answer_panel = card.create_answer() if app.show_answer else Panel(
+            "Press 'S' to show answer", title="Answer", border_style="green")
+        menu_panel = Panel(
+            app.create_menu(),
+            title="Menu",
+            border_style="blue")
 
         layout_elements = [
-            Layout(Panel(f"Card {app.flashcard_manager.current_index + 1} of {len(app.flashcard_manager.flashcards)}"), name="card_count", ratio=3) if app.layout_config.show_card_count else None,
-            Layout(flashcard_panel, name="flashcard", ratio=5) if app.layout_config.show_flashcard else None,
-            Layout(answer_panel, name="answer", ratio=5) if app.layout_config.show_answer else None,
-            Layout(menu_panel, name="menu", ratio=4) if app.layout_config.show_menu else None
-        ]
+            Layout(
+                Panel(f"Card {app.flashcard_manager.current_index + 1} of {len(app.flashcard_manager.flashcards)}"),
+                name="card_count",
+                ratio=3) if app.layout_config.show_card_count else None,
+            Layout(
+                flashcard_panel,
+                name="flashcard",
+                ratio=5) if app.layout_config.show_flashcard else None,
+            Layout(
+                answer_panel,
+                name="answer",
+                ratio=5) if app.layout_config.show_answer else None,
+            Layout(
+                menu_panel,
+                name="menu",
+                ratio=4) if app.layout_config.show_menu else None]
 
-        layout_elements = [element for element in layout_elements if element is not None]
+        layout_elements = [
+            element for element in layout_elements if element is not None]
 
         if layout_elements:
             layout = Layout()
             layout.split_column(*layout_elements)
         else:
-            layout = Layout(Panel("No elements to display. Please check your layout configuration."))
+            layout = Layout(
+                Panel("No elements to display. Please check your layout configuration."))
 
         console.print(layout)
+
 
 class FlashcardManagerProtocol(Protocol):
     """Protocol defining the interface for FlashcardManager."""
@@ -177,10 +215,12 @@ class FlashcardManagerProtocol(Protocol):
         """Move to the previous flashcard."""
         pass
 
+
 class FlashcardManager(FlashcardManagerProtocol):
     """
     Manages the flashcard deck, including loading, saving, and manipulating flashcards.
     """
+
     def __init__(self) -> None:
         """Initialize the FlashcardManager."""
         self.flashcards: List[Flashcard] = []
@@ -203,14 +243,17 @@ class FlashcardManager(FlashcardManagerProtocol):
             FlashcardLoadError: If there's an error loading the flashcards.
         """
         try:
-            self.flashcards, self.keys, self.styles = load_flashcards_from_json(file_path)
-            logger.info(f"Loaded {len(self.flashcards)} flashcards from {file_path}")
+            self.flashcards, self.keys, self.styles = load_flashcards_from_json(
+                file_path)
+            logger.info(
+                f"Loaded {len(self.flashcards)} flashcards from {file_path}")
         except FileNotFoundError:
             logger.error(f"Flashcard file not found: {file_path}")
             raise FlashcardLoadError(f"Flashcard file not found: {file_path}")
         except json.JSONDecodeError:
             logger.error(f"Invalid JSON format in file: {file_path}")
-            raise FlashcardLoadError(f"Invalid JSON format in file: {file_path}")
+            raise FlashcardLoadError(
+                f"Invalid JSON format in file: {file_path}")
         except Exception as e:
             logger.error(f"Failed to load flashcards: {str(e)}")
             raise FlashcardLoadError(f"Failed to load flashcards: {str(e)}")
@@ -235,11 +278,15 @@ class FlashcardManager(FlashcardManagerProtocol):
     def ensure_valid_index(self) -> None:
         """Ensure that the current index is within the valid range."""
         if self.flashcards:
-            self.current_index = max(0, min(self.current_index, len(self.flashcards) - 1))
-            logger.warning(f"Safely adjusted current index to {self.current_index + 1}")
+            self.current_index = max(
+                0, min(
+                    self.current_index, len(
+                        self.flashcards) - 1))
+            logger.warning(
+                f"Safely adjusted current index to {self.current_index + 1}")
         else:
             self.current_index = 0
-    
+
     def get_current_card(self) -> Optional[Flashcard]:
         """
         Get the current flashcard.
@@ -360,8 +407,10 @@ class FlashcardManager(FlashcardManagerProtocol):
         Returns:
             List[Flashcard]: A list of flashcards that match the search criteria.
         """
-        results = [card for card in self.flashcards if any(keyword.lower() in str(value).lower() for value in card.card_data.values())]
-        logger.info(f"Searched for keyword '{keyword}', found {len(results)} results")
+        results = [card for card in self.flashcards if any(
+            keyword.lower() in str(value).lower() for value in card.card_data.values())]
+        logger.info(
+            f"Searched for keyword '{keyword}', found {len(results)} results")
         return results
 
 
@@ -378,8 +427,9 @@ class KeyboardHandler:
             'E': (self.app.edit_flashcard, "Edit Flashcard"),
             'D': (self.app.delete_flashcard, "Delete Flashcard"),
             'F': (self.app.search_flashcards, "Search Flashcards"),
-            'M': (lambda: True, "Return to Main Menu"), # M-key handled beforehand.
-            'Q': (lambda: True, "Quit"), # Q-key handled beforehand.
+            # M-key handled beforehand.
+            'M': (lambda: True, "Return to Main Menu"),
+            'Q': (lambda: True, "Quit"),  # Q-key handled beforehand.
         }
 
     @typechecked
@@ -390,7 +440,9 @@ class KeyboardHandler:
         return False
 
     def get_menu_options(self) -> List[str]:
-        return [f"{key}: {description}" for key, (_, description) in self.key_bindings.items()]
+        return [f"{key}: {description}" for key,
+                (_, description) in self.key_bindings.items()]
+
 
 class LayoutConfig:
     def __init__(self):
@@ -398,6 +450,7 @@ class LayoutConfig:
         self.show_flashcard = True
         self.show_answer = True
         self.show_menu = True
+
 
 class FlashcardApp:
     def __init__(self) -> None:
@@ -419,22 +472,35 @@ class FlashcardApp:
 
     def toggle_layout_element(self, element: str) -> None:
         if hasattr(self.layout_config, element):
-            setattr(self.layout_config, element, not getattr(self.layout_config, element))
-            console.print(f"[bold green]{element.replace('_', ' ').title()} {'shown' if getattr(self.layout_config, element) else 'hidden'}[/bold green]")
+            setattr(
+                self.layout_config,
+                element,
+                not getattr(
+                    self.layout_config,
+                    element))
+            console.print(
+                f"[bold green]{element.replace('_', ' ').title()} {'shown' if getattr(self.layout_config, element) else 'hidden'}[/bold green]")
         else:
-            console.print(f"[bold red]Invalid layout element: {element}[/bold red]")
+            console.print(
+                f"[bold red]Invalid layout element: {element}[/bold red]")
 
     def configure_layout(self) -> None:
         while True:
             console.clear()
             console.print(Panel("Layout Configuration", style="bold magenta"))
-            console.print(f"1. Card Count: {'Shown' if self.layout_config.show_card_count else 'Hidden'}")
-            console.print(f"2. Flashcard: {'Shown' if self.layout_config.show_flashcard else 'Hidden'}")
-            console.print(f"3. Answer: {'Shown' if self.layout_config.show_answer else 'Hidden'}")
-            console.print(f"4. Menu: {'Shown' if self.layout_config.show_menu else 'Hidden'}")
+            console.print(
+                f"1. Card Count: {'Shown' if self.layout_config.show_card_count else 'Hidden'}")
+            console.print(
+                f"2. Flashcard: {'Shown' if self.layout_config.show_flashcard else 'Hidden'}")
+            console.print(
+                f"3. Answer: {'Shown' if self.layout_config.show_answer else 'Hidden'}")
+            console.print(
+                f"4. Menu: {'Shown' if self.layout_config.show_menu else 'Hidden'}")
             console.print("5. Return to main menu")
 
-            choice = TypedPrompt.ask("Choose an option to toggle", str, choices=["1", "2", "3", "4", "5"])
+            choice = TypedPrompt.ask(
+                "Choose an option to toggle", str, choices=[
+                    "1", "2", "3", "4", "5"])
             if choice == "1":
                 self.toggle_layout_element("show_card_count")
             elif choice == "2":
@@ -470,7 +536,8 @@ class FlashcardApp:
 
     def jump_to_card(self) -> bool:
         if not self.flashcard_manager.flashcards:
-            console.print("[bold yellow]No flashcards available.[/bold yellow]")
+            console.print(
+                "[bold yellow]No flashcards available.[/bold yellow]")
             return False
 
         card_number = TypedPrompt.ask("Enter card number", int)
@@ -479,7 +546,8 @@ class FlashcardApp:
             self.show_answer = False
             self.display_current_card()
         else:
-            console.print(f"[bold red]Error: Please enter a number between 1 and {len(self.flashcard_manager.flashcards)}.[/bold red]")
+            console.print(
+                f"[bold red]Error: Please enter a number between 1 and {len(self.flashcard_manager.flashcards)}.[/bold red]")
         return False  # Continue studying
 
     def add_flashcard(self) -> bool:
@@ -491,15 +559,17 @@ class FlashcardApp:
                     new_card_data[key] = value
                     break
                 else:
-                    console.print(f"[bold red]Error: {key} cannot be empty. Please try again.[/bold red]")
+                    console.print(
+                        f"[bold red]Error: {key} cannot be empty. Please try again.[/bold red]")
         self.flashcard_manager.add_flashcard(new_card_data)
         console.print("[bold green]Flashcard added successfully![/bold green]")
         self.force_refresh = True
         return False  # Continue studying
-    
+
     def edit_flashcard(self) -> bool:
         if not self.flashcard_manager.flashcards:
-            console.print("[bold yellow]No flashcards available to edit.[/bold yellow]")
+            console.print(
+                "[bold yellow]No flashcards available to edit.[/bold yellow]")
             return False
 
         index = TypedPrompt.ask("Enter the card number to edit", int) - 1
@@ -508,18 +578,24 @@ class FlashcardApp:
             updated_data: Dict[str, str] = {}
             for key in self.flashcard_manager.keys.values():
                 current_value = str(card.card_data.get(key, ""))
-                value = str(TypedPrompt.get_input_with_default(f"Enter the new {key}", str, current_value))
+                value = str(
+                    TypedPrompt.get_input_with_default(
+                        f"Enter the new {key}", str, current_value))
                 if value.strip():
                     updated_data[key] = value
                 else:
-                    console.print(f"[bold red]Error: {key} cannot be empty. Using previous value.[/bold red]")
+                    console.print(
+                        f"[bold red]Error: {key} cannot be empty. Using previous value.[/bold red]")
                     updated_data[key] = current_value
             self.flashcard_manager.edit_flashcard(index, updated_data)
-            console.print("[bold green]Flashcard updated successfully![/bold green]")
+            console.print(
+                "[bold green]Flashcard updated successfully![/bold green]")
         except FlashcardNotFoundError:
-            console.print(f"[bold red]Error: Please enter a number between 1 and {len(self.flashcard_manager.flashcards)}.[/bold red]")
+            console.print(
+                f"[bold red]Error: Please enter a number between 1 and {len(self.flashcard_manager.flashcards)}.[/bold red]")
         except Exception as e:
-            console.print(f"[bold red]An error occurred while editing the flashcard: {str(e)}[/bold red]")
+            console.print(
+                f"[bold red]An error occurred while editing the flashcard: {str(e)}[/bold red]")
             logger.error(f"Error editing flashcard: {str(e)}")
         self.force_refresh = True
         return False  # Continue studying
@@ -527,7 +603,12 @@ class FlashcardApp:
     def delete_flashcard(self) -> bool:
         index = TypedPrompt.ask("Enter the card number to delete", int) - 1
         if 0 <= index < len(self.flashcard_manager.flashcards):
-            confirm = TypedPrompt.ask("Are you sure you want to delete this flashcard? (y/n)", str, choices=["y", "n"])
+            confirm = TypedPrompt.ask(
+                "Are you sure you want to delete this flashcard? (y/n)",
+                str,
+                choices=[
+                    "y",
+                    "n"])
             if confirm.lower() == "y":
                 self.flashcard_manager.delete_flashcard(index)
                 console.print(f"Flashcard {index + 1} deleted successfully!")
@@ -547,36 +628,43 @@ class FlashcardApp:
     def search_flashcards(self) -> bool:
         """Searches for flashcards matching a user-provided keyword.
 
-        Displays search results in a formatted table, or an "not found" message if no matches are found. 
+        Displays search results in a formatted table, or an "not found" message if no matches are found.
 
         Returns:
             bool: False (indicating the study session should continue).
         """
 
-        keyword = TypedPrompt.ask("Enter search keyword", str)  # Prompt for keyword input
+        keyword = TypedPrompt.ask(
+            "Enter search keyword",
+            str)  # Prompt for keyword input
 
         if keyword.strip():  # Ensure keyword is not empty after whitespace removal
-            results = self.flashcard_manager.search_flashcards(keyword) 
+            results = self.flashcard_manager.search_flashcards(keyword)
 
             if results:  # If matching flashcards are found
                 table = Table(title=f"Search Results for '{keyword}'")
-                table.add_column("Card #", style="cyan")  # Add a numbered column
+                # Add a numbered column
+                table.add_column("Card #", style="cyan")
 
-                # Dynamically add columns based on flashcard keys (e.g., "Term", "Definition")
-                for key in self.flashcard_manager.keys.values(): 
+                # Dynamically add columns based on flashcard keys (e.g.,
+                # "Term", "Definition")
+                for key in self.flashcard_manager.keys.values():
                     table.add_column(key.capitalize(), style="magenta")
 
-                for i, card in enumerate(results):  # Populate table rows with card data
-                    table.add_row(str(i+1), *[str(card.card_data.get(key, "N/A")) for key in self.flashcard_manager.keys.values()])
+                for i, card in enumerate(
+                        results):  # Populate table rows with card data
+                    table.add_row(str(i + 1), *[str(card.card_data.get(key, "N/A"))
+                                  for key in self.flashcard_manager.keys.values()])
 
-                console.print(table) 
+                console.print(table)
             else:
-                console.print("No matching flashcards found.")  # Inform user if no matches
+                # Inform user if no matches
+                console.print("No matching flashcards found.")
         else:
-            console.print("[bold red]Error: Search keyword cannot be empty. Please try again.[/bold red]") 
+            console.print(
+                "[bold red]Error: Search keyword cannot be empty. Please try again.[/bold red]")
 
         return False  # Continue studying after search
-    
 
     def display_current_card(self) -> None:
         current_card = self.flashcard_manager.get_current_card()
@@ -587,21 +675,22 @@ class FlashcardApp:
 
     def create_menu(self, condense: bool = False) -> str:
         options = self.keyboard_handler.get_menu_options()
-        
+
         if condense:
             return " | ".join(options)
-        
+
         max_width = max(len(option) for option in options)
         columns = max(1, 80 // (max_width + 2))  # Assuming 80 characters width
-        
+
         formatted_options = []
         for i in range(0, len(options), columns):
             row = options[i:i + columns]
-            formatted_row = "  ".join(option.ljust(max_width) for option in row)
+            formatted_row = "  ".join(option.ljust(max_width)
+                                      for option in row)
             formatted_options.append(formatted_row)
-        
+
         return "\n".join(formatted_options)
-    
+
     def study_flashcards(self) -> bool:
         """
         Start an interactive flashcard study session.
@@ -614,7 +703,8 @@ class FlashcardApp:
             bool: True if the user wants to quit, False otherwise.
         """
         if not self.flashcard_manager.flashcards:
-            console.print("[bold yellow]No flashcards available. Please add some flashcards first.[/bold yellow]")
+            console.print(
+                "[bold yellow]No flashcards available. Please add some flashcards first.[/bold yellow]")
             TypedPrompt.ask("Press Enter to continue", str)
             return False
 
@@ -627,7 +717,9 @@ class FlashcardApp:
             if not HIDE_MENU_OPTIONS:
                 for option in menu_options:
                     console.print(option)
-            choice = TypedPrompt.ask("Choose an option", str, choices=[key.lower() for key in self.keyboard_handler.key_bindings.keys()])
+            choice = TypedPrompt.ask(
+                "Choose an option", str, choices=[
+                    key.lower() for key in self.keyboard_handler.key_bindings.keys()])
             choice = choice.upper()
             if choice == 'Q':  # Quit
                 return True
@@ -637,8 +729,10 @@ class FlashcardApp:
             self.keyboard_handler.handle_input(choice)
         return False
 
+
 @click.command()
-@click.option('--file', default= FLASHCARD_FILEPATH, help='Path to the flashcards JSON file.')
+@click.option('--file', default=FLASHCARD_FILEPATH,
+              help='Path to the flashcards JSON file.')
 def main(file: str) -> None:
     """
     Main entry point for the Flashcard Study App.
@@ -654,16 +748,30 @@ def main(file: str) -> None:
         console.print(f"[bold red]Error loading flashcards: {str(e)}")
         logger.error(f"Failed to load flashcards: {str(e)}")
         return
-    
+
     while True:
         console.clear()
         console.print(Panel("Flashcard Study App", style="bold magenta"))
-        console.print(Panel("1. Study Flashcards: Study the flashcards interactively.", style="bold green"))
-        console.print(Panel("2. Search Flashcards: Search for flashcards containing a specific keyword.", style="bold green"))
-        console.print(Panel("3. Configure Layout: Customize the visible elements of the layout.", style="bold green"))
-        console.print(Panel("4. Save and Quit: Save the flashcards and quit the application.", style="bold green"))
+        console.print(
+            Panel(
+                "1. Study Flashcards: Study the flashcards interactively.",
+                style="bold green"))
+        console.print(
+            Panel(
+                "2. Search Flashcards: Search for flashcards containing a specific keyword.",
+                style="bold green"))
+        console.print(
+            Panel(
+                "3. Configure Layout: Customize the visible elements of the layout.",
+                style="bold green"))
+        console.print(
+            Panel(
+                "4. Save and Quit: Save the flashcards and quit the application.",
+                style="bold green"))
 
-        choice = TypedPrompt.ask("Choose an option", str, choices=[choice.value for choice in MenuChoice])
+        choice = TypedPrompt.ask(
+            "Choose an option", str, choices=[
+                choice.value for choice in MenuChoice])
         logger.debug(f"User selected menu option: {choice}")
 
         if choice == MenuChoice.STUDY.value:

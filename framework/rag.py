@@ -1,4 +1,5 @@
-# This file is for functions related to indexing documents and assembling RAG components
+# This file is for functions related to indexing documents and assembling
+# RAG components
 from os.path import exists, join
 
 from langchain_core.documents import Document
@@ -12,6 +13,7 @@ from config.config import EXPERIMENTAL_UNSTRUCTURED, METADATA_MAP
 from constants import CHROMA_FOLDER, FAISS_FOLDER
 from utils import clean_docs, database_exists
 
+
 def loader_from_arxiv_url(url: str) -> ArxivLoader:
     """
     Load documents from an arXiv URL, return List[Document]
@@ -23,6 +25,7 @@ def loader_from_arxiv_url(url: str) -> ArxivLoader:
     doc_id = url.split("/")[-1].replace(".pdf", "")
     loader = ArxivLoader(query=doc_id)
     return loader
+
 
 def loader_from_notebook_url(url: str) -> NotebookLoader:
     """
@@ -91,6 +94,7 @@ def documents_from_local_pdf(filepath) -> list[Document]:
     if not docs:
         raise ValueError(f"Failed to read PDF and return documents.")
     return docs
+
 
 def documents_from_text_file(filepath: str = "sample.txt") -> list[Document]:
     """
@@ -203,6 +207,7 @@ def load_existing_faiss_vectorstore(collection_name: str, embedder):
         filename, embedder, allow_dangerous_deserialization=True)
     return vectorstore
 
+
 def input_to_docs(input: str) -> list[Document]:
     """
     Converts the input to a list of documents.
@@ -287,7 +292,7 @@ def vectorstore_from_inputs(
     assert vectorstore is not None, "Vectorstore not initialized. Provide valid inputs."
     return vectorstore
 
-### DEPRECATED
+# DEPRECATED
 # if EXPERIMENTAL_UNSTRUCTURED:
 #     try:
 #         from unstructured.cleaners.core import clean_extra_whitespace

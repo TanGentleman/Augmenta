@@ -15,7 +15,7 @@ PROMPT_CHOOSER_SYSTEM_MESSAGE = "Use the context from Anthropic's example prompt
 # EVAL_EXCERPT_SYSTEM_MESSAGE = "You are an AI assistant that evaluates text excerpts to determine if it meets specified criteria. Respond ONLY with a valid JSON output with 2 keys: index: int, and meetsCriteria: bool."
 EVAL_EXCERPT_SYSTEM_MESSAGE = 'Evaluate a text excerpt to determine if it meets specified criteria. Always include a boolean key meetsCriteria. Respond ONLY with a valid JSON output.'
 MUSIC_SYSTEM_MESSAGE = 'You will be provided with unstructured data, and your task is to parse it into JSON format. You should output a list of dictionaries, where each dictionary contains the keys "title", "artist", and "album".'
-FLASHCARD_SYSTEM_MESSAGE = """You are Flashcard AI. Use the document excerpts to generate a list of JSON flashcards. Example output: 
+FLASHCARD_SYSTEM_MESSAGE = """You are Flashcard AI. Use the document excerpts to generate a list of JSON flashcards. Example output:
 [
     {
         "term": "Python",

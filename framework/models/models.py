@@ -3,7 +3,7 @@
 # TODO: Implement embedding model context size checks, potentially issues
 # during vectorstore steps?
 
-### NOTE: IF DOTENV NOT LOADED, API KEYS WILL NEED TO BE SET MANUALLY
+# NOTE: IF DOTENV NOT LOADED, API KEYS WILL NEED TO BE SET MANUALLY
 # from dotenv import load_dotenv
 # load_dotenv()
 
@@ -16,11 +16,11 @@ from langchain_together import TogetherEmbeddings
 # from langchain_anthropic import ChatAnthropic
 from langchain.schema import BaseMessage
 
-### FOR DEBUG
+# FOR DEBUG
 # from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 # from langchain.callbacks.manager import CallbackManager
 
-### DEPRECATED
+# DEPRECATED
 # from langchain_community.embeddings import OllamaEmbeddings
 # from langchain_community.llms.ollama import Ollama
 
@@ -28,7 +28,8 @@ DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
 TOGETHER_BASE_URL = "https://api.together.xyz"
 
 OLLAMA_BASE_URL = "http://localhost:11434/v1"
-LOCAL_BASE_URL = "http://localhost:1234/v1" # This is for LMSTUDIO, but I set llamacpp to same port
+# This is for LMSTUDIO, but I set llamacpp to same port
+LOCAL_BASE_URL = "http://localhost:1234/v1"
 logger = logging.getLogger(__name__)
 
 TOGETHER_BASE_URL = "https://api.together.xyz"
@@ -38,7 +39,10 @@ VALID_TOGETHER_MODELS = []
 VALID_OPENAI_MODELS = ["gpt-4o"]
 VALID_DEEPSEEK_MODELS = ["deepseek-coder"]
 VALID_LOCAL_MODELS = ["local-model"]
-VALID_OLLAMA_MODELS = ["local-ollama3", "mistral:7b-instruct-v0.3-q6_K", "local-hermes"]
+VALID_OLLAMA_MODELS = [
+    "local-ollama3",
+    "mistral:7b-instruct-v0.3-q6_K",
+    "local-hermes"]
 
 allowed_models = {
     "providers": {
@@ -46,11 +50,10 @@ allowed_models = {
         "together": VALID_TOGETHER_MODELS,
         "deepseek": VALID_DEEPSEEK_MODELS,
         "local": VALID_LOCAL_MODELS,
-        "ollama": ["local-ollama3", "mistral:7b-instruct-v0.3-q6_K", "local-hermes"]
-    }
-}
-
-
+        "ollama": [
+            "local-ollama3",
+            "mistral:7b-instruct-v0.3-q6_K",
+            "local-hermes"]}}
 
 
 def get_together_model(model_name: str, hyperparameters=None) -> ChatOpenAI:
@@ -67,6 +70,7 @@ def get_together_model(model_name: str, hyperparameters=None) -> ChatOpenAI:
             # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
         )
 
+
 def get_openai_gpt4(hyperparameters=None) -> ChatOpenAI:
     api_key = getenv("OPENAI_API_KEY")
     assert api_key, "Please set OPENAI_API_KEY in .env file"
@@ -78,6 +82,7 @@ def get_openai_gpt4(hyperparameters=None) -> ChatOpenAI:
         streaming=True,
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
+
 
 def get_together_dolphin(hyperparameters=None) -> ChatOpenAI:
     api_key = getenv("TOGETHER_API_KEY")
@@ -242,6 +247,8 @@ def get_together_deepseek_32k(hyperparameters=None) -> ChatOpenAI:
 #         streaming=True,
 #         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
 #     )
+
+
 def get_claude_sonnet(hyperparameters=None) -> ChatOpenAI:
     api_key = getenv("OPENROUTER_API_KEY")
     assert api_key, "Please set OPENROUTER_API_KEY in .env file"
@@ -253,7 +260,6 @@ def get_claude_sonnet(hyperparameters=None) -> ChatOpenAI:
         streaming=True,
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
-
 
 
 def get_openai_embedder_large(hyperparameters=None) -> OpenAIEmbeddings:
@@ -272,6 +278,8 @@ def get_openai_embedder_large(hyperparameters=None) -> OpenAIEmbeddings:
 #         api_key=api_key,
 #         model="BAAI/bge-large-en-v1.5",
 #     )
+
+
 def get_together_embedder_large(hyperparameters=None) -> TogetherEmbeddings:
     api_key = getenv("TOGETHER_API_KEY")
     assert api_key, "Please set TOGETHER_API_KEY in .env file"
@@ -279,6 +287,7 @@ def get_together_embedder_large(hyperparameters=None) -> TogetherEmbeddings:
         api_key=api_key,
         model="BAAI/bge-large-en-v1.5",
     )
+
 
 def get_deepseek_coder(hyperparameters=None) -> ChatOpenAI:
     api_key = getenv("DEEPSEEK_API_KEY")
@@ -292,6 +301,7 @@ def get_deepseek_coder(hyperparameters=None) -> ChatOpenAI:
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
+
 def get_local_model(hyperparameters=None) -> ChatOpenAI:
     return ChatOpenAI(
         base_url=LOCAL_BASE_URL,
@@ -302,6 +312,7 @@ def get_local_model(hyperparameters=None) -> ChatOpenAI:
         streaming=True,
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
+
 
 def get_ollama_llama3(hyperparameters=None) -> ChatOpenAI:
     return ChatOpenAI(
@@ -314,6 +325,7 @@ def get_ollama_llama3(hyperparameters=None) -> ChatOpenAI:
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
+
 def get_ollama_mistral(hyperparameters=None) -> ChatOpenAI:
     return ChatOpenAI(
         base_url=OLLAMA_BASE_URL,
@@ -325,6 +337,7 @@ def get_ollama_mistral(hyperparameters=None) -> ChatOpenAI:
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
+
 def get_local_hermes(hyperparameters=None) -> ChatOpenAI:
     return ChatOpenAI(
         base_url="http://localhost:8000/v1",
@@ -335,6 +348,7 @@ def get_local_hermes(hyperparameters=None) -> ChatOpenAI:
         streaming=True,
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
+
 
 def get_ollama_local_embedder(hyperparameters=None) -> OpenAIEmbeddings:
     return OpenAIEmbeddings(
@@ -489,6 +503,8 @@ EMBEDDING_CONTEXT_SIZE_DICT = {
 }
 
 # Create class LLM_FN that takes a function that is a value in MODEL_DICT
+
+
 class LLM_FN:
     def __init__(self, model_fn, hyperparameters=None):
         # If it's not a value in MODEL_DICT, raise an error
@@ -580,7 +596,8 @@ class LLM:
         # return self.model_name in ["mistral:7b-instruct-v0.3-q6_K"]
         return False
 
-    def invoke(self, query: str | list, tools=None, tool_choice=None) -> list[BaseMessage]:
+    def invoke(self, query: str | list, tools=None,
+               tool_choice=None) -> list[BaseMessage]:
         """
         Generate a response from the model
         """

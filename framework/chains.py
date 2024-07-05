@@ -4,10 +4,12 @@ from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
 from constants import get_music_template, get_rag_template, get_summary_template, get_eval_template
 from utils import format_docs
 
+
 class SimpleChain:
     """
     A simple chain class that can be used to create chains.
     """
+
     def __init__(self, chain):
         self.chain = chain
 
@@ -16,17 +18,19 @@ class SimpleChain:
         Invokes the chain with the given input data.
         """
         return self.chain.invoke(input_data)
-    
+
     def stream(self, input_data: str | list | dict):
         """
         Streams the chain with the given input data.
         """
         return self.chain.stream(input_data)
 
+
 class RAGChain(SimpleChain):
     """
     A chain that can be used to interact with the RAG pipeline.
     """
+
     def __init__(self, chain):
         self.chain = chain
 
@@ -36,7 +40,10 @@ class RAGChain(SimpleChain):
         """
         return self.chain(input_data)
 
-def get_object_from_response(string: str, validity_fn: Callable[[dict], bool] | None = None) -> Any:
+
+def get_object_from_response(string: str,
+                             validity_fn: Callable[[dict],
+                                                   bool] | None = None) -> Any:
     """
     A JSON output parser that returns the response object.
     """
@@ -45,9 +52,9 @@ def get_object_from_response(string: str, validity_fn: Callable[[dict], bool] | 
         try:
             string = string.content
             assert isinstance(string, str)
-        except:
+        except BaseException:
             raise ValueError("Could not convert input to string")
-    
+
     if validity_fn is None:
         def is_output_valid(output_object: dict) -> bool:
             """
@@ -72,7 +79,9 @@ def get_object_from_response(string: str, validity_fn: Callable[[dict], bool] | 
     return response_object
 
 
-def get_eval_chain(llm, validity_fn: Callable[[dict], bool] | None = None) -> SimpleChain:
+def get_eval_chain(llm,
+                   validity_fn: Callable[[dict],
+                                         bool] | None = None) -> SimpleChain:
     """
     Returns a chain for evaluating a given excerpt.
 
@@ -83,10 +92,14 @@ def get_eval_chain(llm, validity_fn: Callable[[dict], bool] | None = None) -> Si
     # and then use it in the chain?
     # Response: I can pass it as an argument to the function.
 
-    {"first_string": eval_prompt_template | llm | StrOutputParser() }
+    {"first_string": eval_prompt_template | llm | StrOutputParser()}
 
-    chain = SimpleChain(eval_prompt_template | llm | StrOutputParser() | (lambda x: get_object_from_response(string = x, validity_fn = validity_fn)))
+    chain = SimpleChain(
+        eval_prompt_template | llm | StrOutputParser() | (
+            lambda x: get_object_from_response(
+                string=x, validity_fn=validity_fn)))
     return chain
+
 
 def music_output_handler(response_string: str):
     """
@@ -104,6 +117,7 @@ def music_output_handler(response_string: str):
                 return False
         return True
     return get_object_from_response(response_string, is_output_valid)
+
 
 def get_music_chain(llm, few_shot_examples=None):
     """
@@ -124,6 +138,7 @@ def get_music_chain(llm, few_shot_examples=None):
         | music_output_handler
     )
     return chain
+
 
 def get_rag_chain(
         retriever,
@@ -146,6 +161,7 @@ def get_rag_chain(
         | llm
     )
     return chain
+
 
 def get_summary_chain(llm) -> SimpleChain:
     """

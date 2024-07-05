@@ -1,4 +1,21 @@
 
+from rag import input_to_docs, get_chroma_vectorstore_from_docs, get_faiss_vectorstore_from_docs, load_existing_faiss_vectorstore, load_existing_chroma_vectorstore, split_documents
+from chains import get_summary_chain, get_rag_chain, get_eval_chain
+from models.models import LLM_FN, LLM
+from classes import Config
+from config.config import MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, EXPLAIN_EXCERPT, FILTER_TOPIC
+from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SUMMARY_TEMPLATE, SYSTEM_MESSAGE_CODES
+import utils
+from langchain.storage import InMemoryByteStore
+from langchain_core.documents import Document
+from langchain.retrievers.multi_vector import MultiVectorRetriever
+from langchain_core.vectorstores import VectorStoreRetriever
+from langchain_community.vectorstores.faiss import FAISS
+from langchain_community.vectorstores.chroma import Chroma
+from langchain.schema import SystemMessage, AIMessage, HumanMessage, BaseMessage
+from textwrap import fill
+from os import get_terminal_size
+from uuid import uuid4
 import pyperclip
 try:
     import gnureadline
@@ -7,29 +24,12 @@ except ImportError:
 from dotenv import load_dotenv
 load_dotenv()
 
-from uuid import uuid4
-from os import get_terminal_size
-from textwrap import fill
 
-from langchain.schema import SystemMessage, AIMessage, HumanMessage, BaseMessage
-from langchain_community.vectorstores.chroma import Chroma
-from langchain_community.vectorstores.faiss import FAISS
-from langchain_core.vectorstores import VectorStoreRetriever
-from langchain.retrievers.multi_vector import MultiVectorRetriever
-from langchain_core.documents import Document
-from langchain.storage import InMemoryByteStore
-
-import utils
 # from utils import copy_string_to_clipboard, database_exists, get_clipboard_contents, get_db_collection_names, process_docs, get_doc_ids_from_manifest, save_string_as_markdown_file, read_sample, update_manifest
-from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SUMMARY_TEMPLATE, SYSTEM_MESSAGE_CODES
-from config.config import MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, EXPLAIN_EXCERPT, FILTER_TOPIC
-from classes import Config
-from models.models import LLM_FN, LLM
-from chains import get_summary_chain, get_rag_chain, get_eval_chain
-from rag import input_to_docs, get_chroma_vectorstore_from_docs, get_faiss_vectorstore_from_docs, load_existing_faiss_vectorstore, load_existing_chroma_vectorstore, split_documents
 
 
 TERMINAL_WIDTH = get_terminal_size().columns
+
 
 def print_adjusted(
         text: str,
@@ -154,11 +154,13 @@ class Chatbot:
             self.messages = messages
             self.response_count = len(messages) // 2
             return
-        
+
         messages = []
         if not self.config.rag_settings.rag_mode:
             if self.config.chat_settings.enable_system_message:
-                messages.append(SystemMessage(content=self.config.chat_settings.system_message))
+                messages.append(
+                    SystemMessage(
+                        content=self.config.chat_settings.system_message))
             else:
                 print('System message disabled')
 
@@ -188,7 +190,8 @@ class Chatbot:
 
         # Get doc_ids
         if self.config.rag_settings.multivector_enabled:
-            doc_ids = utils.get_doc_ids_from_manifest(self.config.rag_settings.collection_name)
+            doc_ids = utils.get_doc_ids_from_manifest(
+                self.config.rag_settings.collection_name)
             if self.config.rag_settings.database_exists and not doc_ids:
                 raise ValueError("Doc IDs not initialized")
             self.doc_ids = doc_ids
@@ -209,7 +212,7 @@ class Chatbot:
             inputs=self.config.rag_settings.inputs,
             collection_name=self.config.rag_settings.collection_name,
             doc_ids=self.doc_ids)
-        
+
         # Save current config to active.json
         self.config.save_to_json()
         return True
@@ -296,7 +299,9 @@ class Chatbot:
             child_docs.append(new_doc)
         return child_docs
 
-    def index_docs(self, processing_docs_fn=PROCESSING_DOCS_FN) -> list[Document]:
+    def index_docs(
+            self,
+            processing_docs_fn=PROCESSING_DOCS_FN) -> list[Document]:
         """
         Indexes documents for the vectorstore.
 
@@ -307,7 +312,9 @@ class Chatbot:
         inputs = self.config.rag_settings.inputs
         collection_name = self.config.rag_settings.collection_name
         # Check if collection exists
-        if utils.database_exists(collection_name, self.config.rag_settings.method):
+        if utils.database_exists(
+                collection_name,
+                self.config.rag_settings.method):
             raise ValueError(f"Collection {collection_name} already exists")
         docs = []
         for i in range(len(inputs)):
@@ -322,13 +329,14 @@ class Chatbot:
             print("Indexed", inputs[i])
 
         assert docs, "No documents to create collection"
-        if RAG_COLLECTION_TO_SYSTEM_MESSAGE.get(collection_name) == PROMPT_CHOOSER_SYSTEM_MESSAGE:
+        if RAG_COLLECTION_TO_SYSTEM_MESSAGE.get(
+                collection_name) == PROMPT_CHOOSER_SYSTEM_MESSAGE:
             if processing_docs_fn:
                 print("Prompt chooser detected, processing documents...")
                 docs = processing_docs_fn(docs)
         docs = split_documents(docs,
-                            self.config.rag_settings.chunk_size,
-                            self.config.rag_settings.chunk_overlap)
+                               self.config.rag_settings.chunk_size,
+                               self.config.rag_settings.chunk_overlap)
         if not docs:
             print('No documents generated!')
             return []
@@ -359,18 +367,23 @@ class Chatbot:
         if utils.database_exists(collection_name, method):
             print(f"Loading existing Vector DB: {collection_name}")
             if method == "chroma":
-                vectorstore = load_existing_chroma_vectorstore(collection_name, embedder)
+                vectorstore = load_existing_chroma_vectorstore(
+                    collection_name, embedder)
             elif method == "faiss":
-                vectorstore = load_existing_faiss_vectorstore(collection_name, embedder)
+                vectorstore = load_existing_faiss_vectorstore(
+                    collection_name, embedder)
             assert vectorstore is not None, "Collection exists but not loaded properly"
             if self.config.rag_settings.multivector_enabled:
                 docs = self.index_docs()
                 assert docs, "No documents to make parent docs"
                 print("Warning: Parent docs regenerated from inputs")
-                assert len(self.parent_docs) == len(self.doc_ids), "Parent docs and doc IDs do not match length"
+                assert len(
+                    self.parent_docs) == len(
+                    self.doc_ids), "Parent docs and doc IDs do not match length"
                 for doc in docs:
                     if doc.metadata["char_count"] > 20000:
-                        print('WARNING: Parent documents very long, split to avoid expensive large contexts')
+                        print(
+                            'WARNING: Parent documents very long, split to avoid expensive large contexts')
                 self.parent_docs = docs
             return vectorstore
         else:
@@ -379,19 +392,28 @@ class Chatbot:
             if self.config.rag_settings.multivector_enabled:
                 for doc in docs:
                     if doc.metadata["char_count"] > 20000:
-                        raise ValueError('Document too long, split before making child documents')
+                        raise ValueError(
+                            'Document too long, split before making child documents')
                 self.parent_docs = docs
-                self._set_doc_ids() # These are new doc IDs
+                self._set_doc_ids()  # These are new doc IDs
                 child_docs = self._get_child_docs()
                 docs = child_docs
             if method == "chroma":
-                vectorstore = get_chroma_vectorstore_from_docs(collection_name, embedder, docs)
+                vectorstore = get_chroma_vectorstore_from_docs(
+                    collection_name, embedder, docs)
             elif method == "faiss":
-                vectorstore = get_faiss_vectorstore_from_docs(collection_name, embedder, docs)
+                vectorstore = get_faiss_vectorstore_from_docs(
+                    collection_name, embedder, docs)
             assert vectorstore is not None, "Vectorstore not created properly"
             return vectorstore
-        
-    def run_eval_tests_on_vectorstore(self, vectorstore, similarity_query: str, criteria: str = "This document is about dolphins", k_excerpts: int = 1, enable_llm_eval: bool = False):
+
+    def run_eval_tests_on_vectorstore(
+            self,
+            vectorstore,
+            similarity_query: str,
+            criteria: str = "This document is about dolphins",
+            k_excerpts: int = 1,
+            enable_llm_eval: bool = False):
         """
         Runs evaluation tests on the vectorstore.
 
@@ -410,7 +432,8 @@ class Chatbot:
         if self.filter_topic is not None:
             filter = {"topic": self.filter_topic}
 
-        docs: list[Document] = vectorstore.similarity_search(similarity_query, k=k_excerpts, filter=filter)
+        docs: list[Document] = vectorstore.similarity_search(
+            similarity_query, k=k_excerpts, filter=filter)
         assert len(docs) == k_excerpts, f"Document count must be {k_excerpts}"
         print(len(docs), "documents found")
 
@@ -421,10 +444,12 @@ class Chatbot:
             char_count = doc.metadata.get("char_count")
 
             topic_string = f"(Topic: {topic})" if topic else ""
-            print(f"Document {index} ({source}) (Word count: {round(char_count/5)}) {topic_string}")
+            print(
+                f"Document {index} ({source}) (Word count: {round(char_count/5)}) {topic_string}")
             print_adjusted(doc.page_content)
             if char_count > 3000:
-                print(f"Warning: Document {index} ({source}) is {char_count} chars long!")
+                print(
+                    f"Warning: Document {index} ({source}) is {char_count} chars long!")
 
         if not enable_llm_eval:
             return
@@ -439,7 +464,8 @@ class Chatbot:
             index = docs[0].metadata["index"]
             new_index = index + 1 if index < len(docs) - 1 else index - 1
             temp_search_kwargs = {"k": 1, "filter": {"index": new_index}}
-            new_docs: list[Document] = vectorstore.similarity_search("", search_kwargs=temp_search_kwargs)
+            new_docs: list[Document] = vectorstore.similarity_search(
+                "", search_kwargs=temp_search_kwargs)
             if new_docs:
                 print_adjusted(new_docs[0].page_content)
                 eval_dict["excerpt"] = new_docs[0].page_content
@@ -477,7 +503,8 @@ class Chatbot:
             retriever = vectorstore.as_retriever(search_kwargs=search_kwargs)
             return retriever
 
-    def messages_to_string(self, messages: list[SystemMessage | AIMessage | HumanMessage]):
+    def messages_to_string(
+            self, messages: list[SystemMessage | AIMessage | HumanMessage]):
         message_string = ""
         for message in messages:
             if isinstance(message, SystemMessage):
@@ -719,7 +746,10 @@ class Chatbot:
         print("Command executed! (Return before this point.)")
         return
 
-    def get_chat_response(self, prompt: str, stream: bool = False) -> AIMessage | None:
+    def get_chat_response(
+            self,
+            prompt: str,
+            stream: bool = False) -> AIMessage | None:
         """
         Gets a chat response from the chat model.
 
@@ -755,7 +785,8 @@ class Chatbot:
                     print_adjusted(response)
                     response = AIMessage(content=response)
                 else:
-                    assert isinstance(response, AIMessage), "Response not AIMessage"
+                    assert isinstance(
+                        response, AIMessage), "Response not AIMessage"
                     print_adjusted(response.content)
         except KeyboardInterrupt:
             print('Keyboard interrupt, aborting generation.')

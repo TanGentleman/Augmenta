@@ -20,10 +20,14 @@ FLASHCARD_AI_ROOT = Path(__file__).resolve().parent
 
 
 # Configure logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-def generate_mapping_and_styles(data: List[Dict[str, Any]]) -> Tuple[Dict[str, str], List[Tuple[str, str]]]:
+
+def generate_mapping_and_styles(
+        data: List[Dict[str, Any]]) -> Tuple[Dict[str, str], List[Tuple[str, str]]]:
     """
     Generate field mapping and styles for flashcards based on the first item in the data.
 
@@ -38,21 +42,24 @@ def generate_mapping_and_styles(data: List[Dict[str, Any]]) -> Tuple[Dict[str, s
     """
     if not data:
         raise ValueError("Input data is empty")
-    
+
     first_item = data[0]
     if not isinstance(first_item, dict):
         raise ValueError("Data must be a list of dictionaries")
-    
+
     mapping = {f"field_{i}": key for i, key in enumerate(first_item.keys())}
     colors = list(ANSI_COLOR_NAMES.keys())[1:]  # Exclude 'default' color
-    styles = [(f"field_{i}", f"bold {colors[i % len(colors)]}") for i in range(len(mapping))]
-    
+    styles = [(f"field_{i}", f"bold {colors[i % len(colors)]}")
+              for i in range(len(mapping))]
+
     return mapping, styles
+
 
 class Flashcard:
     """Represents a flashcard with its data, field keys, and styles."""
 
-    def __init__(self, card_data: Dict[str, Any], keys: Dict[str, str], styles: List[Tuple[str, str]]):
+    def __init__(self, card_data: Dict[str, Any],
+                 keys: Dict[str, str], styles: List[Tuple[str, str]]):
         """
         Initialize a Flashcard instance.
 
@@ -62,23 +69,29 @@ class Flashcard:
             styles (List[Tuple[str, str]]): List of styles for each field.
         """
         self.original_card_data: Dict[str, Any] = card_data
-        self.card_data: Dict[str, str] = {key: str(value) for key, value in card_data.items()}
+        self.card_data: Dict[str, str] = {
+            key: str(value) for key, value in card_data.items()}
         self.keys: Dict[str, str] = keys
         self.styles: List[Tuple[str, str]] = styles
         self.cache_flashcard_types()
-    
+
     def cache_flashcard_types(self):
         """
         Cache the types of flashcard fields.
         """
-        self.field_types = {key: type(value) for key, value in self.card_data.items()}
+        self.field_types = {key: type(value)
+                            for key, value in self.card_data.items()}
         # Convert types to string representations
-        new_card_data = {key: str(value) for key, value in self.card_data.items()}
+        new_card_data = {key: str(value)
+                         for key, value in self.card_data.items()}
         self.original_card_data = self.card_data
         self.card_data = new_card_data
         # logger.warning(f"Field types have been converted. This means values are now compared to str(value). This may lead to unexpected behavior.")
 
-    def create_flashcard(self, panel_name: str = "Question", include_answer=False) -> Panel:
+    def create_flashcard(
+            self,
+            panel_name: str = "Question",
+            include_answer=False) -> Panel:
         """
         Create a panel representing the question side of the flashcard.
 
@@ -89,7 +102,7 @@ class Flashcard:
             Panel: A Rich Panel object containing the formatted question.
         """
         return self._create_panel(panel_name, include_answer=include_answer)
-    
+
     def create_answer(self) -> Panel:
         """
         Create a panel representing the answer side of the flashcard.
@@ -117,15 +130,24 @@ class Flashcard:
             if key_name:
                 if include_answer or key_name.lower() != 'answer':
                     if key_name == 'answer':
-                        logger.info(f"Exposed Answer: {self.card_data.get(key_name, 'N/A')}")
+                        logger.info(
+                            f"Exposed Answer: {self.card_data.get(key_name, 'N/A')}")
                     value = self.card_data.get(key_name, 'N/A')
                     flashcard_text.append(f"{key_name}: {value}", style=style)
                     if i < len(self.styles) - 1:
                         flashcard_text.append("\n")
-        return Panel(flashcard_text, title=title, border_style="cyan" if title == "Question" else "green",
-                     expand=False)
+        return Panel(
+            flashcard_text,
+            title=title,
+            border_style="cyan" if title == "Question" else "green",
+            expand=False)
 
-def display_flashcards(flashcards: List[Flashcard], panel_name: str = "Question", delay: float = 0.1, include_answer=False) -> None:
+
+def display_flashcards(
+        flashcards: List[Flashcard],
+        panel_name: str = "Question",
+        delay: float = 0.1,
+        include_answer=False) -> None:
     """
     Display a list of flashcards with a delay between each.
 
@@ -137,7 +159,9 @@ def display_flashcards(flashcards: List[Flashcard], panel_name: str = "Question"
         print(flashcard.create_flashcard(panel_name, include_answer))
         sleep(delay)
 
-def load_flashcards_from_json(file_path: str) -> Tuple[List[Flashcard], Dict[str, str], List[Tuple[str, str]]]:
+
+def load_flashcards_from_json(
+        file_path: str) -> Tuple[List[Flashcard], Dict[str, str], List[Tuple[str, str]]]:
     """
     Load flashcards from a JSON file.
 
@@ -156,11 +180,11 @@ def load_flashcards_from_json(file_path: str) -> Tuple[List[Flashcard], Dict[str
     try:
         with open(file_path, 'r') as file:
             data = json.load(file)
-        
+
         keys, styles = generate_mapping_and_styles(data)
         flashcards = [Flashcard(card, keys, styles) for card in data]
         return flashcards, keys, styles
-    
+
     except FileNotFoundError:
         logger.error(f"File not found: {file_path}")
         raise
@@ -174,7 +198,10 @@ def load_flashcards_from_json(file_path: str) -> Tuple[List[Flashcard], Dict[str
         logger.error(f"Unexpected error: {str(e)}")
         raise
 
-def save_flashcards_to_json(flashcards: List[Flashcard], file_path: str) -> None:
+
+def save_flashcards_to_json(
+        flashcards: List[Flashcard],
+        file_path: str) -> None:
     """
     Save flashcards to a JSON file.
 
@@ -193,6 +220,7 @@ def save_flashcards_to_json(flashcards: List[Flashcard], file_path: str) -> None
     except IOError as e:
         logger.error(f"Error saving flashcards to {file_path}: {str(e)}")
         raise
+
 
 if __name__ == "__main__":
     try:

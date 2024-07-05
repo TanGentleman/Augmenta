@@ -17,7 +17,7 @@ FLASHCARD_FILEPATH = ROOT / "flashcards.json"
 # DEFAULT_PROMPT = "Create a list of JSON flashcards with keys: term, definition, example for the Russian terms. The term and example sentence should appropriately be in Russian."
 DEFAULT_PROMPT = "The context is notes from a Russian class. Create comprehensive flashcards with the keys term, definition, and example. term, definition in russian, example in English."
 # prompt = "The context is notes from a Russian class. Create comprehensive flashcards with the keys term, definition, and example. term, definition in russian, example in English."
-FLASHCARD_SYSTEM_MESSAGE = """You are Flashcard AI. Use the document excerpts to generate a list of JSON flashcards. Example output: 
+FLASHCARD_SYSTEM_MESSAGE = """You are Flashcard AI. Use the document excerpts to generate a list of JSON flashcards. Example output:
 [
     {
         "term": "Python",
@@ -33,10 +33,12 @@ FLASHCARD_SYSTEM_MESSAGE = """You are Flashcard AI. Use the document excerpts to
 
 ENABLE_RAG = False
 
+
 class FlashcardSchema(BaseModel):
     term: str
     definition: str
     example: str
+
 
 def get_config() -> Config:
     config_override = dict(
@@ -63,14 +65,16 @@ def get_config() -> Config:
             assert all(isinstance(i, str) for i in inputs)
             RAG["inputs"] = inputs
         config_override["RAG"] = RAG
-    
+
     config = Config(config_override=config_override)
     return config
+
 
 def is_output_valid(response_object):
     if not isinstance(response_object, list):
         return False
-    # NOTE: The schema is not validated for the JSON response, only ensuring valid JSON.
+    # NOTE: The schema is not validated for the JSON response, only ensuring
+    # valid JSON.
     for item in response_object:
         try:
             continue
@@ -79,6 +83,7 @@ def is_output_valid(response_object):
             print(f"Error: {e}")
             return False
     return True
+
 
 def main(keys: dict[str, str]):
     config = get_config()
@@ -108,7 +113,9 @@ def main(keys: dict[str, str]):
             print("Reading from clipboard")
             # prompt = ".read"
             prompt = paste().strip()
-        messages = chatbot.chat(prompt_prefix + prompt, persistence_enabled=False)
+        messages = chatbot.chat(
+            prompt_prefix + prompt,
+            persistence_enabled=False)
         response_string = messages[-1].content
         # Check if the JSON output is valid
         response_object = JsonOutputParser().parse(response_string)
@@ -120,14 +127,15 @@ def main(keys: dict[str, str]):
             json.dump(response_object, file, indent=4)
 
         # Load the flashcards and display them
-        flashcards, keys, styles = load_flashcards_from_json(FLASHCARD_FILEPATH)
-        # 
+        flashcards, keys, styles = load_flashcards_from_json(
+            FLASHCARD_FILEPATH)
+        #
         display_flashcards(flashcards, "Flashcard")
         count += 1
         prompt = None
     # from pyperclip import copy
     # copy(str(response_object))
-    
+
 
 if __name__ == "__main__":
     # keys = {

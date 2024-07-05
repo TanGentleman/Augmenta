@@ -56,32 +56,36 @@ def route_topic_to_chain(info):
     else:
         return general_chain
 
-full_chain = {"topic": classifier_chain, "question": lambda x: x["question"]} | RunnableLambda(
-    route_topic_to_chain
-)
 
-def test_first_chain(query = SAMPLE_LLAMA_QUERY):
+full_chain = {
+    "topic": classifier_chain,
+    "question": lambda x: x["question"]} | RunnableLambda(route_topic_to_chain)
+
+
+def test_first_chain(query=SAMPLE_LLAMA_QUERY):
     if not query:
         print("No query provided")
         raise ValueError
     response_string = ""
     for chunk in classifier_chain.stream({"question": query}):
-        print(chunk, end = "")
+        print(chunk, end="")
         response_string += chunk
     print("\n")
     print("Passed!") if response_string else print("Failed!")
     return response_string
 
-def main(query = SAMPLE_QWEN_QUERY):
+
+def main(query=SAMPLE_QWEN_QUERY):
     if not query:
         print("No query provided")
         raise ValueError
     response_string = ""
     for chunk in full_chain.stream({"question": query}):
-        print(chunk.content, end = "")
+        print(chunk.content, end="")
         response_string += chunk.content
     print("\n")
     print("Passed!") if response_string else print("Failed!")
     return response_string
+
 
 main(SAMPLE_LLAMA_QUERY)

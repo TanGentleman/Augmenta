@@ -152,7 +152,8 @@ class RagSettings:
         self.k_excerpts = k_excerpts
         self.multivector_method = multivector_method
         if self.database_exists is None:
-            self.database_exists = utils.database_exists(collection_name, method)
+            self.database_exists = utils.database_exists(
+                collection_name, method)
         else:
             logger.warning("Found value for rag_settings.database_exists!")
 
@@ -580,7 +581,7 @@ class Config:
             self,
             config_override: dict | None = None,
             config_file="settings.json",):
-        
+
         config = utils.read_settings(config_file)
 
         if config_override is not None:
@@ -590,19 +591,23 @@ class Config:
                         config["RAG"][key] = config_override["RAG"][key]
                         logger.info(f"Rag config key {key} overridden")
                     else:
-                        raise ValueError(f"Key {key} not found in RAG settings")
+                        raise ValueError(
+                            f"Key {key} not found in RAG settings")
             if "chat" in config_override:
                 for key in config_override["chat"]:
                     if key in config["chat"]:
                         config["chat"][key] = config_override["chat"][key]
                         logger.info(f"Chat config key {key} overridden")
                     else:
-                        raise ValueError(f"Key {key} not found in chat settings")
+                        raise ValueError(
+                            f"Key {key} not found in chat settings")
         # Replace the LLM codes with the function name
         if config["chat"]["primary_model"] in MODEL_CODES:
-            config["chat"]["primary_model"] = MODEL_CODES[config["chat"]["primary_model"]]
+            config["chat"]["primary_model"] = MODEL_CODES[config["chat"]
+                                                          ["primary_model"]]
         if config["chat"]["backup_model"] in MODEL_CODES:
-            config["chat"]["backup_model"] = MODEL_CODES[config["chat"]["backup_model"]]
+            config["chat"]["backup_model"] = MODEL_CODES[config["chat"]
+                                                         ["backup_model"]]
         if config["RAG"]["rag_llm"] in MODEL_CODES:
             config["RAG"]["rag_llm"] = MODEL_CODES[config["RAG"]["rag_llm"]]
 

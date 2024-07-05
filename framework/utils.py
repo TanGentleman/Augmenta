@@ -15,6 +15,7 @@ CONFIG_DIR = ROOT / "config"
 DATA_DIR = ROOT / "data"
 DB_PATH = DATA_DIR / "databases"
 
+
 def copy_string_to_clipboard(string: str) -> str | None:
     """
     Copy a string to the clipboard.
@@ -29,7 +30,8 @@ def copy_string_to_clipboard(string: str) -> str | None:
     except ImportError:
         print("pyperclip is not installed. Install it using 'pip install pyperclip'")
         return None
-    
+
+
 def get_clipboard_contents() -> str | None:
     """
     Get the contents of the clipboard.
@@ -40,6 +42,7 @@ def get_clipboard_contents() -> str | None:
     except ImportError:
         print("pyperclip is not installed. Install it using 'pip install pyperclip'")
         return None
+
 
 def save_string_as_markdown_file(
         response_string: str,
@@ -72,6 +75,7 @@ def read_text_file(filename: str = "sample.txt") -> str:
     with open(filepath, "r") as file:
         print(f"Reading file: {filename}")
         return file.read()
+
 
 def read_sample():
     """
@@ -109,10 +113,13 @@ def clean_text(text):
     """
     # Replace multiple whitespace characters with a single space
     cleaned_text = regex_sub(r'\s+', ' ', text)
-    
+
     # Keep important symbols and punctuation, remove unwanted characters
-    cleaned_text = regex_sub(r'[^a-zA-Z0-9(),.!?;:\-@#$%^&*_+={}|[\]<>/`~ ]', '', cleaned_text)
-    
+    cleaned_text = regex_sub(
+        r'[^a-zA-Z0-9(),.!?;:\-@#$%^&*_+={}|[\]<>/`~ ]',
+        '',
+        cleaned_text)
+
     return cleaned_text
 
 
@@ -315,6 +322,7 @@ def update_manifest(
     with open(filepath, "w") as f:
         json_dump(data, f, indent=4)
     print("Updated manifest.json")
+
 
 def save_config_as_json(data, filename: str):
     """
