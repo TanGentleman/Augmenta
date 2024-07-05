@@ -1,33 +1,16 @@
-# This 
-from langchain_core.runnables import RunnablePassthrough
+# This file is for functions related to indexing documents and assembling RAG components
+from os.path import exists, join
+
 from langchain_core.documents import Document
-from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
-from helpers import clean_docs, database_exists, format_docs
-from constants import get_music_template, get_rag_template, get_summary_template, get_eval_template
-from config import EXPERIMENTAL_UNSTRUCTURED
-
-# This file is for loading documents and indexing them to a vectorstore
-
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import WebBaseLoader, TextLoader, NotebookLoader
-from langchain_core.documents import Document
-from langchain_community.vectorstores import Chroma
+from langchain_community.vectorstores import Chroma, FAISS
 from chromadb.config import Settings
-from os.path import exists, join
 from langchain_community.document_loaders import PyPDFLoader, ArxivLoader
-from langchain_community.vectorstores import FAISS
+
 from config import EXPERIMENTAL_UNSTRUCTURED, METADATA_MAP
 from constants import CHROMA_FOLDER, FAISS_FOLDER
-from helpers import database_exists
-
-# if EXPERIMENTAL_UNSTRUCTURED:
-#     try:
-#         from unstructured.cleaners.core import clean_extra_whitespace
-#         from langchain_community.document_loaders import UnstructuredPDFLoader
-#     except ImportError:
-#         print("ImportError: Unstructured functions in embed.py not be accessible")
-#         raise ValueError("Set EXPERIMENTAL_UNSTRUCTURED to False to continue")
-
+from helpers import clean_docs, database_exists
 
 def loader_from_arxiv_url(url: str) -> ArxivLoader:
     """
@@ -40,27 +23,6 @@ def loader_from_arxiv_url(url: str) -> ArxivLoader:
     doc_id = url.split("/")[-1].replace(".pdf", "")
     loader = ArxivLoader(query=doc_id)
     return loader
-
-
-# def loader_from_file_unstructured(filepath: str):
-#     """
-#     Load documents from any file, return List[Document]
-#     """
-#     assert filepath.endswith(
-#         ".pdf"), "Unstructured temporarily only supports PDFs"
-#     LOAD_ELEMENTS = False
-#     if LOAD_ELEMENTS:
-#         element_loader = UnstructuredPDFLoader(
-#             filepath,
-#             mode="elements",
-#             post_processors=[clean_extra_whitespace])
-#         loader = element_loader
-#     else:
-#         loader = UnstructuredPDFLoader(
-#             filepath,
-#             post_processors=[clean_extra_whitespace])
-#     return loader
-
 
 def loader_from_notebook_url(url: str) -> NotebookLoader:
     """
@@ -129,21 +91,6 @@ def documents_from_local_pdf(filepath) -> list[Document]:
     if not docs:
         raise ValueError(f"Failed to read PDF and return documents.")
     return docs
-
-
-# def documents_from_arbitrary_file(filepath: str) -> list[Document]:
-#     """
-#     Load a pdf from the "documents" folder
-#     Returns List[Document]
-#     """
-#     filepath = join("documents", filepath)
-#     assert exists(filepath), "Local file not found"
-#     element_loader = loader_from_file_unstructured(filepath)
-#     docs = element_loader.load()
-#     if not docs:
-#         raise ValueError(f"Did not get docs from local document at {filepath}")
-#     return docs
-
 
 def documents_from_text_file(filepath: str = "sample.txt") -> list[Document]:
     """
@@ -256,136 +203,6 @@ def load_existing_faiss_vectorstore(collection_name: str, embedder):
         filename, embedder, allow_dangerous_deserialization=True)
     return vectorstore
 
-
-def get_summary_chain(llm):
-    """
-    Returns a chain for summarization only.
-    Can be invoked, like `chain.invoke("Excerpt of long reading:...")` to get a response.
-    """
-    chain = (
-        {"excerpt": lambda x: x}
-        | get_summary_template()
-        | llm
-        | StrOutputParser()
-    )
-    return chain
-
-
-def eval_output_handler(output):
-    """
-    A JSON output parser that returns the response object.
-    """
-    def is_output_valid(output):
-        """
-        Checks if the output is valid.
-        """
-        structure_passed = bool(
-            "index" in output and "meetsCriteria" in output)
-        if structure_passed:
-            print("Meets criteria:", output["meetsCriteria"])
-        return structure_passed
-    try:
-        if isinstance(output, str):
-            output_string = output
-        else:
-            output_string = output.content
-        response_object = JsonOutputParser().parse(output_string)
-        if not is_output_valid(response_object):
-            raise ValueError("JSON output does not contain the required keys")
-    except BaseException:
-        raise ValueError("Eval chain did not return valid JSON")
-    # print("Output:", output)
-    # Perform JSON validation here
-    # This function can also redirect to the next step in the pipeline
-    return response_object
-
-
-def get_eval_chain(llm):
-    """
-    Returns a chain for evaluating a given excerpt.
-
-    This chain will NEED to be passed a dictionary with keys excerpt and criteria, not a string.
-    """
-    eval_prompt_template = get_eval_template()
-    chain = eval_prompt_template | llm | eval_output_handler
-    return chain
-
-
-def music_output_handler(output):
-    """
-    A parser that returns a list of dictionaries.
-
-    Each dictionary should have keys "title", "artist", and "album".
-    """
-    def is_output_valid(output):
-        """
-        Checks if the output is valid.
-        """
-        for item in output:
-            if not all(key in item for key in ["title", "artist", "album"]):
-                print(f"At least one song does not contain the required keys")
-                return False
-        return True
-
-    try:
-        if isinstance(output, str):
-            output_string = output
-        else:
-            output_string = output.content
-        print("Output:" + output_string)
-        response_object = JsonOutputParser().parse(output_string)
-        if not is_output_valid(response_object):
-            raise ValueError("JSON output is not valid")
-    except ValueError:
-        print("Music chain did not return valid JSON")
-        return None
-        # raise SystemExit("Music chain did not return valid JSON")
-    return response_object
-
-
-def get_music_chain(llm, few_shot_examples=None):
-    """
-    Returns a chain for the music pipeline.
-    """
-    music_prompt_template = get_music_template()
-    few_shot_string = ""
-    if few_shot_examples:
-        assert isinstance(few_shot_examples, list)
-        for example in few_shot_examples:
-            assert "input" in example and "output" in example
-            few_shot_string += f"input: {example['input']}\noutput: {example['output']}\n\n"
-    chain = (
-        {"input": RunnablePassthrough(), "few_shot_examples": lambda x: few_shot_string}
-        | music_prompt_template
-        | llm
-        | music_output_handler
-    )
-    return chain
-
-
-def get_rag_chain(
-        retriever,
-        llm,
-        format_fn=format_docs,
-        system_message: str | None = None):
-    """
-    Returns a chain for the RAG pipeline.
-
-    Can be invoked with a question, like `chain.invoke("How do I do x task using this framework?")` to get a response.
-    Inputs:
-    - retriever (contains vectorstore with documents) and llm
-    - format_fn (callable): A function that takes a list of Document objects and returns a string.
-    """
-    # Get prompt template
-    rag_prompt_template = get_rag_template(system_message)
-    chain = (
-        {"context": retriever | format_fn, "question": RunnablePassthrough()}
-        | rag_prompt_template
-        | llm
-    )
-    return chain
-
-
 def input_to_docs(input: str) -> list[Document]:
     """
     Converts the input to a list of documents.
@@ -469,3 +286,45 @@ def vectorstore_from_inputs(
             vectorstore.add_documents(docs)
     assert vectorstore is not None, "Vectorstore not initialized. Provide valid inputs."
     return vectorstore
+
+### DEPRECATED
+# if EXPERIMENTAL_UNSTRUCTURED:
+#     try:
+#         from unstructured.cleaners.core import clean_extra_whitespace
+#         from langchain_community.document_loaders import UnstructuredPDFLoader
+#     except ImportError:
+#         print("ImportError: Unstructured functions in embed.py not be accessible")
+#         raise ValueError("Set EXPERIMENTAL_UNSTRUCTURED to False to continue")
+
+
+# def loader_from_file_unstructured(filepath: str):
+#     """
+#     Load documents from any file, return List[Document]
+#     """
+#     assert filepath.endswith(
+#         ".pdf"), "Unstructured temporarily only supports PDFs"
+#     LOAD_ELEMENTS = False
+#     if LOAD_ELEMENTS:
+#         element_loader = UnstructuredPDFLoader(
+#             filepath,
+#             mode="elements",
+#             post_processors=[clean_extra_whitespace])
+#         loader = element_loader
+#     else:
+#         loader = UnstructuredPDFLoader(
+#             filepath,
+#             post_processors=[clean_extra_whitespace])
+#     return loader
+
+# def documents_from_arbitrary_file(filepath: str) -> list[Document]:
+#     """
+#     Load a pdf from the "documents" folder
+#     Returns List[Document]
+#     """
+#     filepath = join("documents", filepath)
+#     assert exists(filepath), "Local file not found"
+#     element_loader = loader_from_file_unstructured(filepath)
+#     docs = element_loader.load()
+#     if not docs:
+#         raise ValueError(f"Did not get docs from local document at {filepath}")
+#     return docs
