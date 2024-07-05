@@ -1,9 +1,19 @@
+
+import pyperclip
+try:
+    import gnureadline
+except ImportError:
+    pass
+from dotenv import load_dotenv
+load_dotenv()
+
 from uuid import uuid4
-from langchain.schema import SystemMessage, AIMessage, HumanMessage
+from langchain.schema import SystemMessage, AIMessage, HumanMessage, BaseMessage
 from langchain_community.vectorstores.chroma import Chroma
 from langchain_community.vectorstores.faiss import FAISS
 from langchain_core.vectorstores import VectorStoreRetriever
-from helpers import database_exists, get_db_collection_names, process_docs, get_doc_ids_from_manifest, save_response_to_markdown_file, save_history_to_markdown_file, read_sample, update_manifest
+from langchain.retrievers.multi_vector import MultiVectorRetriever
+from helpers import copy_string_to_clipboard, database_exists, get_clipboard_contents, get_db_collection_names, process_docs, get_doc_ids_from_manifest, save_string_as_markdown_file, read_sample, update_manifest
 from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SUMMARY_TEMPLATE, SYSTEM_MESSAGE_CODES
 from config import MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, EXPLAIN_EXCERPT, FILTER_TOPIC
 from classes import Config
@@ -14,23 +24,8 @@ from langchain_core.documents import Document
 from langchain.storage import InMemoryByteStore
 from os import get_terminal_size
 from textwrap import fill
-try:
-    import gnureadline
-except ImportError:
-    pass
-
-from langchain.retrievers.multi_vector import MultiVectorRetriever
-
-try:
-    from pyperclip import paste as clipboard_paste, copy as clipboard_copy
-    CLIPBOARD_ACCESS_ENABLED = True
-except ImportError:
-    print('pyperclip not installed, clipboard access disabled')
-    CLIPBOARD_ACCESS_ENABLED = False
-
 
 TERMINAL_WIDTH = get_terminal_size().columns
-
 
 def print_adjusted(
         text: str,
@@ -76,7 +71,7 @@ COMMAND_LIST = [
 
 class Chatbot:
     """
-    This class is an interactive RAG-capable chatbot.
+    An interactive RAG-capable chatbot class.
 
     Parameters:
     - config (Config, optional): The configuration object. Holds ChatSettings and RagSettings.
@@ -95,10 +90,30 @@ class Chatbot:
     - messages: The message history used in context for non-RAG chat.
 
     Methods:
-    - chat: The main chat loop. It's as simple as `from chat import Chatbot; Chatbot().chat()`
+    - chat: The main chat loop.
+    - ingest_documents: Initializes the retriever and RAG chain.
+    - refresh_config: Refreshes the configuration.
+    - _set_doc_ids: Sets document IDs.
+    - get_child_docs: Generates child documents.
+    - _get_vectorstore: Retrieves or creates a vectorstore.
+    - run_eval_tests_on_vectorstore: Runs evaluation tests on the vectorstore.
+    - get_retriever: Retrieves the retriever.
+    - messages_to_strings: Converts messages to strings.
+    - get_clipboard: Retrieves clipboard content.
+    - set_clipboard: Sets clipboard content.
+    - handle_command: Handles commands.
+    - get_chat_response: Gets a chat response.
+    - get_rag_response: Gets a RAG response.
+    - _pop_last_exchange: Deletes the last exchange.
     """
 
     def __init__(self, config=None):
+        """
+        Initializes the Chatbot with the given configuration.
+
+        Parameters:
+        - config (Config, optional): The configuration object. Defaults from settings.json if not provided.
+        """
         if config is None:
             config = Config()
 
@@ -122,41 +137,57 @@ class Chatbot:
             self.ingest_documents()
         else:
             self.chat_model = LLM(self.config.chat_settings.primary_model)
-            self.set_starting_messages()
+            self.set_messages()
 
-    def set_starting_messages(self):
+    def set_messages(self, messages: list[BaseMessage] | None = None):
+        """
+        Sets the starting messages based on the configuration.
+        """
+        if messages is not None:
+            assert isinstance(messages, list)
+            assert all(isinstance(m, BaseMessage) for m in messages)
+            self.messages = messages
+            self.count = len(messages) // 2
+            return
         messages = []
-        if self.config.rag_settings.rag_mode:
-            messages = []
-        else:
-            if self.config.chat_settings.enable_system_message:
-                messages.append(
-                    SystemMessage(
-                        content=self.config.chat_settings.system_message))
-            else:
-                print('System message is disabled')
-        self.messages = messages
         self.count = 0
+        if not self.config.rag_settings.rag_mode:
+            if self.config.chat_settings.enable_system_message:
+                messages.append(SystemMessage(content=self.config.chat_settings.system_message))
+            else:
+                print('System message disabled')
+        self.messages = messages
+        return
+
+    def _initialize_rag(self):
+        """
+        """
+        
 
     def ingest_documents(self):
         """
         Initializes the retriever and RAG chain.
 
         Raises:
-            ValueError: Doc ID not initialized
+            ValueError: If Doc ID is not initialized.
+            Exception: If RAG mode is not enabled.
         """
         if self.retriever is not None:
             print('Retriever already exists. Use "refresh" to clear it first')
             return
+        if not self.config.rag_settings.rag_mode:
+            print('RAG mode not enabled')
+            raise Exception('RAG mode not enabled')
         assert self.config.rag_settings.rag_mode, "RAG mode not enabled"
         self.rag_model = LLM(self.config.rag_settings.rag_llm)
-        # get doc_ids
+
+        # Get doc_ids
         if self.config.rag_settings.multivector_enabled:
-            doc_ids = get_doc_ids_from_manifest(
-                self.config.rag_settings.collection_name)
+            doc_ids = get_doc_ids_from_manifest(self.config.rag_settings.collection_name)
             if self.config.rag_settings.database_exists and not doc_ids:
                 raise ValueError("Doc IDs not initialized")
             self.doc_ids = doc_ids
+
         self.retriever = self.get_retriever()
         rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE.get(
             self.config.rag_settings.collection_name, "default")
@@ -164,19 +195,17 @@ class Chatbot:
             self.retriever,
             self.rag_model.llm,
             system_message=rag_system_message)
-
-        self.set_starting_messages()
+        self.set_messages()
         update_manifest(
             embedding_model_name=self.config.rag_settings.embedding_model.model_name,
             method=self.config.rag_settings.method,
             chunk_size=self.config.rag_settings.chunk_size,
             chunk_overlap=self.config.rag_settings.chunk_overlap,
             inputs=self.config.rag_settings.inputs,
-            # NOTE: These values can be wrong if a db is loaded after manifest was reset
-            # Afaik, there's no decent way to solve this, but it wouldn't affect a stable version
             collection_name=self.config.rag_settings.collection_name,
             doc_ids=self.doc_ids)
-        # Update active json file
+        
+        # Save current config to active.json
         self.config.save_to_json()
 
     def refresh_config(self, config: Config | None = None):
@@ -209,10 +238,10 @@ class Chatbot:
         else:
             self.chat_model = LLM(self.config.chat_settings.primary_model)
             self.backup_model = None
-            self.set_starting_messages()
+            self.set_messages()
             self.count = 0
 
-    def set_doc_ids(self):
+    def _set_doc_ids(self):
         assert self.config.rag_settings.rag_mode, "RAG mode must be on"
         assert self.config.rag_settings.multivector_enabled, "Multivector not enabled"
         assert self.parent_docs, "Parent docs not initialized"
@@ -223,7 +252,7 @@ class Chatbot:
             self.doc_ids = [str(uuid4()) for _ in self.parent_docs]
         assert self.doc_ids, "Doc IDs not created"
 
-    def get_child_docs(self):
+    def _get_child_docs(self) -> list[Document]:
         # This function has limits for doc count/size set in constants.py
         assert self.config.rag_settings.multivector_enabled, "Multivector not enabled"
         assert isinstance(
@@ -257,31 +286,76 @@ class Chatbot:
             child_docs.append(new_doc)
         return child_docs
 
-    def get_vectorstore(
-            self,
-            processing_docs_fn=PROCESSING_DOCS_FN) -> Chroma | FAISS:
-        # The processing_docs_fn can be used to format or clean up the
-        # documents before indexing.
+    def index_docs(self, processing_docs_fn=PROCESSING_DOCS_FN) -> list[Document]:
+        """
+        Indexes documents for the vectorstore.
+
+        Returns:
+            list[Document]: The indexed documents.
+        """
+        assert self.config.rag_settings.rag_mode, "RAG mode not enabled"
+        inputs = self.config.rag_settings.inputs
+        collection_name = self.config.rag_settings.collection_name
+        docs = []
+        for i in range(len(inputs)):
+            if not inputs[i]:
+                print(f'Input {i} is empty, skipping')
+                continue
+            new_docs = input_to_docs(inputs[i])
+            if not new_docs:
+                print(f'No documents found in input {i}')
+                continue
+            docs.extend(new_docs)
+            print("Indexed", inputs[i])
+
+        assert docs, "No documents to create collection"
+        if RAG_COLLECTION_TO_SYSTEM_MESSAGE.get(collection_name) == PROMPT_CHOOSER_SYSTEM_MESSAGE:
+            if processing_docs_fn:
+                print("Prompt chooser detected, processing documents...")
+                docs = processing_docs_fn(docs)
+        docs = split_documents(docs,
+                            self.config.rag_settings.chunk_size,
+                            self.config.rag_settings.chunk_overlap)
+        if self.config.rag_settings.multivector_enabled:
+            for doc in docs:
+                if doc.metadata["char_count"] > 20000:
+                    raise ValueError('Document too long, split before making child documents')
+            self.parent_docs = docs
+            self._set_doc_ids()
+            docs = self._get_child_docs()
+        return docs
+        
+
+    def _get_vectorstore(self, processing_docs_fn=PROCESSING_DOCS_FN) -> Chroma | FAISS:
+        """
+        Retrieves or creates a vectorstore.
+
+        Args:
+            processing_docs_fn (function, optional): Function to process documents before indexing.
+
+        Returns:
+            Chroma | FAISS: The vectorstore.
+
+        Raises:
+            AssertionError: If RAG mode is not enabled or embedding model is not an instance of LLM_FN.
+        """
         assert self.config.rag_settings.rag_mode, "RAG mode not enabled"
         collection_name = self.config.rag_settings.collection_name
         method = self.config.rag_settings.method
         embedding_model_fn = self.config.rag_settings.embedding_model
         assert isinstance(embedding_model_fn, LLM_FN)
-        # This is used instead of the LLM object
         embedder = embedding_model_fn.get_llm()
 
         vectorstore = None
         inputs = self.config.rag_settings.inputs
         docs = []
-        # If collection exists, load it
+
         if database_exists(collection_name, method):
             print(f"Loading existing Vector DB: {collection_name}")
             if method == "chroma":
-                vectorstore = load_existing_chroma_vectorstore(
-                    collection_name, embedder)
+                vectorstore = load_existing_chroma_vectorstore(collection_name, embedder)
             elif method == "faiss":
-                vectorstore = load_existing_faiss_vectorstore(
-                    collection_name, embedder)
+                vectorstore = load_existing_faiss_vectorstore(collection_name, embedder)
             assert vectorstore is not None, "Collection exists but not loaded properly"
             if self.config.rag_settings.multivector_enabled:
                 for i in range(len(inputs)):
@@ -291,69 +365,33 @@ class Chatbot:
                     docs.extend(input_to_docs(inputs[i]))
                 assert docs, "No documents to make parent docs"
                 docs = split_documents(docs,
-                                       self.config.rag_settings.chunk_size,
-                                       self.config.rag_settings.chunk_overlap)
-                # TODO: assertion to make sure parent docs are
-                # correctly formed
+                                    self.config.rag_settings.chunk_size,
+                                    self.config.rag_settings.chunk_overlap)
                 self.parent_docs = docs
-                assert len(
-                    self.parent_docs) == len(
-                    self.doc_ids), "Parent docs and doc IDs do not match length"
+                print("Warning: Parent docs regenerated from inputs")
+                assert len(self.parent_docs) == len(self.doc_ids), "Parent docs and doc IDs do not match length"
             return vectorstore
         else:
-            # Ingest documents
             print('No collection found, now ingesting documents')
-            for i in range(len(inputs)):
-                # In the future this can be parallelized
-                if not inputs[i]:
-                    print(f'Input {i} is empty, skipping')
-                    continue
-                new_docs = input_to_docs(inputs[i])
-                if not new_docs:
-                    print(f'No documents found in input {i}')
-                    continue
-                docs.extend(new_docs)
-                print("Indexed", inputs[i])
-
-            assert docs, "No documents to create collection"
-            if RAG_COLLECTION_TO_SYSTEM_MESSAGE.get(
-                    collection_name) == PROMPT_CHOOSER_SYSTEM_MESSAGE:
-                # This is for indexing anthropic url prompt library data
-                if processing_docs_fn:
-                    print("Prompt chooser detected, processing documents...")
-                    docs = processing_docs_fn(docs)
-            docs = split_documents(docs,
-                                   self.config.rag_settings.chunk_size,
-                                   self.config.rag_settings.chunk_overlap)
-            if self.config.rag_settings.multivector_enabled:
-                # Make sure the parent docs aren't too wordy
-                for doc in docs:
-                    # This number is arbitrary for now
-                    if doc.metadata["char_count"] > 20000:
-                        raise ValueError(
-                            'Document too long, split before making child documents')
-
-                self.parent_docs = docs
-                # Add child docs to vectorstore instead
-                self.set_doc_ids()
-                docs = self.get_child_docs()
+            docs = self.index_docs()
             if method == "chroma":
-                vectorstore = get_chroma_vectorstore_from_docs(
-                    collection_name, embedder, docs)
+                vectorstore = get_chroma_vectorstore_from_docs(collection_name, embedder, docs)
             elif method == "faiss":
-                vectorstore = get_faiss_vectorstore_from_docs(
-                    collection_name, embedder, docs)
+                vectorstore = get_faiss_vectorstore_from_docs(collection_name, embedder, docs)
             assert vectorstore is not None, "Vectorstore not created properly"
             return vectorstore
+        
+    def run_eval_tests_on_vectorstore(self, vectorstore, similarity_query: str, criteria: str = "This document is about dolphins", k_excerpts: int = 1, enable_llm_eval: bool = False):
+        """
+        Runs evaluation tests on the vectorstore.
 
-    def run_eval_tests_on_vectorstore(
-            self,
-            vectorstore,
-            similarity_query: str,
-            criteria: str = "This document is about dolphins",
-            k_excerpts: int = 1,
-            enable_llm_eval: bool = False):
-        # This function is for testing purposes
+        Args:
+            vectorstore: The vectorstore to evaluate.
+            similarity_query (str): The query to retrieve similar documents.
+            criteria (str, optional): The criteria to evaluate the document. Defaults to "This document is about dolphins".
+            k_excerpts (int, optional): Number of excerpts to retrieve. Defaults to 1.
+            enable_llm_eval (bool, optional): Whether to enable LLM evaluation. Defaults to False.
+        """
         if not criteria:
             print("Error: Criteria not provided")
             criteria = "This document is about dolphins"
@@ -362,14 +400,10 @@ class Chatbot:
         if self.filter_topic is not None:
             filter = {"topic": self.filter_topic}
 
-        # This is a test for similarity search
-        docs = vectorstore.similarity_search(
-            similarity_query, k=k_excerpts, filter=filter)
-        # print(docs[0])
-        # There should only be one document
+        docs = vectorstore.similarity_search(similarity_query, k=k_excerpts, filter=filter)
         assert len(docs) == k_excerpts, f"Document count must be {k_excerpts}"
         print(len(docs), "documents found")
-        # Optional scan through documents
+
         for doc in docs:
             index = doc.metadata.get("index")
             source = doc.metadata.get("source")
@@ -377,41 +411,40 @@ class Chatbot:
             char_count = doc.metadata.get("char_count")
 
             topic_string = f"(Topic: {topic})" if topic else ""
-            print(
-                f"Document {index} ({source}) (Word count: {round(char_count/5)}) {topic_string}")
+            print(f"Document {index} ({source}) (Word count: {round(char_count/5)}) {topic_string}")
             print_adjusted(doc.page_content)
             if char_count > 3000:
-                print(
-                    f"Warning: Document {index} ({source}) is {char_count} chars long!")
-        # This is a test for evaluation
-        assert isinstance(self.rag_model, LLM), "RAG LLM not initialized"
+                print(f"Warning: Document {index} ({source}) is {char_count} chars long!")
+
         if not enable_llm_eval:
             return
+
         print('\n\nGetting evaluation from criteria!')
         eval_chain = get_eval_chain(self.rag_model.llm)
-        eval_dict = {
-            "excerpt": docs[0].page_content,
-            "criteria": criteria}
+        eval_dict = {"excerpt": docs[0].page_content, "criteria": criteria}
         res = eval_chain.invoke(eval_dict)
         print(res)
         if res["meetsCriteria"] is True:
             print("Now fetching neighbor document chunk")
             index = docs[0].metadata["index"]
-            # Get next document unless it's the last one, then get the last one
             new_index = index + 1 if index < len(docs) - 1 else index - 1
             temp_search_kwargs = {"k": 1, "filter": {"index": new_index}}
-            new_docs = vectorstore.similarity_search(
-                "", search_kwargs=temp_search_kwargs)
+            new_docs = vectorstore.similarity_search("", search_kwargs=temp_search_kwargs)
             if new_docs:
                 print_adjusted(new_docs[0].page_content)
                 eval_dict["excerpt"] = new_docs[0].page_content
                 new_res = eval_chain.invoke(eval_dict)
                 print(new_res)
         print('yay!')
-        return
 
     def get_retriever(self) -> MultiVectorRetriever | VectorStoreRetriever:
-        vectorstore = self.get_vectorstore()
+        """
+        Retrieves the retriever for the chatbot.
+
+        Returns:
+        - MultiVectorRetriever | VectorStoreRetriever: The retriever object.
+        """
+        vectorstore = self._get_vectorstore()
         # self.run_eval_tests_on_vectorstore(vectorstore)
         search_kwargs = {}
         search_kwargs["k"] = self.config.rag_settings.k_excerpts
@@ -434,25 +467,26 @@ class Chatbot:
             retriever = vectorstore.as_retriever(search_kwargs=search_kwargs)
             return retriever
 
-    def messages_to_strings(self, messages):
-        messages = [msg.type.upper() + ": " + msg.content for msg in messages]
-        return messages
+    def messages_to_string(self, messages: list[SystemMessage | AIMessage | HumanMessage]):
+        message_string = ""
+        for message in messages:
+            if isinstance(message, SystemMessage):
+                message_string += f"SYSTEM: {message.content}\n"
+            elif isinstance(message, AIMessage):
+                message_string += f"AI: {message.content}\n"
+            elif isinstance(message, HumanMessage):
+                message_string += f"HUMAN: {message.content}\n"
+        return message_string
 
     def get_clipboard(self) -> str | None:
-        if CLIPBOARD_ACCESS_ENABLED:
-            prompt = clipboard_paste().strip()
-            return prompt
-        return None
+        return get_clipboard_contents()
 
     def set_clipboard(self, text: str) -> None:
-        if CLIPBOARD_ACCESS_ENABLED:
-            clipboard_copy(text)
-            print('Copied response to clipboard')
-        else:
-            print('Clipboard access disabled')
+        return copy_string_to_clipboard()
 
     def handle_command(self, prompt):
         assert prompt in COMMAND_LIST, "Invalid command"
+        print("Executing command")
         if prompt == "del":
             self._pop_last_exchange()
             return
@@ -488,16 +522,14 @@ class Chatbot:
             if len(self.messages) < 2:
                 print('No responses to save')
                 return
-            save_response_to_markdown_file(self.messages[-1].content)
+            save_string_as_markdown_file(self.messages[-1].content)
             # TODO: Modify this to work with RAG mode
             print('Saved response to response.md')
             return
         elif prompt == "saveall":
-            message_strings = self.messages_to_strings(self.messages)
-            save_history_to_markdown_file(message_strings)
+            message_string = self.messages_to_string(self.messages)
+            save_string_as_markdown_file(message_string)
             print(f'Saved {self.count} exchanges to history.md')
-            for message in message_strings:
-                print_adjusted(f"{message}\n\n")
             return
         elif prompt == "info":
             print(f'RAG mode: {self.config.rag_settings.rag_mode}')
@@ -550,7 +582,7 @@ class Chatbot:
             # TODO: Check if side effects are necessary here
             self.retriever = None
             self.rag_chain = None
-            self.set_starting_messages()
+            self.set_messages()
             return
         elif prompt == ".s":
             if self.config.rag_settings.rag_mode:
@@ -565,6 +597,12 @@ class Chatbot:
                 'Enter a code or type a system message: ')
             if not user_system_message:
                 print('No input given, try again')
+                return
+            if user_system_message == "None":
+                self.config.chat_settings.enable_system_message = False
+                print('System message disabled')
+                self.messages = []
+                self.count = 0
                 return
             # Check against SYSTEM_MESSAGE_CODES
             if user_system_message in SYSTEM_MESSAGE_CODES:
@@ -645,6 +683,7 @@ class Chatbot:
                         self.messages.pop(start)
                         self.count -= i % 2
                     print('Deleted exchanges')
+                    return
                 else:
                     index = int(index)
                     if index <= 0 or index > len(self.messages) // 2:
@@ -661,23 +700,33 @@ class Chatbot:
                     self.messages.pop(index_to_pop)
                     self.count -= 1
                     print('Deleted exchange')
+                    return
             except ValueError:
                 print('Invalid input')
         else:
             print('Invalid command: ', prompt)
             return
+        print("Command executed! (Return before this point.)")
+        return
 
-    def is_ollama_model(self, model_name: str) -> bool:
-        return model_name in ["local-ollama3", "mistral:7b-instruct-v0.3-q6_K"]
+    def get_chat_response(self, prompt: str, stream: bool = False) -> AIMessage | None:
+        """
+        Gets a chat response from the chat model.
 
-    def get_chat_response(self, prompt: str, stream: bool = False):
+        Args:
+        - prompt (str): The user's input prompt.
+        - stream (bool): Whether to stream the response.
+
+        Returns:
+        - AIMessage: The AI's response message.
+        """
         assert self.chat_model is not None, "Chat model not initialized"
         self.messages.append(HumanMessage(content=prompt))
         print(f'Fetching response #{self.count + 1}!')
         try:
             if stream:
                 response_string = ""
-                if self.is_ollama_model(self.chat_model.model_name):
+                if self.chat_model.is_ollama:
                     for chunk in self.chat_model.stream(self.messages):
                         print(chunk, end="", flush=True)
                         response_string += chunk
@@ -691,22 +740,21 @@ class Chatbot:
                 response = AIMessage(content=response_string)
             else:
                 response = self.chat_model.invoke(self.messages)
-                if self.is_ollama_model(self.chat_model.model_name):
+                if self.chat_model.is_ollama:
                     assert isinstance(response, str), "Response not str"
                     print_adjusted(response)
                     response = AIMessage(content=response)
                 else:
-                    assert isinstance(
-                        response, AIMessage), "Response not AIMessage"
+                    assert isinstance(response, AIMessage), "Response not AIMessage"
                     print_adjusted(response.content)
         except KeyboardInterrupt:
             print('Keyboard interrupt, aborting generation.')
             self.messages.pop()
-            return
+            return None
         except Exception as e:
             print(f'Error!: {e}')
             self.messages.pop()
-            return
+            return None
         self.messages.append(response)
         self.count += 1
         return response
@@ -719,7 +767,7 @@ class Chatbot:
         try:
             if stream:
                 response_string = ""
-                if self.is_ollama_model(self.rag_model.model_name):
+                if self.rag_model.is_ollama:
                     for chunk in self.rag_chain.stream(prompt):
                         print(chunk, end="", flush=True)
                         response_string += chunk
@@ -731,7 +779,7 @@ class Chatbot:
                 response = AIMessage(content=response_string)
             else:
                 response = self.rag_chain.invoke(prompt)
-                if self.is_ollama_model(self.rag_model.model_name):
+                if self.rag_model.is_ollama:
                     assert isinstance(response, str), "Response not str"
                     print_adjusted(response)
                     response = AIMessage(content=response)
@@ -751,6 +799,16 @@ class Chatbot:
         return response
 
     def chat(self, prompt=None, persistence_enabled=True):
+        """
+        Main chat loop for the chatbot.
+
+        Args:
+        - prompt (str, optional): Initial prompt for the chatbot.
+        - persistence_enabled (bool): Whether to enable persistent chat mode.
+
+        Returns:
+        - list: The message history.
+        """
         force_prompt = False
         forced_prompt = ""
         save_response = False
@@ -786,6 +844,8 @@ class Chatbot:
                     # Read sample.txt as prompt
                     # TODO: Add some checks for string content of sample.txt
                     prompt = read_sample()
+                else:
+                    print('Reformatting command not yet implemented in .chat method')
                 # Do not continue here
             stripped_prompt = prompt.strip()
             if not stripped_prompt:
@@ -805,8 +865,9 @@ class Chatbot:
             else:
                 self.get_chat_response(prompt, stream=True)
         if save_response:
-            save_response_to_markdown_file(self.messages[-1].content)
+            save_string_as_markdown_file(self.messages[-1].content)
             print('Saved response to response.md')
+        return self.messages
 
     def _pop_last_exchange(self):
         if len(self.messages) < 2:
