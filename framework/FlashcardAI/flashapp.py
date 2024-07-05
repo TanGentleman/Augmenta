@@ -417,7 +417,10 @@ class FlashcardManager(FlashcardManagerProtocol):
 class KeyboardHandler:
     def __init__(self, app: 'FlashcardApp'):
         self.app = app
+        # NOTE: Key bindings MUST be in all caps
         self.key_bindings: Dict[str, Tuple[Callable[[], bool], str]] = {
+            'HELP': (self.app.toggle_menu_bar, "Toggle Menu Bar"),
+            'H': (self.app.print_help, "Help"),
             'N': (self.app.next_card, "Next Card"),
             'P': (self.app.previous_card, "Previous Card"),
             'S': (self.app.toggle_answer, "Show/Hide Answer"),
@@ -449,7 +452,7 @@ class LayoutConfig:
         self.show_card_count = True
         self.show_flashcard = True
         self.show_answer = True
-        self.show_menu = True
+        self.show_menu = False
 
 
 class FlashcardApp:
@@ -470,6 +473,7 @@ class FlashcardApp:
     def save_flashcards(self, file_path: str) -> None:
         self.flashcard_manager.save_flashcards(file_path)
 
+    @typechecked
     def toggle_layout_element(self, element: str) -> None:
         if hasattr(self.layout_config, element):
             setattr(
@@ -483,6 +487,11 @@ class FlashcardApp:
         else:
             console.print(
                 f"[bold red]Invalid layout element: {element}[/bold red]")
+
+    def toggle_menu_bar(self) -> bool:
+        self.layout_config.show_menu = not self.layout_config.show_menu # Toggle menu bar
+        self.force_refresh = True
+        return False
 
     def configure_layout(self) -> None:
         while True:
@@ -513,6 +522,15 @@ class FlashcardApp:
                 break
 
             TypedPrompt.ask("Press Enter to continue", str)
+
+    def print_help(self) -> bool:
+        console.print(
+            Panel(
+                self.create_menu(
+                    condense=False),
+                title="Keyboard Shortcuts",
+                border_style="blue"))
+        return False
 
     def next_card(self) -> bool:
         self.flashcard_manager.next_card()
@@ -718,7 +736,7 @@ class FlashcardApp:
                 for option in menu_options:
                     console.print(option)
             choice = TypedPrompt.ask(
-                "Choose an option", str, choices=[
+                "Press a key (h: Help, q: Quit):", str, choices=[
                     key.lower() for key in self.keyboard_handler.key_bindings.keys()])
             choice = choice.upper()
             if choice == 'Q':  # Quit
