@@ -17,10 +17,10 @@
         "multivector_method": "summary"
     },
     "chat": {
-        "primary_model": "code",
+        "primary_model": "local",
         "backup_model": "llama",
-        "enable_system_message": true,
-        "system_message": "You are a helpful AI."
+        "enable_system_message": false,
+        "system_message": "You are working on Augmenta AI. This is a framework for LLM and RAG pipelines. You are currently iterating on chat.py."
     },
     "hyperparameters": {
         "max_tokens": 1000,
