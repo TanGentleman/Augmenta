@@ -91,7 +91,7 @@ class Chatbot:
 
     Methods:
     - chat: The main chat loop.
-    - ingest_documents: Initializes the retriever and RAG chain.
+    - initialize_rag: Initializes the retriever and RAG chain.
     - refresh_config: Refreshes the configuration.
     - _set_doc_ids: Sets document IDs.
     - get_child_docs: Generates child documents.
@@ -134,7 +134,7 @@ class Chatbot:
         self.messages = []
 
         if self.config.rag_settings.rag_mode:
-            self.ingest_documents()
+            self.initialize_rag()
         else:
             self.chat_model = LLM(self.config.chat_settings.primary_model)
             self.set_messages()
@@ -149,22 +149,19 @@ class Chatbot:
             self.messages = messages
             self.response_count = len(messages) // 2
             return
+        
         messages = []
-        self.response_count = 0
         if not self.config.rag_settings.rag_mode:
             if self.config.chat_settings.enable_system_message:
                 messages.append(SystemMessage(content=self.config.chat_settings.system_message))
             else:
                 print('System message disabled')
+
         self.messages = messages
+        self.response_count = 0
         return
 
-    def _initialize_rag(self):
-        """
-        """
-        
-
-    def ingest_documents(self):
+    def initialize_rag(self):
         """
         Initializes the retriever and RAG chain.
 
@@ -208,6 +205,18 @@ class Chatbot:
         # Save current config to active.json
         self.config.save_to_json()
 
+    def refresh_rag_state(self):
+        """
+        Refreshes the RAG state.
+        """
+        if not self.config.rag_settings.rag_mode:
+            print('RAG mode not enabled')
+        self.retriever = None
+        self.rag_chain = None
+        self.doc_ids = []
+        self.parent_docs = None
+        self.set_messages()
+
     def refresh_config(self, config: Config | None = None):
         """
         Refreshes the configuration.
@@ -223,21 +232,13 @@ class Chatbot:
             config_override["RAG"]["rag_mode"] = self.config.rag_settings.rag_mode
             config = Config(config_override=config_override)
         self.config = config
+        self.chat_model = None
         self.backup_model = None
-        self.retriever = None
-        self.rag_chain = None
-        self.doc_ids = []
-        self.parent_docs = None
 
         if self.config.rag_settings.rag_mode:
-            # NOTE: I may have to set self.chat_model = None here. Not sure if
-            # it's necessary.
-            self.ingest_documents()
-            self.chat_model = None
-            self.backup_model = None
+            self.initialize_rag()
         else:
             self.chat_model = LLM(self.config.chat_settings.primary_model)
-            self.backup_model = None
             self.set_messages()
             self.response_count = 0
 
@@ -364,7 +365,7 @@ class Chatbot:
                 self.parent_docs = docs
             return vectorstore
         else:
-            print('No collection found, now ingesting documents')
+            print('No collection found, now indexing documents')
             docs = self.index_docs()
             if self.config.rag_settings.multivector_enabled:
                 for doc in docs:
@@ -569,7 +570,7 @@ class Chatbot:
                     'Already in RAG mode. Type reg to switch back to chat mode, or refresh to reload the configuration')
                 return
             self.config.rag_settings.rag_mode = True
-            self.ingest_documents()
+            self.initialize_rag()
             return
         elif prompt == "reg":
             if not self.config.rag_settings.rag_mode:
