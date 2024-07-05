@@ -23,7 +23,6 @@ class SimpleChain:
         """
         return self.chain.stream(input_data)
 
-
 class RAGChain(SimpleChain):
     """
     A chain that can be used to interact with the RAG pipeline.
@@ -59,37 +58,34 @@ def get_object_from_response(string: str, validity_fn: Callable[[dict], bool] | 
             if structure_passed:
                 print("Meets criteria:", output_object["meetsCriteria"])
             return structure_passed
+        print("No validity function provided. Using default.")
         validity_fn = is_output_valid
     try:
         response_object = JsonOutputParser().parse(string)
+        print("Checking validity of response object")
         if not validity_fn(response_object):
+            print("JSON output does not contain the required keys")
             raise ValueError("JSON output does not contain the required keys")
     except ValueError:
         raise ValueError("Eval chain did not return valid JSON")
     # print("Output:", output)
     return response_object
 
-def get_summary_chain(llm) -> SimpleChain:
-    """
-    Returns a chain for summarization only.
-    Can be invoked, like `chain.invoke("Excerpt of long reading:...")` to get a response.
-    """
-    chain = SimpleChain(
-        {"excerpt": lambda x: x}
-        | get_summary_template()
-        | llm
-        | StrOutputParser()
-    )
-    return chain
 
-def get_eval_chain(llm):
+def get_eval_chain(llm, validity_fn: Callable[[dict], bool] | None = None) -> SimpleChain:
     """
     Returns a chain for evaluating a given excerpt.
 
     This chain will NEED to be passed a dictionary with keys excerpt and criteria, not a string.
     """
     eval_prompt_template = get_eval_template()
-    chain = SimpleChain(eval_prompt_template | llm | StrOutputParser | get_object_from_response)
+    # How can I pass the validity function to get_object_from_response
+    # and then use it in the chain?
+    # Response: I can pass it as an argument to the function.
+
+    {"first_string": eval_prompt_template | llm | StrOutputParser() }
+
+    chain = SimpleChain(eval_prompt_template | llm | StrOutputParser() | (lambda x: get_object_from_response(string = x, validity_fn = validity_fn)))
     return chain
 
 def music_output_handler(response_string: str):
@@ -148,5 +144,18 @@ def get_rag_chain(
         {"context": retriever | format_fn, "question": RunnablePassthrough()}
         | rag_prompt_template
         | llm
+    )
+    return chain
+
+def get_summary_chain(llm) -> SimpleChain:
+    """
+    Returns a chain for summarization only.
+    Can be invoked, like `chain.invoke("Excerpt of long reading:...")` to get a response.
+    """
+    chain = SimpleChain(
+        {"excerpt": lambda x: x}
+        | get_summary_template()
+        | llm
+        | StrOutputParser()
     )
     return chain
