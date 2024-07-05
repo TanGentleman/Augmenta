@@ -98,7 +98,7 @@ class Chatbot:
     - _get_vectorstore: Retrieves or creates a vectorstore.
     - run_eval_tests_on_vectorstore: Runs evaluation tests on the vectorstore.
     - get_retriever: Retrieves the retriever.
-    - messages_to_strings: Converts messages to strings.
+    - messages_to_string: Converts messages to a single string.
     - get_clipboard: Retrieves clipboard content.
     - set_clipboard: Sets clipboard content.
     - handle_command: Handles commands.
@@ -129,7 +129,7 @@ class Chatbot:
         self.doc_ids = []
         self.rag_chain = None
         self.retriever = None
-        self.count = 0
+        self.response_count = 0
         self.exit = False
         self.messages = []
 
@@ -147,10 +147,10 @@ class Chatbot:
             assert isinstance(messages, list)
             assert all(isinstance(m, BaseMessage) for m in messages)
             self.messages = messages
-            self.count = len(messages) // 2
+            self.response_count = len(messages) // 2
             return
         messages = []
-        self.count = 0
+        self.response_count = 0
         if not self.config.rag_settings.rag_mode:
             if self.config.chat_settings.enable_system_message:
                 messages.append(SystemMessage(content=self.config.chat_settings.system_message))
@@ -239,7 +239,7 @@ class Chatbot:
             self.chat_model = LLM(self.config.chat_settings.primary_model)
             self.backup_model = None
             self.set_messages()
-            self.count = 0
+            self.response_count = 0
 
     def _set_doc_ids(self):
         assert self.config.rag_settings.rag_mode, "RAG mode must be on"
@@ -296,6 +296,9 @@ class Chatbot:
         assert self.config.rag_settings.rag_mode, "RAG mode not enabled"
         inputs = self.config.rag_settings.inputs
         collection_name = self.config.rag_settings.collection_name
+        # Check if collection exists
+        if database_exists(collection_name, self.config.rag_settings.method):
+            raise ValueError(f"Collection {collection_name} already exists")
         docs = []
         for i in range(len(inputs)):
             if not inputs[i]:
@@ -316,12 +319,17 @@ class Chatbot:
         docs = split_documents(docs,
                             self.config.rag_settings.chunk_size,
                             self.config.rag_settings.chunk_overlap)
+        if not docs:
+            print('No documents generated!')
+            return []
+        return docs
         if self.config.rag_settings.multivector_enabled:
+            # This should only be if the DB does not exist
             for doc in docs:
                 if doc.metadata["char_count"] > 20000:
                     raise ValueError('Document too long, split before making child documents')
             self.parent_docs = docs
-            self._set_doc_ids()
+            self._set_doc_ids() # These are new doc IDs
             docs = self._get_child_docs()
         return docs
         
@@ -347,8 +355,6 @@ class Chatbot:
         embedder = embedding_model_fn.get_llm()
 
         vectorstore = None
-        inputs = self.config.rag_settings.inputs
-        docs = []
 
         if database_exists(collection_name, method):
             print(f"Loading existing Vector DB: {collection_name}")
@@ -358,22 +364,23 @@ class Chatbot:
                 vectorstore = load_existing_faiss_vectorstore(collection_name, embedder)
             assert vectorstore is not None, "Collection exists but not loaded properly"
             if self.config.rag_settings.multivector_enabled:
-                for i in range(len(inputs)):
-                    if not inputs[i]:
-                        print(f'Input {i} is empty, skipping')
-                        continue
-                    docs.extend(input_to_docs(inputs[i]))
+                docs = self.index_docs()
                 assert docs, "No documents to make parent docs"
-                docs = split_documents(docs,
-                                    self.config.rag_settings.chunk_size,
-                                    self.config.rag_settings.chunk_overlap)
-                self.parent_docs = docs
                 print("Warning: Parent docs regenerated from inputs")
                 assert len(self.parent_docs) == len(self.doc_ids), "Parent docs and doc IDs do not match length"
+                for doc in docs:
+                    if doc.metadata["char_count"] > 20000:
+                        raise ValueError('Document too long, split before making child documents')
+                self.parent_docs = docs
             return vectorstore
         else:
             print('No collection found, now ingesting documents')
             docs = self.index_docs()
+            if self.config.rag_settings.multivector_enabled:
+                self.parent_docs = docs
+                self._set_doc_ids() # These are new doc IDs
+                child_docs = self._get_child_docs()
+                docs = child_docs
             if method == "chroma":
                 vectorstore = get_chroma_vectorstore_from_docs(collection_name, embedder, docs)
             elif method == "faiss":
@@ -400,7 +407,7 @@ class Chatbot:
         if self.filter_topic is not None:
             filter = {"topic": self.filter_topic}
 
-        docs = vectorstore.similarity_search(similarity_query, k=k_excerpts, filter=filter)
+        docs: list[Document] = vectorstore.similarity_search(similarity_query, k=k_excerpts, filter=filter)
         assert len(docs) == k_excerpts, f"Document count must be {k_excerpts}"
         print(len(docs), "documents found")
 
@@ -529,12 +536,12 @@ class Chatbot:
         elif prompt == "saveall":
             message_string = self.messages_to_string(self.messages)
             save_string_as_markdown_file(message_string)
-            print(f'Saved {self.count} exchanges to history.md')
+            print(f'Saved {self.response_count} exchanges to history.md')
             return
         elif prompt == "info":
             print(f'RAG mode: {self.config.rag_settings.rag_mode}')
             if self.config.rag_settings.rag_mode is False:
-                print(f'Exchanges: {self.count}')
+                print(f'Exchanges: {self.response_count}')
                 if self.config.chat_settings.enable_system_message:
                     print(
                         f'System message: {self.config.chat_settings.system_message}')
@@ -602,7 +609,7 @@ class Chatbot:
                 self.config.chat_settings.enable_system_message = False
                 print('System message disabled')
                 self.messages = []
-                self.count = 0
+                self.response_count = 0
                 return
             # Check against SYSTEM_MESSAGE_CODES
             if user_system_message in SYSTEM_MESSAGE_CODES:
@@ -612,7 +619,7 @@ class Chatbot:
             self.messages = [
                 SystemMessage(
                     content=user_system_message)]
-            self.count = 0
+            self.response_count = 0
             print('Chat history cleared')
             return
         elif prompt == ".names":
@@ -681,7 +688,7 @@ class Chatbot:
                         end = (end * 2 - 1)
                     for i in range(start, end + 1):
                         self.messages.pop(start)
-                        self.count -= i % 2
+                        self.response_count -= i % 2
                     print('Deleted exchanges')
                     return
                 else:
@@ -698,7 +705,7 @@ class Chatbot:
                         index_to_pop = (index * 2 - 2)
                     self.messages.pop(index_to_pop)
                     self.messages.pop(index_to_pop)
-                    self.count -= 1
+                    self.response_count -= 1
                     print('Deleted exchange')
                     return
             except ValueError:
@@ -722,7 +729,7 @@ class Chatbot:
         """
         assert self.chat_model is not None, "Chat model not initialized"
         self.messages.append(HumanMessage(content=prompt))
-        print(f'Fetching response #{self.count + 1}!')
+        print(f'Fetching response #{self.response_count + 1}!')
         try:
             if stream:
                 response_string = ""
@@ -756,14 +763,14 @@ class Chatbot:
             self.messages.pop()
             return None
         self.messages.append(response)
-        self.count += 1
+        self.response_count += 1
         return response
 
     def get_rag_response(self, prompt: str, stream: bool = False):
         assert self.rag_model is not None, "RAG LLM not initialized"
         assert self.rag_chain is not None, "RAG chain not initialized"
         self.messages.append(HumanMessage(content=prompt))
-        print(f'RAG engine response #{self.count + 1}!')
+        print(f'RAG engine response #{self.response_count + 1}!')
         try:
             if stream:
                 response_string = ""
@@ -795,7 +802,7 @@ class Chatbot:
             print(f'Error!: {e}')
             return None
         self.messages.append(response)
-        self.count += 1
+        self.response_count += 1
         return response
 
     def chat(self, prompt=None, persistence_enabled=True):
@@ -812,19 +819,19 @@ class Chatbot:
         force_prompt = False
         forced_prompt = ""
         save_response = False
-        max_exchanges = MAX_CHAT_EXCHANGES
+        max_responses = MAX_CHAT_EXCHANGES
         if prompt is not None:
             force_prompt = True
             forced_prompt = prompt
         if persistence_enabled is False:
             if prompt is None:
                 prompt = DEFAULT_QUERY
-            max_exchanges = 1
+            max_responses = 1
             if SAVE_ONESHOT_RESPONSE:
                 save_response = True
         while self.exit is False:
-            if self.count >= max_exchanges:
-                print(f'Max exchanges reached: {self.count}')
+            if self.response_count >= max_responses:
+                print(f'Max exchanges reached: {self.response_count}')
                 self.exit = True
                 continue
             if force_prompt:
@@ -863,20 +870,23 @@ class Chatbot:
             if self.config.rag_settings.rag_mode:
                 self.get_rag_response(prompt, stream=True)
             else:
-                self.get_chat_response(prompt, stream=True)
+                res = self.get_chat_response(prompt, stream=True)
+                if res is None:
+                    print('No response generated')
+                    continue
         if save_response:
             save_string_as_markdown_file(self.messages[-1].content)
             print('Saved response to response.md')
         return self.messages
 
-    def _pop_last_exchange(self):
+    def _pop_last_exchange(self) -> None:
         if len(self.messages) < 2:
             print('No messages to delete')
             return
         self.messages.pop()
         self.messages.pop()
         print('Deleted last exchange')
-        self.count -= 1
+        self.response_count -= 1
 
 
 def run_chat(config: Config | None = None):
