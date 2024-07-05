@@ -1,6 +1,8 @@
 langchain
 langchain_together
 langchain_openai
+langchain_community
+
 langchain-anthropic
 
 faiss-cpu
