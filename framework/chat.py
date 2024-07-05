@@ -8,22 +8,26 @@ from dotenv import load_dotenv
 load_dotenv()
 
 from uuid import uuid4
+from os import get_terminal_size
+from textwrap import fill
+
 from langchain.schema import SystemMessage, AIMessage, HumanMessage, BaseMessage
 from langchain_community.vectorstores.chroma import Chroma
 from langchain_community.vectorstores.faiss import FAISS
 from langchain_core.vectorstores import VectorStoreRetriever
 from langchain.retrievers.multi_vector import MultiVectorRetriever
-from helpers import copy_string_to_clipboard, database_exists, get_clipboard_contents, get_db_collection_names, process_docs, get_doc_ids_from_manifest, save_string_as_markdown_file, read_sample, update_manifest
-from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SUMMARY_TEMPLATE, SYSTEM_MESSAGE_CODES
-from config import MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, EXPLAIN_EXCERPT, FILTER_TOPIC
-from classes import Config
-from models import LLM_FN, LLM
-from rag import get_summary_chain, input_to_docs, get_rag_chain, get_eval_chain
-from embed import get_chroma_vectorstore_from_docs, get_faiss_vectorstore_from_docs, load_existing_faiss_vectorstore, load_existing_chroma_vectorstore, split_documents
 from langchain_core.documents import Document
 from langchain.storage import InMemoryByteStore
-from os import get_terminal_size
-from textwrap import fill
+
+import utils
+# from utils import copy_string_to_clipboard, database_exists, get_clipboard_contents, get_db_collection_names, process_docs, get_doc_ids_from_manifest, save_string_as_markdown_file, read_sample, update_manifest
+from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SUMMARY_TEMPLATE, SYSTEM_MESSAGE_CODES
+from config.config import MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, EXPLAIN_EXCERPT, FILTER_TOPIC
+from classes import Config
+from models.models import LLM_FN, LLM
+from chains import get_summary_chain, get_rag_chain, get_eval_chain
+from rag import input_to_docs, get_chroma_vectorstore_from_docs, get_faiss_vectorstore_from_docs, load_existing_faiss_vectorstore, load_existing_chroma_vectorstore, split_documents
+
 
 TERMINAL_WIDTH = get_terminal_size().columns
 
@@ -46,7 +50,7 @@ def print_adjusted(
     # Easier method
 
 
-PROCESSING_DOCS_FN = process_docs
+PROCESSING_DOCS_FN = utils.process_docs
 
 ID_KEY = "doc_id"
 
@@ -92,6 +96,7 @@ class Chatbot:
     Methods:
     - chat: The main chat loop.
     - initialize_rag: Initializes the retriever and RAG chain.
+    - refresh_rag_state: Refreshes the RAG state.
     - refresh_config: Refreshes the configuration.
     - _set_doc_ids: Sets document IDs.
     - get_child_docs: Generates child documents.
@@ -161,17 +166,20 @@ class Chatbot:
         self.response_count = 0
         return
 
-    def initialize_rag(self):
+    def initialize_rag(self) -> bool:
         """
         Initializes the retriever and RAG chain.
 
         Raises:
             ValueError: If Doc ID is not initialized.
             Exception: If RAG mode is not enabled.
+
+        Returns:
+            bool: Whether the initialization was successful.
         """
         if self.retriever is not None:
             print('Retriever already exists. Use "refresh" to clear it first')
-            return
+            return False
         if not self.config.rag_settings.rag_mode:
             print('RAG mode not enabled')
             raise Exception('RAG mode not enabled')
@@ -180,7 +188,7 @@ class Chatbot:
 
         # Get doc_ids
         if self.config.rag_settings.multivector_enabled:
-            doc_ids = get_doc_ids_from_manifest(self.config.rag_settings.collection_name)
+            doc_ids = utils.get_doc_ids_from_manifest(self.config.rag_settings.collection_name)
             if self.config.rag_settings.database_exists and not doc_ids:
                 raise ValueError("Doc IDs not initialized")
             self.doc_ids = doc_ids
@@ -193,7 +201,7 @@ class Chatbot:
             self.rag_model.llm,
             system_message=rag_system_message)
         self.set_messages()
-        update_manifest(
+        utils.update_manifest(
             embedding_model_name=self.config.rag_settings.embedding_model.model_name,
             method=self.config.rag_settings.method,
             chunk_size=self.config.rag_settings.chunk_size,
@@ -204,6 +212,7 @@ class Chatbot:
         
         # Save current config to active.json
         self.config.save_to_json()
+        return True
 
     def refresh_rag_state(self):
         """
@@ -298,7 +307,7 @@ class Chatbot:
         inputs = self.config.rag_settings.inputs
         collection_name = self.config.rag_settings.collection_name
         # Check if collection exists
-        if database_exists(collection_name, self.config.rag_settings.method):
+        if utils.database_exists(collection_name, self.config.rag_settings.method):
             raise ValueError(f"Collection {collection_name} already exists")
         docs = []
         for i in range(len(inputs)):
@@ -347,7 +356,7 @@ class Chatbot:
 
         vectorstore = None
 
-        if database_exists(collection_name, method):
+        if utils.database_exists(collection_name, method):
             print(f"Loading existing Vector DB: {collection_name}")
             if method == "chroma":
                 vectorstore = load_existing_chroma_vectorstore(collection_name, embedder)
@@ -480,10 +489,10 @@ class Chatbot:
         return message_string
 
     def get_clipboard(self) -> str | None:
-        return get_clipboard_contents()
+        return utils.get_clipboard_contents()
 
     def set_clipboard(self, text: str) -> None:
-        return copy_string_to_clipboard()
+        return utils.copy_string_to_clipboard(text)
 
     def handle_command(self, prompt):
         assert prompt in COMMAND_LIST, "Invalid command"
@@ -523,13 +532,13 @@ class Chatbot:
             if len(self.messages) < 2:
                 print('No responses to save')
                 return
-            save_string_as_markdown_file(self.messages[-1].content)
+            utils.save_string_as_markdown_file(self.messages[-1].content)
             # TODO: Modify this to work with RAG mode
             print('Saved response to response.md')
             return
         elif prompt == "saveall":
             message_string = self.messages_to_string(self.messages)
-            save_string_as_markdown_file(message_string)
+            utils.save_string_as_markdown_file(message_string)
             print(f'Saved {self.response_count} exchanges to history.md')
             return
         elif prompt == "info":
@@ -620,7 +629,7 @@ class Chatbot:
             # Get collection names from database
             db_method = self.config.rag_settings.method
             print("Fetching collection names for method:", db_method)
-            collection_names = get_db_collection_names(method=db_method)
+            collection_names = utils.get_db_collection_names(method=db_method)
             # sort collection names
             collection_names.sort()
             print("Collection names:")
@@ -844,7 +853,7 @@ class Chatbot:
                 elif prompt == ".read":
                     # Read sample.txt as prompt
                     # TODO: Add some checks for string content of sample.txt
-                    prompt = read_sample()
+                    prompt = utils.read_sample()
                 else:
                     print('Reformatting command not yet implemented in .chat method')
                 # Do not continue here
@@ -869,7 +878,7 @@ class Chatbot:
                     print('No response generated')
                     continue
         if save_response:
-            save_string_as_markdown_file(self.messages[-1].content)
+            utils.save_string_as_markdown_file(self.messages[-1].content)
             print('Saved response to response.md')
         return self.messages
 
@@ -963,7 +972,7 @@ def main_cli():
     persistence_enabled = not args.not_persistent
     if prompt is None and persistence_enabled is False:
         if DEFAULT_TO_SAMPLE:
-            excerpt_as_prompt = read_sample()
+            excerpt_as_prompt = utils.read_sample()
             if EXPLAIN_EXCERPT:
                 excerpt_as_prompt = SUMMARY_TEMPLATE.format(
                     excerpt=excerpt_as_prompt)

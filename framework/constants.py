@@ -2,22 +2,44 @@
 from langchain_core.prompts import ChatPromptTemplate
 from langchain.schema import SystemMessage
 
+### MISC ###
+VECTOR_DB_SUFFIX = "-vector-dbs"
+CHROMA_FOLDER = "chroma" + VECTOR_DB_SUFFIX
+FAISS_FOLDER = "faiss" + VECTOR_DB_SUFFIX
+
+CURRENT_SYSTEM_MESSAGE = "You are working on Augmenta AI. This is a framework for LLM and RAG pipelines. You are currently iterating on chat.py"
 DEFAULT_SYSTEM_MESSAGE = "You are a helpful AI."
 CODE_SYSTEM_MESSAGE = "You are an expert programmer. Review the Python code and provide optimizations."
 RAG_SYSTEM_MESSAGE = "You are a helpful AI. Use the document excerpts to respond to the best of your ability."
 PROMPT_CHOOSER_SYSTEM_MESSAGE = "Use the context from Anthropic's example prompting guides to create a sample system message and user message template for the given task."
-EVAL_EXCERPT_SYSTEM_MESSAGE = "You are an AI assistant that evaluates text excerpts to determine if it meets specified criteria. Respond ONLY with a valid JSON output with 2 keys: index: int, and meetsCriteria: bool."
+# EVAL_EXCERPT_SYSTEM_MESSAGE = "You are an AI assistant that evaluates text excerpts to determine if it meets specified criteria. Respond ONLY with a valid JSON output with 2 keys: index: int, and meetsCriteria: bool."
+EVAL_EXCERPT_SYSTEM_MESSAGE = 'Evaluate a text excerpt to determine if it meets specified criteria. Always include a boolean key meetsCriteria. Respond ONLY with a valid JSON output.'
 MUSIC_SYSTEM_MESSAGE = 'You will be provided with unstructured data, and your task is to parse it into JSON format. You should output a list of dictionaries, where each dictionary contains the keys "title", "artist", and "album".'
+FLASHCARD_SYSTEM_MESSAGE = """You are Flashcard AI. Use the document excerpts to generate a list of JSON flashcards. Example output: 
+[
+    {
+        "term": "Python",
+        "definition": "A high-level, interpreted programming language with a focus on code readability.",
+        "example": "print('Hello, World!')"
+    },
+    {
+        "term": "JavaScript",
+        "definition": "A high-level, dynamic, and interpreted programming language that is primarily used for building web applications and adding interactive elements to websites.",
+        "example": "console.log('Hello, World!');"
+    }
+]"""
+
 MODEL_CODES = {
     "gpt4": "get_openai_gpt4",
     "bigmix": "get_together_bigmix",
+    "code": "get_deepseek_coder",
     "dbrx": "get_together_dbrx",
     "arctic": "get_together_arctic",
-    "llama3": "get_together_llama3",
+    "llama": "get_together_llama3",
     "deepseek": "get_together_deepseek_4k",
-    "quen": "get_together_quen",
+    "qwen": "get_together_qwen",
     "opus": "get_claude_opus",
-    "lmstudio": "get_local_model",
+    "local": "get_local_model",
     "ollama3": "get_ollama_llama3",
     "ollama": "get_ollama_mistral",
 }
@@ -28,6 +50,7 @@ SYSTEM_MESSAGE_CODES = {
     "eval": EVAL_EXCERPT_SYSTEM_MESSAGE,
     "rag": RAG_SYSTEM_MESSAGE,
     "prompting": PROMPT_CHOOSER_SYSTEM_MESSAGE,
+    "flashcard": FLASHCARD_SYSTEM_MESSAGE,
 }
 
 RAG_COLLECTION_TO_SYSTEM_MESSAGE = {
@@ -40,7 +63,7 @@ RAG_COLLECTION_TO_SYSTEM_MESSAGE = {
 LOCAL_MODELS = [
     "local-ollama3",
     "mistral:7b-instruct-v0.3-q6_K",
-    "lmstudio-model",
+    "local-model",
     "nomic-embed-text",
     "lmstudio-embedding-model",
     "local-hermes"

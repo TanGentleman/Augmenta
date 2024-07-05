@@ -1,15 +1,16 @@
-from config import LOCAL_MODEL_ONLY, SYSTEM_MSG_MAP
+from config.config import LOCAL_MODEL_ONLY, SYSTEM_MSG_MAP
 from constants import LOCAL_MODELS, MODEL_CODES, SYSTEM_MESSAGE_CODES
-from helpers import database_exists, read_settings
 # use pydantic to enforce Config schema
 from typing import Literal, Union
 from pydantic import BaseModel, Field
 
-from models import LLM_FN, MODEL_DICT
+from models.models import LLM_FN, MODEL_DICT
 from os import path, mkdir
 from json import load as json_load, dump as json_dump
 
 import logging
+
+import utils
 logger = logging.getLogger(__name__)
 
 ACTIVE_JSON_FILE = "active.json"
@@ -151,7 +152,7 @@ class RagSettings:
         self.k_excerpts = k_excerpts
         self.multivector_method = multivector_method
         if self.database_exists is None:
-            self.database_exists = database_exists(collection_name, method)
+            self.database_exists = utils.database_exists(collection_name, method)
         else:
             logger.warning("Found value for rag_settings.database_exists!")
 
@@ -319,7 +320,7 @@ class RagSettings:
         """
         logger.warning(
             "This is deprecated. Directly call database_exists, sparingly.")
-        self.database_exists = database_exists(collection_name, method)
+        self.database_exists = utils.database_exists(collection_name, method)
 
     @property
     def collection_name(self):
@@ -577,11 +578,10 @@ class Config:
 
     def __init__(
             self,
-            config_file="settings.json",
-            config_override: dict | None = None):
-        # assert config file exists
-        assert path.exists(config_file), "Config file not found"
-        config = read_settings(config_file)
+            config_override: dict | None = None,
+            config_file="settings.json",):
+        
+        config = utils.read_settings(config_file)
 
         if config_override is not None:
             if "RAG" in config_override:
@@ -619,7 +619,7 @@ class Config:
                 logger.info(f"System message adjusted for model {model_name}.")
 
         self.__validate_rag_settings()
-        self.save_to_json()
+        self.save_active_settings()
         logger.info(f"Config initialized and set in {ACTIVE_JSON_FILE}.")
 
     def __validate_rag_settings(self):
@@ -633,7 +633,7 @@ class Config:
                 # Make databases key
                 f.write('{"databases": []}')
 
-    def save_to_json(self, filename=ACTIVE_JSON_FILE):
+    def save_active_settings(self, filename=ACTIVE_JSON_FILE):
         """
         Save the current config to a JSON file
         """
@@ -641,8 +641,7 @@ class Config:
             "RAG": self.rag_settings.to_dict(),
             "chat": self.chat_settings.to_dict(),
         }
-        with open(filename, "w") as f:
-            json_dump(data, f, indent=2)
+        utils.save_config_as_json(data, filename)
 
     def __str__(self):
         return self.props()

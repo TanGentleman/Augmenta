@@ -49,7 +49,7 @@ class TypedPrompt:
     """Utility class for prompting user input with type checking."""
 
     @staticmethod
-    def ask(prompt: str, type_: type, choices: Optional[List[str]] = None) -> Union[str, int]:
+    def ask(prompt: str, type_: type, choices: Optional[List[str]] = None, default: Optional[str] = None) -> Union[str, int]:
         """
         Prompt the user for input and validate the type.
 
@@ -64,8 +64,14 @@ class TypedPrompt:
         Raises:
             ValueError: If the input cannot be converted to the specified type.
         """
+        assert type_ in (str, int), "Only str and int types are supported"
+        assert choices is None or isinstance(choices, list), "Choices must be a list or None"
+        assert default is None or isinstance(default, str), "Default value must be a string or None"
         while True:
-            result = RichPrompt.ask(prompt, choices=choices)
+            if default is not None:
+                result = RichPrompt.ask(prompt + f" [default: {default}]", choices=choices)
+            else:
+                result = RichPrompt.ask(prompt, choices=choices)
             try:
                 return type_(result)
             except ValueError:
@@ -118,30 +124,23 @@ class TerminalLayout:
         card = app.flashcard_manager.get_current_card()
         if card is None:
             console.print("No flashcard to display.")
-            logger.warning("Attempted to render flashcard when none available")
             return
-        
+
         flashcard_panel = card.create_flashcard()
         answer_panel = card.create_answer() if app.show_answer else Panel("Press 'S' to show answer", title="Answer", border_style="green")
-        
         menu_panel = Panel(app.create_menu(), title="Menu", border_style="blue")
 
-        layout = Layout()
-        layout_elements = []
+        layout_elements = [
+            Layout(Panel(f"Card {app.flashcard_manager.current_index + 1} of {len(app.flashcard_manager.flashcards)}"), name="card_count", ratio=3) if app.layout_config.show_card_count else None,
+            Layout(flashcard_panel, name="flashcard", ratio=5) if app.layout_config.show_flashcard else None,
+            Layout(answer_panel, name="answer", ratio=5) if app.layout_config.show_answer else None,
+            Layout(menu_panel, name="menu", ratio=4) if app.layout_config.show_menu else None
+        ]
 
-        if app.layout_config.show_card_count:
-            layout_elements.append(Layout(Panel(f"Card {app.flashcard_manager.current_index + 1} of {len(app.flashcard_manager.flashcards)}"), name="card_count", ratio=2))
-        
-        if app.layout_config.show_flashcard:
-            layout_elements.append(Layout(flashcard_panel, name="flashcard", ratio=5))
-        
-        if app.layout_config.show_answer:
-            layout_elements.append(Layout(answer_panel, name="answer", ratio=6))
-        
-        if app.layout_config.show_menu:
-            layout_elements.append(Layout(menu_panel, name="menu", ratio=4))
+        layout_elements = [element for element in layout_elements if element is not None]
 
         if layout_elements:
+            layout = Layout()
             layout.split_column(*layout_elements)
         else:
             layout = Layout(Panel("No elements to display. Please check your layout configuration."))
@@ -235,6 +234,7 @@ class FlashcardManager(FlashcardManagerProtocol):
         """Ensure that the current index is within the valid range."""
         if self.flashcards:
             self.current_index = max(0, min(self.current_index, len(self.flashcards) - 1))
+            logger.warning(f"Safely adjusted current index to {self.current_index + 1}")
         else:
             self.current_index = 0
     
@@ -376,8 +376,8 @@ class KeyboardHandler:
             'E': (self.app.edit_flashcard, "Edit Flashcard"),
             'D': (self.app.delete_flashcard, "Delete Flashcard"),
             'F': (self.app.search_flashcards, "Search Flashcards"),
-            'M': (lambda: True, "Return to Main Menu"), # This should be handled separately
-            'Q': (lambda: True, "Save and Quit"), # This should be handled separately
+            'M': (lambda: True, "Return to Main Menu"), # M-key handled beforehand.
+            'Q': (lambda: True, "Quit"), # Q-key handled beforehand.
         }
 
     @typechecked
@@ -543,22 +543,37 @@ class FlashcardApp:
         return False  # Continue studying
 
     def search_flashcards(self) -> bool:
-        keyword = TypedPrompt.ask("Enter search keyword", str)
-        if keyword.strip():
-            results = self.flashcard_manager.search_flashcards(keyword)
-            if results:
+        """Searches for flashcards matching a user-provided keyword.
+
+        Displays search results in a formatted table, or an "not found" message if no matches are found. 
+
+        Returns:
+            bool: False (indicating the study session should continue).
+        """
+
+        keyword = TypedPrompt.ask("Enter search keyword", str)  # Prompt for keyword input
+
+        if keyword.strip():  # Ensure keyword is not empty after whitespace removal
+            results = self.flashcard_manager.search_flashcards(keyword) 
+
+            if results:  # If matching flashcards are found
                 table = Table(title=f"Search Results for '{keyword}'")
-                table.add_column("Card #", style="cyan")
-                for key in self.flashcard_manager.keys.values():
+                table.add_column("Card #", style="cyan")  # Add a numbered column
+
+                # Dynamically add columns based on flashcard keys (e.g., "Term", "Definition")
+                for key in self.flashcard_manager.keys.values(): 
                     table.add_column(key.capitalize(), style="magenta")
-                for i, card in enumerate(results):
+
+                for i, card in enumerate(results):  # Populate table rows with card data
                     table.add_row(str(i+1), *[str(card.card_data.get(key, "N/A")) for key in self.flashcard_manager.keys.values()])
-                console.print(table)
+
+                console.print(table) 
             else:
-                console.print("No matching flashcards found.")
+                console.print("No matching flashcards found.")  # Inform user if no matches
         else:
-            console.print("[bold red]Error: Search keyword cannot be empty. Please try again.[/bold red]")
-        return False  # Continue studying
+            console.print("[bold red]Error: Search keyword cannot be empty. Please try again.[/bold red]") 
+
+        return False  # Continue studying after search
     
 
     def display_current_card(self) -> None:
@@ -612,7 +627,7 @@ class FlashcardApp:
                     console.print(option)
             choice = TypedPrompt.ask("Choose an option", str, choices=[key.lower() for key in self.keyboard_handler.key_bindings.keys()])
             choice = choice.upper()
-            if choice == 'Q':  # Save and Quit
+            if choice == 'Q':  # Quit
                 return True
             elif choice == 'M':  # Return to Main Menu
                 self.force_refresh = True

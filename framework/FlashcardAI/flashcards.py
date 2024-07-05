@@ -15,6 +15,10 @@ from typing import List, Dict, Any, Tuple
 import logging
 from time import sleep
 
+from pathlib import Path
+FLASHCARD_AI_ROOT = Path(__file__).resolve().parent
+
+
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -121,7 +125,7 @@ class Flashcard:
         return Panel(flashcard_text, title=title, border_style="cyan" if title == "Question" else "green",
                      expand=False)
 
-def display_flashcards(flashcards: List[Flashcard], delay: float = 0.1, include_answer=False) -> None:
+def display_flashcards(flashcards: List[Flashcard], panel_name: str = "Question", delay: float = 0.1, include_answer=False) -> None:
     """
     Display a list of flashcards with a delay between each.
 
@@ -130,7 +134,7 @@ def display_flashcards(flashcards: List[Flashcard], delay: float = 0.1, include_
         delay (float, optional): Delay in seconds between displaying each flashcard. Defaults to 0.1.
     """
     for flashcard in flashcards:
-        print(flashcard.create_flashcard(include_answer=include_answer))
+        print(flashcard.create_flashcard(panel_name, include_answer))
         sleep(delay)
 
 def load_flashcards_from_json(file_path: str) -> Tuple[List[Flashcard], Dict[str, str], List[Tuple[str, str]]]:
@@ -192,7 +196,8 @@ def save_flashcards_to_json(flashcards: List[Flashcard], file_path: str) -> None
 
 if __name__ == "__main__":
     try:
-        flashcards, keys, styles = load_flashcards_from_json('flashcards.json')
+        file_path = FLASHCARD_AI_ROOT / "flashcards.json"
+        flashcards, keys, styles = load_flashcards_from_json(file_path)
         logger.info(f"Generated mapping: {keys}")
         logger.info(f"Generated styles: {styles}")
         display_flashcards(flashcards, include_answer=True)
