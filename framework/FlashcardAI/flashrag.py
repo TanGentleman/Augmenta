@@ -77,6 +77,7 @@ def is_output_valid(response_object):
     # valid JSON.
     for item in response_object:
         try:
+            assert isinstance(item, dict)
             continue
             FlashcardSchema(**item)
         except Exception as e:
@@ -85,7 +86,7 @@ def is_output_valid(response_object):
     return True
 
 
-def main(keys: dict[str, str]):
+def main():
     config = get_config()
     chatbot = Chatbot(config)
     if ENABLE_RAG:
@@ -103,18 +104,24 @@ def main(keys: dict[str, str]):
     MAX_COUNT = 1
     count = 0
     prompt_prefix = ""
-    if not chatbot.config.chat_settings.enable_system_message:
-        print("Appending system message to prompt")
-        prompt_prefix = chatbot.config.chat_settings.system_message + "\n"
+    assert chatbot.chat_model
+    if chatbot.chat_model.is_local:
+        print("Using local model")
+    
+    prompt_prefix = chatbot.config.optional["prompt_prefix"]
+    prompt_suffix = chatbot.config.optional["prompt_suffix"]
+    assert isinstance(prompt_prefix, str)
+    print(f"Using prompt prefix: {prompt_prefix}")
     while count < MAX_COUNT:
-        default_text = "Reading from clipboard:"
-        prompt = input(f"Enter a prompt. Default - {default_text}")
+        default_text = "Read clipboard.\n"
+        prompt = input(f"Enter a prompt. One-time default: {default_text}")
         if not prompt:
             print("Reading from clipboard")
             # prompt = ".read"
             prompt = paste().strip()
+        prompt = prompt_prefix + prompt + prompt_suffix
         messages = chatbot.chat(
-            prompt_prefix + prompt,
+            prompt,
             persistence_enabled=False)
         response_string = messages[-1].content
         # Check if the JSON output is valid
@@ -138,13 +145,6 @@ def main(keys: dict[str, str]):
 
 
 if __name__ == "__main__":
-    # keys = {
-    #     'term': 'term',
-    #     'definition': 'definition',
-    #     'example': 'example',
-    # }
-    # FlashcardSchema(**keys)
-    keys = {}
-    main(keys)
+    main()
     # get the keys as a dictionary from the FlashcardSchema
     # print(keys)
