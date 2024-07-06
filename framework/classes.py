@@ -497,18 +497,18 @@ class ChatSettings:
             primary_model,
             backup_model,
             enable_system_message,
-            system_message):
+            system_message,
+            stream):
         self.primary_model = primary_model
         self.backup_model = backup_model
         self.enable_system_message = enable_system_message
         self.system_message = system_message
-
+        self.stream = stream
         assert self.primary_model, "ChatSettings.primary_model exists must be set"
         assert self.backup_model, "ChatSettings.backup_model exists must be set"
-        assert self.system_message, "ChatSettings.system_message exists must be set"
 
     @property
-    def primary_model(self):
+    def primary_model(self) -> LLM_FN:
         return self.__primary_model
 
     @primary_model.setter
@@ -520,7 +520,7 @@ class ChatSettings:
         self.__primary_model = primary_model_llm_fn
 
     @property
-    def backup_model(self):
+    def backup_model(self) -> LLM_FN:
         return self.__backup_model
 
     @backup_model.setter
@@ -532,7 +532,7 @@ class ChatSettings:
         self.__backup_model = backup_model_llm_fn
 
     @property
-    def enable_system_message(self):
+    def enable_system_message(self) -> bool:
         return self.__enable_system_message
 
     @enable_system_message.setter
@@ -556,12 +556,23 @@ class ChatSettings:
         logger.info(f"System message set to {value}")
         self.__system_message = value
 
+    @property
+    def stream(self) -> bool:
+        return self.__stream
+    
+    @stream.setter
+    def stream(self, value):
+        if not isinstance(value, bool):
+            raise ValueError("Stream must be a vool")
+        self.__stream = value
+
     def to_dict(self):
         data = {
             "primary_model": self.primary_model.model_name,
             "backup_model": self.backup_model.model_name,
             "enable_system_message": self.enable_system_message,
-            "system_message": self.system_message
+            "system_message": self.system_message,
+            "stream": self.stream,
         }
         return data
 
@@ -601,6 +612,13 @@ class Config:
                     else:
                         raise ValueError(
                             f"Key {key} not found in chat settings")
+            if "optional" in config_override:
+                for key in config_override["optional"]:
+                    if key in config:
+                        config[key] = config_override["optional"][key]
+                        logger.info(f"Optional config key {key} overridden")
+                    else:
+                        raise ValueError(f"Key {key} not found in config")
         # Replace the LLM codes with the function name
         if config["chat"]["primary_model"] in MODEL_CODES:
             config["chat"]["primary_model"] = MODEL_CODES[config["chat"]
@@ -616,6 +634,7 @@ class Config:
 
         HyperparameterSchema(**config["hyperparameters"])
         self.hyperparameters = config["hyperparameters"]
+        self.optional = config.get("optional", {})
 
         if self.chat_settings.enable_system_message:
             model_name = self.chat_settings.primary_model.model_name

@@ -1,4 +1,5 @@
-
+from dotenv import load_dotenv
+load_dotenv()
 from rag import input_to_docs, get_chroma_vectorstore_from_docs, get_faiss_vectorstore_from_docs, load_existing_faiss_vectorstore, load_existing_chroma_vectorstore, split_documents
 from chains import get_summary_chain, get_rag_chain, get_eval_chain
 from models.models import LLM_FN, LLM
@@ -21,8 +22,7 @@ try:
     import gnureadline
 except ImportError:
     pass
-from dotenv import load_dotenv
-load_dotenv()
+
 
 
 # from utils import copy_string_to_clipboard, database_exists, get_clipboard_contents, get_db_collection_names, process_docs, get_doc_ids_from_manifest, save_string_as_markdown_file, read_sample, update_manifest
@@ -749,7 +749,7 @@ class Chatbot:
     def get_chat_response(
             self,
             prompt: str,
-            stream: bool = False) -> AIMessage | None:
+            stream: bool | None = None) -> AIMessage | None:
         """
         Gets a chat response from the chat model.
 
@@ -761,6 +761,8 @@ class Chatbot:
         - AIMessage: The AI's response message.
         """
         assert self.chat_model is not None, "Chat model not initialized"
+        if stream is None:
+            stream = self.config.chat_settings.stream
         self.messages.append(HumanMessage(content=prompt))
         print(f'Fetching response #{self.response_count + 1}!')
         try:
@@ -839,7 +841,7 @@ class Chatbot:
         self.response_count += 1
         return response
 
-    def chat(self, prompt=None, persistence_enabled=True):
+    def chat(self, prompt: str | None = None, persistence_enabled=True, stream: bool | None = None):
         """
         Main chat loop for the chatbot.
 
@@ -850,6 +852,8 @@ class Chatbot:
         Returns:
         - list: The message history.
         """
+        if stream is None:
+            stream = self.config.chat_settings.stream
         force_prompt = False
         forced_prompt = ""
         save_response = False
@@ -901,10 +905,12 @@ class Chatbot:
                 self.handle_command(stripped_prompt)
                 continue
             # Generate response
+            stream = self.config.chat_settings.stream
             if self.config.rag_settings.rag_mode:
-                self.get_rag_response(prompt, stream=True)
+                # NOTE: Stream value obtained from chat settings
+                self.get_rag_response(prompt, stream=stream)
             else:
-                res = self.get_chat_response(prompt, stream=True)
+                res = self.get_chat_response(prompt, stream=stream)
                 if res is None:
                     print('No response generated')
                     continue

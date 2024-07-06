@@ -17,10 +17,15 @@
         "multivector_method": "summary"
     },
     "chat": {
-        "primary_model": "local",
+        "primary_model": "code",
         "backup_model": "llama",
-        "enable_system_message": false,
-        "system_message": "You are working on Augmenta AI. This is a framework for LLM and RAG pipelines. You are currently iterating on chat.py."
+        "enable_system_message": true,
+        "system_message": "flashcard",
+        "stream": true
+    },
+    "optional": {
+        "prompt_prefix": "",
+        "prompt_suffix": "\n Reminder: Only a list[dict] as your output. Do NOT input True, input true for bools."
     },
     "hyperparameters": {
         "max_tokens": 1000,
