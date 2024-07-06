@@ -190,6 +190,28 @@ class TerminalLayout:
 class FlashcardManagerProtocol(Protocol):
     """Protocol defining the interface for FlashcardManager."""
 
+    # TODO: Look into using @property and setter methods for read-only and writable attributes
+    # Read-only attribute example
+    @property
+    @abstractmethod
+    def flashcards(self) -> list[Flashcard]:
+        """Get the current list of flashcards."""
+        pass
+
+    # Writable attribute example:
+    # NOTE: Writing to flashcards not yet required
+    # @flashcards.setter
+    # @abstractmethod
+    # def flashcards(self, deck: list[Flashcard]) -> None:
+    #     """Set the current deck of flashcards."""
+    #     pass
+
+    @property
+    @abstractmethod
+    def keys(self) -> Dict[str, str]:
+        """Get the keys for the flashcards."""
+        pass
+
     @abstractmethod
     def load_flashcards(self, file_path: str) -> None:
         """Load flashcards from a file."""
@@ -214,6 +236,37 @@ class FlashcardManagerProtocol(Protocol):
     def previous_card(self) -> None:
         """Move to the previous flashcard."""
         pass
+
+    @abstractmethod
+    def jump_to_card(self, index: int) -> None:
+        """Jump to a specific flashcard."""
+        pass
+
+    @abstractmethod
+    def add_flashcard(self, card_data: Dict[str, str]) -> None:
+        """Add a new flashcard."""
+        pass
+
+    @abstractmethod
+    def edit_flashcard(self, index: int, card_data: Dict[str, str]) -> None:
+        """Edit an existing flashcard."""
+        pass
+
+    @abstractmethod
+    def delete_flashcard(self, index: int) -> bool:
+        """Delete a flashcard."""
+        pass
+
+    @abstractmethod
+    def study_random(self) -> None:
+        """Randomize the order of flashcards for studying."""
+        pass
+    
+    @abstractmethod
+    def search_flashcards(self, keyword: str) -> List[Flashcard]:
+        """Search for flashcards containing a specific keyword."""
+        pass
+
 
 
 class FlashcardManager(FlashcardManagerProtocol):
@@ -430,9 +483,9 @@ class KeyboardHandler:
             'E': (self.app.edit_flashcard, "Edit Flashcard"),
             'D': (self.app.delete_flashcard, "Delete Flashcard"),
             'F': (self.app.search_flashcards, "Search Flashcards"),
-            # M-key handled beforehand.
+            # M and Q keys should be handled beforehand. They both end study.
             'M': (lambda: True, "Return to Main Menu"),
-            'Q': (lambda: True, "Quit"),  # Q-key handled beforehand.
+            'Q': (lambda: True, "Quit"),
         }
 
     @typechecked
@@ -592,7 +645,7 @@ class FlashcardApp:
 
         index = TypedPrompt.ask("Enter the card number to edit", int) - 1
         try:
-            card = self.flashcard_manager.flashcards[index]
+            card: Flashcard = self.flashcard_manager.flashcards[index]
             updated_data: Dict[str, str] = {}
             for key in self.flashcard_manager.keys.values():
                 current_value = str(card.card_data.get(key, ""))
