@@ -1,5 +1,6 @@
 # This file is for functions related to indexing documents and assembling
 # RAG components
+from io import BytesIO
 from os.path import exists, join
 
 from langchain_core.documents import Document
@@ -11,8 +12,7 @@ from langchain_community.document_loaders import PyPDFLoader, ArxivLoader
 
 from config.config import EXPERIMENTAL_UNSTRUCTURED, METADATA_MAP
 from constants import CHROMA_FOLDER, FAISS_FOLDER
-from utils import clean_docs, database_exists
-
+from utils import CHROMA_FOLDER_PATH, DOCUMENTS_DIR, DB_DIR, FAISS_FOLDER_PATH, clean_docs, database_exists
 
 def loader_from_arxiv_url(url: str) -> ArxivLoader:
     """
@@ -34,7 +34,7 @@ def loader_from_notebook_url(url: str) -> NotebookLoader:
     assert url[-6:] == ".ipynb", "Make sure the link is a valid notebook"
     import requests
 
-    def reformat_url(url):
+    def reformat_url(url: str):
         if url.count('/blob/') != 1:
             raise ValueError("Use the raw link to the notebook file")
         # remove /blob from the url
@@ -48,11 +48,10 @@ def loader_from_notebook_url(url: str) -> NotebookLoader:
     assert url.startswith("https://raw.githubuser")
     # Download the notebook as a file
     response = requests.get(url)
-    local_file = "temp.ipynb"
-    with open(local_file, 'wb') as f:
-        f.write(response.content)
+    content = response.content
+    assert content, "No content found"
     loader = NotebookLoader(
-        local_file,
+        BytesIO(content),
         include_outputs=True,
         max_output_length=20,
         remove_newline=True,
@@ -64,7 +63,8 @@ def documents_from_url(url: str) -> list[Document]:
     """
     Load documents from a URL, return List[Document]
     """
-    def is_link_valid(url):
+    def is_link_valid(url: str):
+        # This can be nuanced in the future
         return url.startswith("http")
     assert is_link_valid(url), "Make sure the link is valid"
     print("Indexing url:", url)
@@ -81,13 +81,15 @@ def documents_from_url(url: str) -> list[Document]:
     return docs
 
 
-def documents_from_local_pdf(filepath) -> list[Document]:
+def documents_from_local_pdf(filename: str) -> list[Document]:
     """
     Load a pdf from the "documents" folder
     Returns List[Document]
     """
-    filepath = join("documents", filepath)
+    filepath = DOCUMENTS_DIR / filename
     assert exists(filepath), "Local PDF file not found"
+    if not filepath.suffix == ".pdf":
+        print("Warning: File is not a PDF")
     loader = PyPDFLoader(filepath)
     docs = loader.load()
     # TODO: Add page number to each document as metadata
@@ -96,12 +98,12 @@ def documents_from_local_pdf(filepath) -> list[Document]:
     return docs
 
 
-def documents_from_text_file(filepath: str = "sample.txt") -> list[Document]:
+def documents_from_text_file(filename: str = "input.txt") -> list[Document]:
     """
     Load a text file from the "documents" folder
     Returns List[Document]
     """
-    filepath = join("documents", filepath)
+    filepath = DOCUMENTS_DIR / filepath
     assert exists(filepath), "Local text file not found"
     loader = TextLoader(filepath)
     docs = loader.load()
@@ -145,11 +147,11 @@ def get_chroma_vectorstore(
     if exists is False:
         assert not database_exists(
             collection_name, "chroma"), "Collection does not exist"
-    filename = join(CHROMA_FOLDER, collection_name)
+    filepath = CHROMA_FOLDER_PATH / collection_name
     vectorstore = Chroma(
         collection_name=collection_name,
         embedding_function=embedder,
-        persist_directory=filename,
+        persist_directory=filepath,
         client_settings=Settings(
             anonymized_telemetry=False,
             is_persistent=True),
@@ -189,12 +191,12 @@ def get_faiss_vectorstore_from_docs(
     assert not database_exists(
         collection_name, "faiss"), "Collection already exists"
     assert docs, "No documents found"
-    filename = join(FAISS_FOLDER, collection_name)
+    filepath = FAISS_FOLDER_PATH / collection_name
     if docs is None:
         raise ValueError(
             "Collection not found. Provide documents to create a new collection")
     vectorstore = FAISS.from_documents(docs, embedder)
-    vectorstore.save_local(filename)
+    vectorstore.save_local(filepath)
     print('Vector database saved locally')
     return vectorstore
 
@@ -202,9 +204,9 @@ def get_faiss_vectorstore_from_docs(
 def load_existing_faiss_vectorstore(collection_name: str, embedder):
     assert database_exists(
         collection_name, "faiss"), "Collection does not exist"
-    filename = join(FAISS_FOLDER, collection_name)
+    filepath = FAISS_FOLDER_PATH / collection_name
     vectorstore = FAISS.load_local(
-        filename, embedder, allow_dangerous_deserialization=True)
+        filepath, embedder, allow_dangerous_deserialization=True)
     return vectorstore
 
 
