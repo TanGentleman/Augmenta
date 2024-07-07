@@ -1,5 +1,5 @@
-from config.config import LOCAL_MODEL_ONLY, SYSTEM_MSG_MAP
-from constants import LOCAL_MODELS, MODEL_CODES, SYSTEM_MESSAGE_CODES
+from config.config import LOCAL_MODEL_ONLY
+from constants import LOCAL_MODELS, MODEL_CODES, MODEL_TO_SYSTEM_MSG, SYSTEM_MESSAGE_CODES
 # use pydantic to enforce Config schema
 from typing import Literal, Union
 from pydantic import BaseModel, Field
@@ -91,6 +91,14 @@ class RagSchema(BaseModel):
     multivector_method: Literal["summary", "qa"]
     doc_ids: list[str] = []
 
+class OptionalSchema(BaseModel):
+    """
+    Optional configuration
+    """
+    prompt_prefix: str
+    prompt_suffix: str
+    amnesia: bool
+    display_flashcards: bool
 
 def get_llm_fn(model_name: str,
                model_type: Literal["llm",
@@ -147,15 +155,21 @@ class RagSettings:
         Enable RAG mode
         """
         assert self.rag_mode, "RAG mode must be enabled"
+        if self.database_exists is not None:
+            logger.warning("Found value for rag_settings.database_exists! Resetting.")
+        self.database_exists = utils.database_exists(collection_name, method)
+        # NOTE: Metadata:
+        # - embedding_model
+        # - method
+        # - chunk_size
+        # - chunk_overlap
+        # - inputs
+        # - doc_ids ([] unless multivector_enabled is True)
+        # TODO: Decide the best way to set these values
         self.collection_name = collection_name
-        self.method = method
         self.k_excerpts = k_excerpts
         self.multivector_method = multivector_method
-        if self.database_exists is None:
-            self.database_exists = utils.database_exists(
-                collection_name, method)
-        else:
-            logger.warning("Found value for rag_settings.database_exists!")
+        self.multivector_enabled = multivector_enabled
 
         if self.database_exists:
             logger.info("DB exists! Replacing the manifest.json settings.")
@@ -163,12 +177,14 @@ class RagSettings:
             # Passing override_all will ensure that the model, chunk size,
             # overlap, inputs, and multivector are updated
         else:
+            self.method = method
             self.embedding_model = embedding_model
             self.chunk_size = chunk_size
             self.chunk_overlap = chunk_overlap
             self.inputs = inputs
-            self.multivector_enabled = multivector_enabled
+            
         self.rag_llm = rag_llm
+        print(self.props())
 
     def adjust_rag_settings(
             self, metadata: dict[str, configValue], override_all=False):
@@ -186,23 +202,14 @@ class RagSettings:
         assert "embedding_model" in metadata, "Embedding model key not found"
         # Replace the manifest "embedKding model" value from the model name to
         # the MODEL_DICT key
-        for model in MODEL_DICT:
-            if MODEL_DICT[model]["model_name"] == metadata["embedding_model"]:
+        for model, model_info in MODEL_DICT.items():
+            if model_info["model_name"] == metadata["embedding_model"]:
                 metadata["embedding_model"] = model
                 break
         else:
             raise ValueError("Model not found in MODEL_DICT")
         ManifestSchema(**metadata)
-        if override_all or (
-                metadata["embedding_model"] != self.embedding_model.model_name):
-            self.embedding_model = metadata["embedding_model"]
-            logger.warning(
-                f"Switched embedding model to {self.embedding_model.model_name} from manifest.json.")
-        if override_all or (metadata["method"] != self.method):
-            self.method = metadata["method"]
-            logger.warning(
-                f"Switched method to {self.method} from manifest.json.")
-
+        
         manifest_chunk_size = int(metadata["chunk_size"])
         if override_all or (manifest_chunk_size != self.chunk_size):
             self.chunk_size = manifest_chunk_size
@@ -214,7 +221,16 @@ class RagSettings:
             self.chunk_overlap = manifest_chunk_overlap
             logger.warning(
                 f"Switched chunk overlap to {manifest_chunk_overlap} from manifest.json.")
-
+        
+        if override_all or (
+                metadata["embedding_model"] != self.embedding_model.model_name):
+            self.embedding_model = metadata["embedding_model"]
+            logger.warning(
+                f"Switched embedding model to {self.embedding_model.model_name} from manifest.json.")
+        if override_all or (metadata["method"] != self.method):
+            self.method = metadata["method"]
+            logger.warning(
+                f"Switched method to {self.method} from manifest.json.")
         if override_all or (metadata["inputs"] != self.inputs):
             self.inputs = metadata["inputs"]
             logger.warning(
@@ -251,44 +267,46 @@ class RagSettings:
         # Adjust RAG settings with correct fields (include print statements)
         if override_all:
             assert self.database_exists is True, "DB must exist to override all settings"
-        with open("manifest.json", "r") as f:
+        filepath = utils.DATA_DIR / "manifest.json"
+        with open(filepath, "r") as f:
             data = json_load(f)
-            assert "databases" in data, "databases key not found in manifest.json"
-            if self.rag_mode:
-                prune_collection = False
-                if self.database_exists is None:
-                    logger.error(
-                        "This check should not ever be called! Set DB exists first!")
-                    self.set_database_exists()
+        assert "databases" in data, "databases key not found in manifest.json"
+        if self.rag_mode:
+            prune_collection = False
+            if self.database_exists is None:
+                logger.error(
+                    "This check should not ever be called! Set DB exists first!")
+                self.set_database_exists()
 
-                for item in data["databases"]:
-                    if item["collection_name"] == self.collection_name:
-                        if self.database_exists:
-                            logger.info("Collection found in vector DB")
-                            # Adjust rag config to match the collection
-                            self.adjust_rag_settings(
-                                item["metadata"], override_all=override_all)
-                            logger.info("RAG settings adjusted.")
-                            break
-                        else:
-                            logger.warning(
-                                "Collection found in manifest.json but not in vector DB")
-                            prune_collection = True
-                            break
-                else:
+            for item in data["databases"]:
+                if item["collection_name"] == self.collection_name:
                     if self.database_exists:
+                        logger.info("Collection found in vector DB")
+                        # Adjust rag config to match the collection
+                        self.adjust_rag_settings(
+                            item["metadata"], override_all=override_all)
+                        logger.info("RAG settings adjusted.")
+                        break
+                    else:
                         logger.warning(
-                            "Collection from DB not found in manifest.json")
-
-                if prune_collection:
-                    # Happens when DB is deleted but collection in manifest
+                            "Collection found in manifest.json but not in vector DB")
+                        prune_collection = True
+                        break
+            else:
+                if self.database_exists:
                     logger.warning(
-                        "Removing this collection from manifest.json")
-                    # Remove by collection name
-                    data["databases"] = [item for item in data["databases"]
-                                         if item["collection_name"] != self.collection_name]
-                    with open("manifest.json", "w") as f:
-                        json_dump(data, f, indent=2)
+                        "Collection from DB not found in manifest.json")
+
+            if prune_collection:
+                # Happens when DB is deleted but collection in manifest
+                logger.warning(
+                    "Removing this collection from manifest.json")
+                # Remove by collection name
+                data["databases"] = [item for item in data["databases"]
+                                        if item["collection_name"] != self.collection_name]
+                with open(filepath, "w") as f:
+                    json_dump(data, f, indent=2)
+                # NOTE: What happens to the values in the config?
 
     @property
     def rag_mode(self):
@@ -454,6 +472,7 @@ class RagSettings:
 
     @property
     def multivector_method(self):
+        # Can check if multivector is enabled
         return self.__multivector_method
 
     @multivector_method.setter
@@ -614,11 +633,13 @@ class Config:
                             f"Key {key} not found in chat settings")
             if "optional" in config_override:
                 for key in config_override["optional"]:
-                    if key in config:
-                        config[key] = config_override["optional"][key]
+                    if key in config["optional"]:
+                        config["optional"][key] = config_override["optional"][key]
                         logger.info(f"Optional config key {key} overridden")
                     else:
-                        raise ValueError(f"Key {key} not found in config")
+                        print("aaaah")
+                        print(f"This key from object: {key}")
+                        raise ValueError((f"Key {key} not found in config"))
         # Replace the LLM codes with the function name
         if config["chat"]["primary_model"] in MODEL_CODES:
             config["chat"]["primary_model"] = MODEL_CODES[config["chat"]
@@ -632,15 +653,25 @@ class Config:
         self.rag_settings = RagSettings(**config["RAG"])
         self.chat_settings = ChatSettings(**config["chat"])
 
-        HyperparameterSchema(**config["hyperparameters"])
-        self.hyperparameters = config["hyperparameters"]
-        self.optional = config.get("optional", {})
+        # Validate the hyperparameters and optional settings
+        self.hyperparameters = HyperparameterSchema(**config["hyperparameters"])
 
+        # Validate the optional settings
+        # # NOTE: Due to weird finickiness, the amnesia key does not fail if it is not a boolean
+        # Exceptions are the strings "True" and "False"
+        amnesia_value = config["optional"]["amnesia"]
+        if isinstance(amnesia_value, str):
+            logger.error("Amnesia value must be a boolean. Converting.")
+            # Convert to boolean
+            config["optional"]["amnesia"] = amnesia_value.lower() == "true"
+        
+        self.optional = OptionalSchema(**config["optional"])
+        
         if self.chat_settings.enable_system_message:
             model_name = self.chat_settings.primary_model.model_name
-            if model_name in SYSTEM_MSG_MAP:
-                self.chat_settings.system_message = SYSTEM_MSG_MAP[model_name]
-                logger.info(f"System message adjusted for model {model_name}.")
+            if model_name in MODEL_TO_SYSTEM_MSG:
+                self.chat_settings.system_message = MODEL_TO_SYSTEM_MSG[model_name]
+                print(f"Forced custom system message for model {model_name}.")
 
         self.__validate_rag_settings()
         self.save_active_settings()
@@ -650,10 +681,12 @@ class Config:
         """
         Validate the RAG settings
         """
-        if not path.exists("documents"):
-            mkdir("documents")
-        if not path.exists("manifest.json"):
-            with open("manifest.json", "w") as f:
+        if not path.exists(utils.DOCUMENTS_DIR):
+            mkdir(utils.DOCUMENTS_DIR)
+
+        filepath = utils.DATA_DIR / "manifest.json"
+        if not path.exists(filepath):
+            with open(filepath, "w") as f:
                 # Make databases key
                 f.write('{"databases": []}')
 
@@ -664,25 +697,36 @@ class Config:
         data = {
             "RAG": self.rag_settings.to_dict(),
             "chat": self.chat_settings.to_dict(),
+            "optional": self.optional.model_dump(),
         }
         utils.save_config_as_json(data, filename)
 
     def __str__(self):
-        return self.props()
+        return self.print_props()
 
     def __repr__(self):
-        return self.props()
+        return self.print_props()
 
-    def props(self) -> str:
+    def print_props(self) -> str:
         """
         Return the keys and values for each item in RAG settings and chat settings
         """
-        RAG_settings_str = "\n".join(
-            f"{k}: {v}" for k,
-            v in self.rag_settings.props().items())
-        chat_settings_str = "\n".join(
-            f"{k}: {v}" for k,
-            v in self.chat_settings.props().items())
-        hyperparameters_str = "\n".join(
-            f"{k}: {v}" for k, v in self.hyperparameters.items())
-        return f"Rag Config:\n{RAG_settings_str}\n\nChat Config:\n{chat_settings_str}\n\nHyperparameters:\n{hyperparameters_str}"
+        def format_dict(d: dict):
+            return "\n".join(f"{k}: {v}" for k, v in d.items())
+        rag_settings = format_dict(self.rag_settings.to_dict())
+        chat_settings = format_dict(self.chat_settings.to_dict())
+        hyperparameters = format_dict(self.hyperparameters.model_dump())
+        optional_settings = format_dict(self.optional.model_dump())
+        
+        return f"""Rag Config:
+{rag_settings}
+
+Chat Config:
+{chat_settings}
+
+Hyperparameters:
+{hyperparameters}
+
+Optional:
+{optional_settings}
+"""
