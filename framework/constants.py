@@ -30,7 +30,7 @@ FLASHCARD_SYSTEM_MESSAGE = """You are Flashcard AI. Use the document excerpts to
 ]"""
 
 FLASHCARD_SIMPLE_SYSTEM_MESSAGE = "Generate a list of JSON flashcards with consistent keys appropriate for the given request. Only output a list[dict] with valid JSON."
-#"Output a list[dict]. Each JSON object should stay consistent to the schema. Use lowercase for boolean values."
+# "Output a list[dict]. Each JSON object should stay consistent to the schema. Use lowercase for boolean values."
 
 MODEL_CODES = {
     "gpt4": "get_openai_gpt4",

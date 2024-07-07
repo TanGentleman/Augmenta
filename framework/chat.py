@@ -1,42 +1,42 @@
+from langchain_core.output_parsers import JsonOutputParser
+from flash.flashcards import construct_flashcards, display_flashcards, FLASHCARD_FILEPATH
+from langchain.schema import SystemMessage, AIMessage, HumanMessage, BaseMessage
+from langchain_community.vectorstores.chroma import Chroma
+from langchain_community.vectorstores.faiss import FAISS
+from langchain_core.vectorstores import VectorStoreRetriever
+from langchain.retrievers.multi_vector import MultiVectorRetriever
+from langchain_core.documents import Document
+from langchain.storage import InMemoryByteStore
+import utils
+from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SUMMARY_TEMPLATE, SYSTEM_MESSAGE_CODES
+from config.config import MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, EXPLAIN_EXCERPT, FILTER_TOPIC
+from classes import Config
+from models.models import LLM_FN, LLM
+from chains import get_summary_chain, get_rag_chain, get_eval_chain
+from rag import input_to_docs, get_chroma_vectorstore_from_docs, get_faiss_vectorstore_from_docs, load_existing_faiss_vectorstore, load_existing_chroma_vectorstore, split_documents
+import pyperclip
+from json import dump as json_dump
+from uuid import uuid4
+from os import get_terminal_size
+from textwrap import fill
 from dotenv import load_dotenv
 load_dotenv()
-from textwrap import fill
-from os import get_terminal_size
-from uuid import uuid4
-from json import dump as json_dump
-import pyperclip
 try:
     import gnureadline
 except ImportError:
     pass
 
-from rag import input_to_docs, get_chroma_vectorstore_from_docs, get_faiss_vectorstore_from_docs, load_existing_faiss_vectorstore, load_existing_chroma_vectorstore, split_documents
-from chains import get_summary_chain, get_rag_chain, get_eval_chain
-from models.models import LLM_FN, LLM
-from classes import Config
-from config.config import MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, EXPLAIN_EXCERPT, FILTER_TOPIC
-from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SUMMARY_TEMPLATE, SYSTEM_MESSAGE_CODES
-import utils
-from langchain.storage import InMemoryByteStore
-from langchain_core.documents import Document
-from langchain.retrievers.multi_vector import MultiVectorRetriever
-from langchain_core.vectorstores import VectorStoreRetriever
-from langchain_community.vectorstores.faiss import FAISS
-from langchain_community.vectorstores.chroma import Chroma
-from langchain.schema import SystemMessage, AIMessage, HumanMessage, BaseMessage
-
-from flash.flashcards import construct_flashcards, display_flashcards, FLASHCARD_FILEPATH
-from langchain_core.output_parsers import JsonOutputParser
-
 
 TERMINAL_WIDTH = get_terminal_size().columns
-# NOTE: The get_terminal_size function can be called at runtime if the terminal width changes
+# NOTE: The get_terminal_size function can be called at runtime if the
+# terminal width changes
+
 
 def print_adjusted(
-    text: str,
-    end='\n',
-    flush=False,
-    width=TERMINAL_WIDTH) -> None:
+        text: str,
+        end='\n',
+        flush=False,
+        width=TERMINAL_WIDTH) -> None:
     '''
     Prints text with adjusted line wrapping
     '''
@@ -243,11 +243,12 @@ class Chatbot:
             config = Config(config_override=config_override)
 
         self.config = config
-        
+
         self.chat_model = None
         self.backup_model = None
 
-        # If rag mode was already set to true True, then this may run initialize_rag again. Shouldn't be a problem.
+        # If rag mode was already set to true True, then this may run
+        # initialize_rag again. Shouldn't be a problem.
         if self.config.rag_settings.rag_mode:
             self.initialize_rag()
         else:
@@ -545,7 +546,8 @@ class Chatbot:
                 try:
                     self.chat_model = LLM(
                         self.config.chat_settings.backup_model)
-                    print(f'Switching to backup model {self.chat_model.model_name}')
+                    print(
+                        f'Switching to backup model {self.chat_model.model_name}')
                     return
                 except BaseException:
                     print('Error switching to backup model')
@@ -559,13 +561,15 @@ class Chatbot:
             if len(self.messages) < 2:
                 print('No responses to save')
                 return
-            utils.save_string_as_markdown_file(self.messages[-1].content, filename="response.md")
+            utils.save_string_as_markdown_file(
+                self.messages[-1].content, filename="response.md")
             # TODO: Modify this to work with RAG mode
             print('Saved response to response.md')
             return
         elif prompt == "saveall":
             message_string = self.messages_to_string(self.messages)
-            utils.save_string_as_markdown_file(message_string, filename="response.md")
+            utils.save_string_as_markdown_file(
+                message_string, filename="response.md")
             print(f'Saved {self.response_count} exchanges to history.md')
             return
         elif prompt == "info":
@@ -821,20 +825,23 @@ class Chatbot:
                 try:
                     def is_output_valid(output):
                         # is it a list of dicts?
-                        return isinstance(output, list) and isinstance(output[0], dict)
+                        return isinstance(
+                            output, list) and isinstance(
+                            output[0], dict)
                     response_object = JsonOutputParser().parse(response_string)
                     assert is_output_valid(response_object)
                     print("Got valid JSON for flashcards.")
-                    flashcards, keys, styles = construct_flashcards(response_object)
+                    flashcards, keys, styles = construct_flashcards(
+                        response_object)
                     display_flashcards(
-                        flashcards, 
+                        flashcards,
                         panel_name="Flashcard",
-                        delay=0, 
+                        delay=0,
                         include_answer=True
                     )
                     with open(FLASHCARD_FILEPATH, 'w') as file:
                         json_dump(response_object, file, indent=4)
-                except:
+                except BaseException:
                     print("Did not get valid JSON for flashcards.")
             else:
                 print('Flashcards disabled')
@@ -849,9 +856,9 @@ class Chatbot:
         try:
             if stream:
                 response_string = ""
-                
+
                 for chunk in self.rag_chain.stream(prompt):
-                    if self.rag_model.is_ollama:    
+                    if self.rag_model.is_ollama:
                         print_adjusted(chunk, end="", flush=True)
                         chunk_content = chunk
                     else:
@@ -881,7 +888,11 @@ class Chatbot:
         self.response_count += 1
         return response
 
-    def chat(self, prompt: str | None = None, persistence_enabled=True, stream: bool | None = None):
+    def chat(
+            self,
+            prompt: str | None = None,
+            persistence_enabled=True,
+            stream: bool | None = None):
         """
         Main chat loop for the chatbot.
 
@@ -936,7 +947,6 @@ class Chatbot:
             if not stripped_prompt:
                 print('No input given, try again')
                 continue
-            
 
             if stripped_prompt in COMMAND_LIST:
                 self.handle_command(stripped_prompt)
@@ -958,7 +968,8 @@ class Chatbot:
                     continue
         if save_response:
             if len(self.messages) > 1:
-                utils.save_string_as_markdown_file(self.messages[-1].content, filename="response.md")
+                utils.save_string_as_markdown_file(
+                    self.messages[-1].content, filename="response.md")
                 print('Saved response to response.md')
         return self.messages
 

@@ -28,6 +28,8 @@ ENCODE_FROM_URL = False
 # config.py?
 
 MODEL_FN = get_together_arctic
+
+
 class TestChatbot(unittest.TestCase):
     def setUp(self):
         config_override = {
@@ -55,10 +57,19 @@ class TestChatbot(unittest.TestCase):
     def test_get_rag_response(self):
         self.chatbot.config.rag_settings.rag_mode = True
         self.chatbot.initialize_rag()
-        response = self.chatbot.get_rag_response("Tell me about the context", stream=False)
+        response = self.chatbot.get_rag_response(
+            "Tell me about the context", stream=False)
         self.assertIsInstance(response, AIMessage)
+
+
 class EvalTest:
-    def __init__(self, chain: SimpleChain, required_keys = [], validity_fn = None, criteria: str = "", excerpt: str = ""):
+    def __init__(
+            self,
+            chain: SimpleChain,
+            required_keys=[],
+            validity_fn=None,
+            criteria: str = "",
+            excerpt: str = ""):
         self.chain = chain
         self.required_keys = required_keys
         self.criteria = criteria
@@ -86,7 +97,8 @@ class EvalTest:
     def test_chain(self):
         assert all([self.excerpt, self.criteria])
 
-        res = self.chain.invoke({"excerpt": self.excerpt, "criteria": self.criteria})
+        res = self.chain.invoke(
+            {"excerpt": self.excerpt, "criteria": self.criteria})
         print(res)
 
 

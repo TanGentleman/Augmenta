@@ -121,15 +121,17 @@ class TypedPrompt:
                     f"[bold red]Invalid input. Please enter a {type_.__name__}.[/bold red]")
                 logger.warning(f"Invalid input received for prompt: {prompt}")
 
+
 class LayoutConfig:
     def __init__(self):
         self.show_card_count = True
         self.show_flashcard = True
         self.show_answer = True
         self.show_menu = True
-    
+
     @typechecked
-    def get_ratios(self) -> dict[Literal["card_count", "flashcard", "answer", "menu"], int]:
+    def get_ratios(self) -> dict[Literal["card_count",
+                                         "flashcard", "answer", "menu"], int]:
         ratios = {
             "card_count": 1,
             "flashcard": 2,
@@ -138,7 +140,7 @@ class LayoutConfig:
         }
         if not self.show_card_count:
             ratios["card_count"] = 0
-        
+
         if not self.show_flashcard:
             ratios["flashcard"] = 0
 
@@ -147,8 +149,9 @@ class LayoutConfig:
 
         if not self.show_menu:
             ratios["menu"] = 0
-        
+
         return ratios
+
 
 class TerminalLayout:
     """Manages the terminal layout for displaying flashcards."""
@@ -178,23 +181,25 @@ class TerminalLayout:
         flashcard_panel = card.create_flashcard()
         answer_panel = card.create_answer() if app.show_answer else Panel(
             "Press 'S' to show answer", title="Answer", border_style="green")
-        
+
         menu_panel = Panel(
             app.create_menu(),
             title="Menu",
             border_style="blue")
-        
-        # TODO: Perform ratio calculations based on LayoutConfig and terminal size
+
+        # TODO: Perform ratio calculations based on LayoutConfig and terminal
+        # size
 
         layout_elements = []
         ratios = app.layout_config.get_ratios()
         for panel, ratio in ratios.items():
             if panel == "card_count":
                 if ratio:
-                    layout_elements.append(Layout(
-                        Panel(f"Card {app.flashcard_manager.get_current_index() + 1} of {app.flashcard_manager.get_card_count()}"),
-                        name="card_count",
-                        ratio=ratio))
+                    layout_elements.append(
+                        Layout(
+                            Panel(f"Card {app.flashcard_manager.get_current_index() + 1} of {app.flashcard_manager.get_card_count()}"),
+                            name="card_count",
+                            ratio=ratio))
             elif panel == "flashcard":
                 if ratio and not app.show_answer:
                     layout_elements.append(Layout(
@@ -213,7 +218,7 @@ class TerminalLayout:
                         menu_panel,
                         name="menu",
                         ratio=ratio))
-                    
+
         if layout_elements:
             layout = Layout()
             layout.split_column(*layout_elements)
@@ -228,7 +233,8 @@ class FlashcardManagerProtocol(Protocol):
     """Protocol defining the interface for FlashcardManager."""
 
     # TODO: Look into using @property and setter methods for read-only and writable attributes
-    # Seems like I won't be able to use abstract properties, I'll have to include the logic in the FlashcardManagerProtocol class.
+    # Seems like I won't be able to use abstract properties, I'll have to
+    # include the logic in the FlashcardManagerProtocol class.
     @abstractmethod
     def get_key_names(self) -> list[str]:
         """Get the keys for the flashcards."""
@@ -243,17 +249,17 @@ class FlashcardManagerProtocol(Protocol):
     def is_empty(self) -> bool:
         """Check if the flashcard deck is empty."""
         pass
-    
+
     @abstractmethod
     def get_card_count(self) -> int:
         """Get the total number of flashcards."""
         pass
-    
+
     @abstractmethod
     def get_flashcards(self, index: int) -> list[Flashcard]:
         """Get the flashcards."""
         pass
-    
+
     @abstractmethod
     def load_flashcards(self, file_path: str) -> None:
         """Load flashcards from a file."""
@@ -303,12 +309,11 @@ class FlashcardManagerProtocol(Protocol):
     def study_random(self) -> None:
         """Randomize the order of flashcards for studying."""
         pass
-    
+
     @abstractmethod
     def search_flashcards(self, keyword: str) -> list[Flashcard]:
         """Search for flashcards containing a specific keyword."""
         pass
-
 
 
 class FlashcardManager(FlashcardManagerProtocol):
@@ -326,12 +331,14 @@ class FlashcardManager(FlashcardManagerProtocol):
     def get_key_names(self) -> list[str]:
         """Get the keys for the flashcards."""
         return list(self.keys.values())
-    
+
     def get_current_index(self) -> int:
         """Get the current index of the flashcard."""
-        if self.current_index < 0 or self.current_index >= len(self.flashcards):
+        if self.current_index < 0 or self.current_index >= len(
+                self.flashcards):
             print(f"Invalid index retrieval attempted: {self.current_index}")
-            raise FlashcardNotFoundError(f"Invalid card number: {self.current_index + 1}")
+            raise FlashcardNotFoundError(
+                f"Invalid card number: {self.current_index + 1}")
         return self.current_index
 
     def is_empty(self) -> bool:
@@ -349,7 +356,8 @@ class FlashcardManager(FlashcardManagerProtocol):
             if 0 <= index < self.get_card_count():
                 return [self.flashcards[index]]
             else:
-                raise FlashcardNotFoundError(f"Invalid card number: {index + 1}")
+                raise FlashcardNotFoundError(
+                    f"Invalid card number: {index + 1}")
         return self.flashcards
 
     @typechecked
@@ -563,8 +571,6 @@ class KeyboardHandler:
                 (_, description) in self.key_bindings.items()]
 
 
-
-
 class FlashcardApp:
     def __init__(self) -> None:
         self.transparent = False
@@ -576,12 +582,12 @@ class FlashcardApp:
         self.keyboard_handler = KeyboardHandler(self)
         self.layout_config = LayoutConfig()
 
-
     # TODO: Make show answer a property that has side effects
+
     @property
     def show_answer(self) -> bool:
         return self._show_answer
-    
+
     @typechecked
     @show_answer.setter
     def show_answer(self, value: bool) -> None:
@@ -613,7 +619,7 @@ class FlashcardApp:
                 f"[bold red]Invalid layout element: {element}[/bold red]")
 
     def toggle_menu_bar(self) -> bool:
-        self.layout_config.show_menu = not self.layout_config.show_menu # Toggle menu bar
+        self.layout_config.show_menu = not self.layout_config.show_menu  # Toggle menu bar
         self.force_refresh = True
         return False
 
@@ -723,7 +729,8 @@ class FlashcardApp:
 
         index = TypedPrompt.ask("Enter the card number to edit", int) - 1
         try:
-            card: Flashcard = self.flashcard_manager.get_flashcards(index=index)[0]
+            card: Flashcard = self.flashcard_manager.get_flashcards(index=index)[
+                0]
             updated_data: Dict[str, str] = {}
             for key in self.flashcard_manager.get_key_names():
                 current_value = str(card.card_data.get(key, ""))
@@ -817,7 +824,7 @@ class FlashcardApp:
                 #     for key in key_list:
                 #         cell_value = str(card.card_data.get(key, "N/A"))
                 #         row_data.append(cell_value)
-                    
+
                 #     # Add a new row to the table
                 #     # The row starts with the card's index (i + 1 to start counting from 1 instead of 0)
                 #     # followed by the card data for each key

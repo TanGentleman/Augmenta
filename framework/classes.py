@@ -91,6 +91,7 @@ class RagSchema(BaseModel):
     multivector_method: Literal["summary", "qa"]
     doc_ids: list[str] = []
 
+
 class OptionalSchema(BaseModel):
     """
     Optional configuration
@@ -99,6 +100,7 @@ class OptionalSchema(BaseModel):
     prompt_suffix: str
     amnesia: bool
     display_flashcards: bool
+
 
 def get_llm_fn(model_name: str,
                model_type: Literal["llm",
@@ -156,7 +158,8 @@ class RagSettings:
         """
         assert self.rag_mode, "RAG mode must be enabled"
         if self.database_exists is not None:
-            logger.warning("Found value for rag_settings.database_exists! Resetting.")
+            logger.warning(
+                "Found value for rag_settings.database_exists! Resetting.")
         self.database_exists = utils.database_exists(collection_name, method)
         # NOTE: Metadata:
         # - embedding_model
@@ -182,7 +185,7 @@ class RagSettings:
             self.chunk_size = chunk_size
             self.chunk_overlap = chunk_overlap
             self.inputs = inputs
-            
+
         self.rag_llm = rag_llm
         print(self.props())
 
@@ -209,7 +212,7 @@ class RagSettings:
         else:
             raise ValueError("Model not found in MODEL_DICT")
         ManifestSchema(**metadata)
-        
+
         manifest_chunk_size = int(metadata["chunk_size"])
         if override_all or (manifest_chunk_size != self.chunk_size):
             self.chunk_size = manifest_chunk_size
@@ -221,7 +224,7 @@ class RagSettings:
             self.chunk_overlap = manifest_chunk_overlap
             logger.warning(
                 f"Switched chunk overlap to {manifest_chunk_overlap} from manifest.json.")
-        
+
         if override_all or (
                 metadata["embedding_model"] != self.embedding_model.model_name):
             self.embedding_model = metadata["embedding_model"]
@@ -303,7 +306,7 @@ class RagSettings:
                     "Removing this collection from manifest.json")
                 # Remove by collection name
                 data["databases"] = [item for item in data["databases"]
-                                        if item["collection_name"] != self.collection_name]
+                                     if item["collection_name"] != self.collection_name]
                 with open(filepath, "w") as f:
                     json_dump(data, f, indent=2)
                 # NOTE: What happens to the values in the config?
@@ -578,7 +581,7 @@ class ChatSettings:
     @property
     def stream(self) -> bool:
         return self.__stream
-    
+
     @stream.setter
     def stream(self, value):
         if not isinstance(value, bool):
@@ -654,7 +657,8 @@ class Config:
         self.chat_settings = ChatSettings(**config["chat"])
 
         # Validate the hyperparameters and optional settings
-        self.hyperparameters = HyperparameterSchema(**config["hyperparameters"])
+        self.hyperparameters = HyperparameterSchema(
+            **config["hyperparameters"])
 
         # Validate the optional settings
         # # NOTE: Due to weird finickiness, the amnesia key does not fail if it is not a boolean
@@ -664,9 +668,9 @@ class Config:
             logger.error("Amnesia value must be a boolean. Converting.")
             # Convert to boolean
             config["optional"]["amnesia"] = amnesia_value.lower() == "true"
-        
+
         self.optional = OptionalSchema(**config["optional"])
-        
+
         if self.chat_settings.enable_system_message:
             model_name = self.chat_settings.primary_model.model_name
             if model_name in MODEL_TO_SYSTEM_MSG:
@@ -717,7 +721,7 @@ class Config:
         chat_settings = format_dict(self.chat_settings.to_dict())
         hyperparameters = format_dict(self.hyperparameters.model_dump())
         optional_settings = format_dict(self.optional.model_dump())
-        
+
         return f"""Rag Config:
 {rag_settings}
 

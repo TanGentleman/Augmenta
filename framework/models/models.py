@@ -563,7 +563,6 @@ class LLM:
         self.context_size = llm_fn.context_size
         # replace the hyperparameters with the new ones
         self.llm = llm_fn.get_llm(hyperparameters)
-        
 
         if not self.confirm_model_name():
             logger.error(

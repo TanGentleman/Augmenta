@@ -36,12 +36,16 @@ ENABLE_RAG = False
 
 SUFFIX_INSTRUCTION_TEMPLATE = "\nCreate a {NOUN} with the above context. Include keys {REQUIRED} and ONLY output valid JSON, no preamble.\n\n```json"
 
+
 class FlashcardSchema(BaseModel):
     term: str
     definition: str
     example: str
 
+
 USE_SYSTEM = False
+
+
 def get_config() -> Config:
     if USE_SYSTEM:
         chat_settings = {
@@ -62,14 +66,15 @@ def get_config() -> Config:
         }
         optional_settings = {
             "prompt_prefix": FLASHCARD_SIMPLE_SYSTEM_MESSAGE + "\n\n",
-            "prompt_suffix": SUFFIX_INSTRUCTION_TEMPLATE.format(NOUN="flashcard", REQUIRED="(all)"),
-            "amnesia": True
-        }
+            "prompt_suffix": SUFFIX_INSTRUCTION_TEMPLATE.format(
+                NOUN="flashcard",
+                REQUIRED="(all)"),
+            "amnesia": True}
     config_override = {
         "chat": chat_settings,
         "optional": optional_settings
     }
-        
+
     if ENABLE_RAG:
         # use the dict notation
         rag_settings = {

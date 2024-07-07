@@ -18,6 +18,7 @@ DB_DIR = DATA_DIR / "databases"
 CHROMA_FOLDER_PATH = DB_DIR / CHROMA_FOLDER
 FAISS_FOLDER_PATH = DB_DIR / FAISS_FOLDER
 
+
 def copy_string_to_clipboard(string: str) -> str | None:
     """
     Copy a string to the clipboard.
