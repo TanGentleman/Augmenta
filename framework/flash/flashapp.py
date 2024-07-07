@@ -343,6 +343,7 @@ class FlashcardManager(FlashcardManagerProtocol):
         """Get the total number of flashcards."""
         return len(self.flashcards)
 
+    @typechecked
     def get_flashcards(self, index: int | None = None) -> list[Flashcard]:
         """Get the flashcards. Optional Index starts at 0."""
         if index is not None:
@@ -567,13 +568,27 @@ class KeyboardHandler:
 
 class FlashcardApp:
     def __init__(self) -> None:
+        self.transparent = False
+        self.force_refresh = True
+
         self.flashcard_manager: FlashcardManagerProtocol = FlashcardManager()
         self.show_answer: bool = False
         self.terminal_layout = TerminalLayout()
         self.keyboard_handler = KeyboardHandler(self)
         self.layout_config = LayoutConfig()
 
-        self.force_refresh = True
+
+    # TODO: Make show answer a property that has side effects
+    @property
+    def show_answer(self) -> bool:
+        return self._show_answer
+    
+    @typechecked
+    @show_answer.setter
+    def show_answer(self, value: bool) -> None:
+        if self.transparent:
+            value = True
+        self._show_answer = value
 
     @typechecked
     def load_flashcards(self, file_path: str) -> None:
@@ -608,6 +623,8 @@ class FlashcardApp:
             console.clear()
             console.print(Panel("Layout Configuration", style="bold magenta"))
             console.print(
+                "0. Enable Transparency (Answers always shown)")
+            console.print(
                 f"1. Card Count: {'Shown' if self.layout_config.show_card_count else 'Hidden'}")
             console.print(
                 f"2. Flashcard: {'Shown' if self.layout_config.show_flashcard else 'Hidden'}")
@@ -619,8 +636,12 @@ class FlashcardApp:
 
             choice = TypedPrompt.ask(
                 "Choose an option to toggle", str, choices=[
-                    "1", "2", "3", "4", "5"])
-            if choice == "1":
+                    "0", "1", "2", "3", "4", "5"])
+
+            if choice == "0":
+                self.transparent = True
+                self.show_answer = True
+            elif choice == "1":
                 self.toggle_layout_element("show_card_count")
             elif choice == "2":
                 self.toggle_layout_element("show_flashcard")
@@ -764,11 +785,14 @@ class FlashcardApp:
         """
 
         keyword = TypedPrompt.ask(
-            "Enter search keyword",
+            "Enter search keyword ('.' for all)",
             str)  # Prompt for keyword input
 
         if keyword.strip():  # Ensure keyword is not empty after whitespace removal
-            results = self.flashcard_manager.search_flashcards(keyword)
+            if keyword == ".":
+                results = self.flashcard_manager.get_flashcards()
+            else:
+                results = self.flashcard_manager.search_flashcards(keyword)
 
             if results:  # If matching flashcards are found
                 table = Table(title=f"Search Results for '{keyword}'")
