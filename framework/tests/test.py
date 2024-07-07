@@ -21,131 +21,73 @@ IMAGE_URL = "https://upload.wikimedia.org/wikipedia/commons/e/e2/The_Algebra_of_
 # Preview image for context
 # Open the image file and encode it as a base64 string
 ENCODE_FROM_URL = False
-"""
-Output a valid json object for each excerpt (4 in total). It should contain the source, index, and a boolean value for criteria_met. If the criteria is met, provide a snippet of what it mentions, and what criteria it corresponds to. CRITERIA: Any word or phrase related to the 1) brain, 2) cognitive science, or 3) research.
 
-Example 1:
-context: "The study, published in the journal Science, used functional magnetic resonance imaging (fMRI) to monitor the brain activity of participants while they performed cognitive tasks."
-
-output: {
-  "source": "Research_Paper_12.pdf",
-  "index": 1,
-  "criteria_met": True,
-  "mention": "brain activity",
-  "criteria": "brain",
-}
-
-Example 2:
-context: "Cognitive science is a multidisciplinary field of study that draws from neuroscience, psychology, philosophy, computer science, anthropology, and linguistics."
-
-output: {
-  "source": "Cognitive_Science_Overview.txt",
-  "index": 2,
-  "criteria_met": True,
-  "mention": "Cognitive science",
-  "criteria": "cognitive science",
-}
-
-Example 3:
-context: "The research team conducted a series of experiments to investigate the neural mechanisms underlying decision-making processes."
-
-output: {
-  "source": "Neural_Mechanisms_Study.docx",
-  "index": 3,
-  "criteria_met": True,
-  "mention": "research team",
-  "criteria": "research",
-}
-
-Example 4:
-context: "The book explores the fascinating world of artificial intelligence and its potential impact on society."
-
-output: {
-  "source": "AI_Book.epub",
-  "index": 4,
-  "criteria_met": False,
-  "mention": "",
-  "criteria": "",
-}
-
-Example 5:
-context: "The lecture covered various aspects of human memory, including short-term memory, long-term memory, and working memory."
-
-output: {
-  "source": "Memory_Lecture.pptx",
-  "index": 5,
-  "criteria_met": True,
-  "mention": "human memory",
-  "criteria": "brain",
-}
-Now provide an output object for the given context.
-"""
 # This file is in Augmenta/framework/tests
 # The root is Augmenta/framework
 # How can I import the Chatbot class from chat.py and Config class from
 # config.py?
 
-MODEL_FN = get_claude_sonnet
-# class TestChatbot(unittest.TestCase):
-#     def setUp(self):
-#         config_override = {
-#             "chat": {
-#                 "primary_model": "local",
-#             },
-#             "RAG": {
-#                 "rag_mode": False,
-#                 "collection_name": "0",
-#             }
-#         }
-#         self.chatbot = Chatbot(Config(config_override))
+MODEL_FN = get_together_arctic
+class TestChatbot(unittest.TestCase):
+    def setUp(self):
+        config_override = {
+            "chat": {
+                "primary_model": "bigmix",
+            },
+            "RAG": {
+                "rag_mode": False,
+                "collection_name": "1",
+            }
+        }
+        self.chatbot = Chatbot(Config(config_override))
 
-#     def test_get_chat_response(self):
-#         prompt = "Capital of indiana?"
-#         response = self.chatbot.get_chat_response(prompt, stream=False)
-#         self.assertIsInstance(response, AIMessage)
+    def test_get_chat_response(self):
+        prompt = "Capital of indiana?"
+        response = self.chatbot.get_chat_response(prompt, stream=False)
+        self.assertIsInstance(response, AIMessage)
 
-# def test_chatbot_nonpersistent(self):
-#     messages = self.chatbot.chat(".read", persistence_enabled=False)
-#     self.assertIsInstance(messages, list)
-#     response = messages[-1]
-#     self.assertIsInstance(response, AIMessage)
+    def test_chatbot_nonpersistent(self):
+        messages = self.chatbot.chat(".read", persistence_enabled=False)
+        self.assertIsInstance(messages, list)
+        response = messages[-1]
+        self.assertIsInstance(response, AIMessage)
 
-# def test_get_rag_response(self):
-#     self.chatbot.config.rag_settings.rag_mode = True
-#     self.chatbot.initialize_rag()
-#     response = self.chatbot.get_rag_response("What is RAG?", stream=False)
-#     self.assertIsInstance(response, AIMessage)
-# class EvalTest:
-#     def __init__(self, chain: SimpleChain, required_keys = [], validity_fn = None, criteria: str = "", excerpt: str = ""):
-#         self.chain = chain
-#         self.required_keys = required_keys
-#         self.criteria = criteria
-#         self.excerpt = excerpt
-#         if validity_fn is None:
-#             self.validity_fn = lambda x: bool(isinstance(x, dict))
+    def test_get_rag_response(self):
+        self.chatbot.config.rag_settings.rag_mode = True
+        self.chatbot.initialize_rag()
+        response = self.chatbot.get_rag_response("Tell me about the context", stream=False)
+        self.assertIsInstance(response, AIMessage)
+class EvalTest:
+    def __init__(self, chain: SimpleChain, required_keys = [], validity_fn = None, criteria: str = "", excerpt: str = ""):
+        self.chain = chain
+        self.required_keys = required_keys
+        self.criteria = criteria
+        self.excerpt = excerpt
+        if validity_fn is None:
+            self.validity_fn = lambda x: bool(isinstance(x, dict))
 
-#         assert self.validity_fn({}), "Empty dictionary failed."
-#         # assert self.validity_fn('{}'), "String failed."
+        assert self.validity_fn({}), "Empty dictionary failed."
+        # assert self.validity_fn('{}'), "String failed."
 
-#     def is_output_valid(self, output_object: dict) -> bool:
-#         """
-#         Checks if the output is valid.
-#         """
-#         for key in self.required_keys:
-#             if key not in output_object:
-#                 return False
-#         result = output_object["meetsCriteria"]
-#         difficulty = output_object["difficulty"]
-#         assert isinstance(result, bool)
-#         assert isinstance(difficulty, str) and difficulty in ["easy", "hard"]
-#         print("Meets criteria:", result)
-#         return True
+    def is_output_valid(self, output_object: dict) -> bool:
+        """
+        Checks if the output is valid.
+        """
+        for key in self.required_keys:
+            if key not in output_object:
+                return False
+        result = output_object["meetsCriteria"]
+        difficulty = output_object["difficulty"]
+        assert isinstance(result, bool)
+        assert isinstance(difficulty, str) and difficulty in ["easy", "hard"]
+        print("Meets criteria:", result)
+        return True
 
-#     def test_chain(self):
-#         assert all([self.excerpt, self.criteria])
+    def test_chain(self):
+        assert all([self.excerpt, self.criteria])
 
-#         res = self.chain.invoke({"excerpt": self.excerpt, "criteria": self.criteria})
-#         print(res)
+        res = self.chain.invoke({"excerpt": self.excerpt, "criteria": self.criteria})
+        print(res)
 
 
 class TestChains(unittest.TestCase):
@@ -176,7 +118,7 @@ class TestChains(unittest.TestCase):
         # EXCERPT = "130-21-1221"
         # CRITERIA = "Evaluating the expression gets a result that is odd."
         EXCERPT = "reformatter.py requirements.txt response.md routing.py run_server.py"
-        CRITERIA = "This is likely to have something to do with nuclear tech."
+        CRITERIA = "This is likely to be part of a Python project."
         criteria_suffix = ' Use 3 keys: reasoning, meetsCriteria, difficulty ("easy" or "hard").'
         eval_inputs = {
             "excerpt": EXCERPT,
