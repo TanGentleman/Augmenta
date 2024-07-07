@@ -159,6 +159,21 @@ def display_flashcards(
         print(flashcard.create_flashcard(panel_name, include_answer))
         sleep(delay)
 
+def construct_flashcards(data: dict) -> Tuple[List[Flashcard], Dict[str, str], List[Tuple[str, str]]]:
+    """
+    Construct Flashcard objects from a dictionary.
+
+    Args:
+        data (dict): Dictionary containing flashcard data.
+
+    Returns:
+        List[Flashcard]: List of Flashcard objects.
+        Dict[str, str]: Field mapping.
+        List[Tuple[str, str]]: List of field styles.
+    """
+    keys, styles = generate_mapping_and_styles(data)
+    flashcards = [Flashcard(card, keys, styles) for card in data]
+    return flashcards, keys, styles
 
 def load_flashcards_from_json(
         file_path: str) -> Tuple[List[Flashcard], Dict[str, str], List[Tuple[str, str]]]:
@@ -180,10 +195,9 @@ def load_flashcards_from_json(
     try:
         with open(file_path, 'r') as file:
             data = json.load(file)
-
-        keys, styles = generate_mapping_and_styles(data)
-        flashcards = [Flashcard(card, keys, styles) for card in data]
-        return flashcards, keys, styles
+            flashcards, keys, styles = construct_flashcards(data)
+            logger.info(f"Loaded {len(flashcards)} flashcards from {file_path}")
+            return flashcards, keys, styles
 
     except FileNotFoundError:
         logger.error(f"File not found: {file_path}")
@@ -197,7 +211,6 @@ def load_flashcards_from_json(
     except Exception as e:
         logger.error(f"Unexpected error: {str(e)}")
         raise
-
 
 def save_flashcards_to_json(
         flashcards: List[Flashcard],
