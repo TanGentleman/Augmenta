@@ -3,6 +3,7 @@ load_dotenv()
 from textwrap import fill
 from os import get_terminal_size
 from uuid import uuid4
+from json import dump as json_dump
 import pyperclip
 try:
     import gnureadline
@@ -24,7 +25,7 @@ from langchain_community.vectorstores.faiss import FAISS
 from langchain_community.vectorstores.chroma import Chroma
 from langchain.schema import SystemMessage, AIMessage, HumanMessage, BaseMessage
 
-from flash.flashcards import construct_flashcards, display_flashcards
+from flash.flashcards import construct_flashcards, display_flashcards, FLASHCARD_FILEPATH
 from langchain_core.output_parsers import JsonOutputParser
 
 
@@ -826,6 +827,8 @@ class Chatbot:
                     print("Got valid JSON for flashcards.")
                     flashcards, keys, styles = construct_flashcards(response_object)
                     display_flashcards(flashcards)
+                    with open(FLASHCARD_FILEPATH, 'w') as file:
+                        json_dump(response_object, file, indent=4)
                 except:
                     print("Did not get valid JSON for flashcards.")
             else:

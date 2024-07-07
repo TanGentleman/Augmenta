@@ -16,8 +16,8 @@ import logging
 from time import sleep
 
 from pathlib import Path
-FLASHCARD_AI_ROOT = Path(__file__).resolve().parent
-
+FLASH_DIR = Path(__file__).resolve().parent
+FLASHCARD_FILEPATH = FLASH_DIR / "flashcards.json"
 
 # Configure logging
 logging.basicConfig(
@@ -237,7 +237,7 @@ def save_flashcards_to_json(
 
 if __name__ == "__main__":
     try:
-        file_path = FLASHCARD_AI_ROOT / "flashcards.json"
+        file_path = FLASHCARD_FILEPATH
         flashcards, keys, styles = load_flashcards_from_json(file_path)
         logger.info(f"Generated mapping: {keys}")
         logger.info(f"Generated styles: {styles}")

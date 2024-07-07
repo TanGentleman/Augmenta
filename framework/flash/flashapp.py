@@ -15,9 +15,8 @@ from typeguard import typechecked
 from abc import ABC, abstractmethod
 from typing_extensions import Protocol
 
-from .flashcards import load_flashcards_from_json, Flashcard, save_flashcards_to_json
-ROOT = Path(__file__).parent
-FLASHCARD_FILEPATH = ROOT / "flashcards.json"
+from .flashcards import load_flashcards_from_json, Flashcard, save_flashcards_to_json, FLASH_DIR
+FLASHCARD_FILEPATH = FLASH_DIR / "flashcards.json"
 # Set up logging
 logging.basicConfig(
     level=logging.INFO,
