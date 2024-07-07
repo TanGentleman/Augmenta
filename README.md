@@ -3,87 +3,15 @@
     <em>Augment your workflows with RAG. And make it easy.</em>
 </p>
 
-<br><!-- TABLE OF CONTENTS -->
-<details>
-  <summary>Table of Contents</summary><br>
-
-- [Overview](#overview)
-- [Features](#features)
-- [Repository Structure](#repository-structure)
-- [Modules](#modules)
-- [Getting Started](#getting-started)
-  - [Installation](#installation)
-  - [Usage](#usage)
-- [Project Roadmap](#project-roadmap)
-- [Contributing](#contributing)
-- [License](#license)
-</details>
-<hr>
-
 ## Overview
 
-Augmenta is a powerful and flexible framework that simplifies the process of building Retrieval-Augmented Generation (RAG) workflows. The configuration supports multiple vector databases, LLM providers, and embedding models into your projects, enabling you to create sophisticated and efficient RAG tasks with minimal effort.
-
-One of the key features of Augmenta is its fully-offline mode, which allows you to run the models locally without relying on external services. This is huge for developers who prioritize data privacy and control over their workflows.
+Augmenta is a powerful and flexible framework that is undergoing rapid change! Check out the flash folder for using Augmenta as a component in an interactive Flashcard app.
 
 Augmenta provides a set of minimal yet useful abstractions that make it easy to scale your chains in complexity and add custom steps to any workflow. For a quick chatbot, a question-answering system for your documents, or scaled up applications that require retrieval and generation capabilities, Augmenta has you covered.
 
-## Repository Structure
-
-```sh
-└── Augmenta/
-    ├── TODO.md
-    ├── chat.py
-    ├── classes.py
-    ├── config.py
-    ├── constants.py
-    ├── documents
-    │   └── 12AngryMen.pdf
-    ├── embed.py
-    ├── evaluation_workflow.jpeg
-    ├── helpers.py
-    ├── manifest.json
-    ├── models.py
-    ├── notebooks
-    │   ├── agents.ipynb
-    │   ├── gradio.ipynb
-    │   ├── notebook.ipynb
-    │   ├── notebook_rag.ipynb
-    │   ├── pipelines.ipynb
-    │   ├── retriever.ipynb
-    │   └── vectors.ipynb
-    ├── rag.py
-    ├── reformatter.py
-    ├── requirements.txt
-    ├── sample.txt
-    └── settings.json
-```
-
-## Modules
-
-### File Summary
-
-| File | Summary |
-| --- | --- |
-| [config.py](config.py) | Defines special settings for the Chatbot, as well as custom configurations for RAG metadata mapping and filtering a vector database by topic. |
-| [settings.json](settings.json) | The main configuration file for the Chatbot. Set up the Chat and RAG specifications here, as these are the settings used to instantiate chats, as well as get inputs and parameters for the vectorization and retrieval. |
-| [embed.py](embed.py) | Module to load and index documents into vector stores for further processing. Supports loading from URLs, local files, and text files using various loaders like WebBaseLoader, ArxivLoader, UnstructuredFileLoader, and TextLoader. Chroma and FAISS vector stores are used to store the vectors obtained through the Embedder model. |
-| [models.py](models.py) | Define and create instances of models using different APIs (Together, OpenAI, Anthropic, Ollama, LMStudio) from this file. The MODEL_DICT stores the up to date list of supported models along with useful metadata. |
-| [requirements.txt](requirements.txt) | The essential packages use the Langchain framework and their integrations. `faiss-cpu` / `chromadb` are the main dependencies for the vector database. |
-| [constants.py](constants.py) | Defines the templates for system messages and the different chains. |
-| [chat.py](chat.py) | Implements an interactive chatbot that can operate in two modes: a standard chat mode and a RAG (Retrieval-Augmented Generation) mode. In standard chat mode, the chatbot responds to user input using a configurable LLM. In RAG mode, the chatbot indexes documents and uses a vector database to retrieve the most contextually appropriate sources to generate responses with high ground truth. |
-| [rag.py](rag.py) | Module to run the Retrieval-Augmented Generation (RAG) pipeline, taking a language model (llm), a retriever, and a template to create a chain. This pipeline is used to retrieve relevant documents, format them, perform in-between steps like generate summaries or evaluate the excerpts, then generate a high quality response using the appropriate context. |
-| [manifest.json](manifest.json) | In this repository, the `manifest.json` file serves as a reference manifest for database collections. It specifies a database with an ID, collection name, and metadata including embedding model, search method, chunk size, and input documents. |
-| [classes.py](classes.py) | Defines schemas for Chat, RAG, and Hyperparameter settings. Custom classes within the Config object for validating and adjusting settings dynamically. |
-| [helpers.py](helpers.py) | Utility functions, including dealing with reading and updating the manifest.json file. Other functions include saving response strings to markdown files, cleaning text, formatting documents for context input, and checking existence for vector databases. |
+Need structured data from 1000+ documents? No problem. Enforcing certain fields and between-step validation functions? You got it. Build complex pipelines using Augmenta components to melt all the friction in your workflow!
 
 ## Getting Started
-
-### System Requirements:
-
-* **Tested on Python**: `version 3.11.7`
-
-### Installation
 
 Get started with Augmenta in <3 minutes:
 
@@ -130,27 +58,10 @@ OPENAI_API_KEY=""
 TOGETHER_API_KEY=""
 ANTHROPIC_API_KEY=""
 LANGCHAIN_API_KEY=""
-LANGCHAIN_TRACING_V2="true"
+LANGCHAIN_TRACING_V2="false"
 LANGCHAIN_PROJECT="Augmenta"
 ```
-Replace the placeholders with your own values. Models set in settings.json will require an API key to authorize with the respective provider, but none are required, as the project can run fully locally using LMStudio or Ollama as a backend inference server.
-
-Run Augmenta using the command below:
-```bash
-python3 chat.py
-```
-Optional flags: `-np` (non-persistent), `-rag` (rag mode). Append a prompt to the command to start the chat with a specific prompt. For example, if loading inputs that contain hundreds of receipes, you can quickly get a response saved to response.md without having a persistent chat:
-```bash
-python3 chat.py -rag -np "What are the ingredients I would need for the tacos and enchiladas? Can I get all the ingredients from the local ALDI?"
-```
-
-## Project Roadmap
-
-- [X] `Finally make this README!`
-- [X] `Implement MultiVectorRetriever workflow from TODO.md`
-- [ ] `Clearer instructions for first-time user` [HIGH]
-- [ ] `YAML implementation for settings.json` [MED]
-- [ ] `Integration with document ingestion APIs (Vectara, AI21Labs, local Cohere server)` [LOW]
+No API keys are required, as the project can run locally using LMStudio, Ollama, or Llama-cpp as a backend inference server.
 
 ## Contributing
 
