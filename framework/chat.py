@@ -51,22 +51,21 @@ ID_KEY = "doc_id"
 
 REFORMATTING_PROMPTS = [".paste", ".read"]
 COMMAND_LIST = [
-    "del",
-    "quit",
-    "exit",
-    "switch",
-    "refresh",
-    "save",
-    "saveall",
-    "info",
-    "rag",
-    "reg",
-    ".s",
-    ".names",
-    ".copy",
-    ".rm",
-    ".eval"]
-
+    "q", ".q", "quit", 
+    ".d", ".del", 
+    ".swap", ".switch", 
+    ".r", ".refresh",
+    ".s", ".save", 
+    ".sa", ".saveall", 
+    ".i", ".info",
+    ".rt", ".rag", ".reg", 
+    ".sys",
+    ".names", 
+    ".copy", 
+    ".eval", 
+    ".a", 
+    ".pick"
+]
 
 class Chatbot:
     """
@@ -153,12 +152,12 @@ class Chatbot:
         messages = []
         if not self.config.rag_settings.rag_mode:
             if self.config.chat_settings.enable_system_message:
-                messages.append(
-                    SystemMessage(
+                self._add_message(SystemMessage(
                         content=self.config.chat_settings.system_message))
             else:
                 print('System message disabled')
-
+        
+        # NOTE: Switch to a a setter method to avoid misalignment of response count
         self.messages = messages
         self.response_count = 0
         return
@@ -252,11 +251,9 @@ class Chatbot:
         # If rag mode was already set to true True, then this may run
         # initialize_rag again. Shouldn't be a problem.
         if self.config.rag_settings.rag_mode:
-            self.initialize_rag()
+            self.enable_rag_mode()
         else:
-            self.chat_model = LLM(self.config.chat_settings.primary_model)
-            self.set_messages()
-            self.response_count = 0
+            self.disable_rag_mode()
 
     def _set_doc_ids(self):
         assert self.config.rag_settings.rag_mode, "RAG mode must be on"
@@ -525,17 +522,111 @@ class Chatbot:
     def set_clipboard(self, text: str) -> None:
         return utils.copy_string_to_clipboard(text)
 
+    def handle_pick_command(self):
+        """
+        Handles the pick command.
+        """
+        if len(self.messages) < 2:
+            print('No messages to delete')
+            return
+        if self._get_message(-1).type != "ai":
+            print('Last message must be AI response')
+            return
+        print('Choose an exchange to delete:')
+        exchange_count = 0
+        
+        # NOTE: Messages must alternate between AI and Human
+        has_sys_message = bool(self._get_message(0).type == "system")
+        for i, message in enumerate(self.messages):
+            if message.type == "system":
+                assert i == 0, "System message not at start"
+            elif message.type == "ai":
+                exchange_count += 1
+                display_index = exchange_count
+            else:
+                assert message.type == "human", "Message type not human"
+                display_index = exchange_count + 1
+            
+            message_suffix = "" if len(message.content) < 50 else "..."
+            print(f"{display_index}. {message.content[:50]}{message_suffix}")
+        try:
+            index = input('Enter the index of the exchange to delete: ')
+            if "-" in index:
+                start, end = map(int, index.split("-"))
+                if start <= 0 or end > len(self.messages) // 2:
+                    print('Invalid index range')
+                    return
+                # Adjust for exchange count
+                if has_sys_message:
+                    start = (start * 2 - 1)
+                    end = (end * 2)
+                else:
+                    start = (start * 2 - 2)
+                    end = (end * 2 - 1)
+                for i in range(start, end + 1):
+                    self.messages.pop(start)
+                    self.response_count -= i % 2
+                print('Deleted exchanges')
+                return
+            else:
+                index = int(index)
+                if index <= 0 or index > len(self.messages) // 2:
+                    if index == 0:
+                        print('Cannot delete system message')
+                    print('Invalid index')
+                    return
+                # Adjust for exchange count
+                if has_sys_message:
+                    index_to_pop = (index * 2 - 1)
+                else:
+                    index_to_pop = (index * 2 - 2)
+                self.messages.pop(index_to_pop)
+                self.messages.pop(index_to_pop)
+                self.response_count -= 1
+                print('Deleted exchange')
+                return
+        except ValueError:
+            print('Invalid input')
+
     def handle_command(self, prompt):
+        """
+        Handles commands in the chat loop.
+
+        Args:
+        - prompt (str): The string from COMMAND_LIST to be called.
+
+        Commands:
+        - q, .q, quit: Exits the chat loop.
+        - .d, .del: Deletes the last exchange.
+        - .swap, .switch: Switches the chat model.
+        - .r, .refresh: Refreshes the configuration.
+        - .s, .save: Saves the last response.
+        - .sa, .saveall: Saves all exchanges.
+        - .i, .info: Displays information.
+        - .r, .refresh: Toggles RAG mode (on/off).
+        - .rag: Switches to RAG mode.
+        - .reg: Switches to chat mode.
+        - .sys: Sets a system message.
+        - .names: Displays collection names.
+        - .copy: Copies the last response to clipboard.
+        - .pick: Select chat exchanges to remove.
+        - .eval: Evaluates the vectorstore.
+        - .a: Amnesia mode.
+        """
         assert prompt in COMMAND_LIST, "Invalid command"
         print("Executing command")
-        if prompt == "del":
+        ### Commands ###
+        # Delete last exchange
+        if prompt in [".d", ".del"]:
             self._pop_last_exchange()
             return
-        elif prompt == "quit" or prompt == "exit":
+        # Quit chat
+        elif prompt in ["q", ".q", "quit"]:
             print('Exiting.')
             self.exit = True
             return
-        elif prompt == "switch":
+        # Switch chat model
+        elif prompt in [".swap", ".switch"]:
             if self.config.rag_settings.rag_mode:
                 print("Cannot switch models in RAG mode")
                 return
@@ -556,25 +647,29 @@ class Chatbot:
                     raise SystemExit
             else:
                 raise ValueError("Backup model is neither None nor LLM")
-        elif prompt == "refresh":
+        # Refresh configuration
+        elif prompt in [".r", ".refresh"]:
             self.refresh_config()
             return
-        elif prompt == "save":
+        # Save last response to file (response.md)
+        elif prompt in [".s", ".save"]:
             if len(self.messages) < 2:
                 print('No responses to save')
                 return
             utils.save_string_as_markdown_file(
-                self.messages[-1].content, filename="response.md")
+                self._get_message(-1).content, filename="response.md")
             # TODO: Modify this to work with RAG mode
             print('Saved response to response.md')
             return
-        elif prompt == "saveall":
+        # Save all responses to file (history.md)
+        elif prompt in [".sa", ".saveall"]:
             message_string = self.messages_to_string(self.messages)
             utils.save_string_as_markdown_file(
                 message_string, filename="response.md")
             print(f'Saved {self.response_count} exchanges to history.md')
             return
-        elif prompt == "info":
+        # Display session information
+        elif prompt in [".i", ".info"]:
             print(f'RAG mode: {self.config.rag_settings.rag_mode}')
             if self.config.rag_settings.rag_mode is False:
                 print(f'Exchanges: {self.response_count}')
@@ -606,28 +701,33 @@ class Chatbot:
                     print(
                         f'Multivector enabled! Using method: {self.config.rag_settings.multivector_method}')
                 return
-        elif prompt == "rag":
+        # Toggle RAG mode on/off
+        elif prompt == ".rt":
+            if self.config.rag_settings.rag_mode:
+                print("Not refreshing rag state!")
+                # self.refresh_rag_state()
+                return
+            self.enable_rag_mode()
+            return
+        # Toggle RAG mode
+        elif prompt == ".rag":
             if self.config.rag_settings.rag_mode:
                 print(
                     'Already in RAG mode. Type reg to switch back to chat mode, or refresh to reload the configuration')
                 return
-            self.config.rag_settings.rag_mode = True
-            self.initialize_rag()
+            self.enable_rag_mode()
             return
-        elif prompt == "reg":
+        # Toggle chat mode
+        elif prompt == ".reg":
             if not self.config.rag_settings.rag_mode:
                 print(
                     'Already in chat mode. Type rag to switch to RAG mode, or refresh to reload the configuration')
                 return
-            self.config.rag_settings.rag_mode = False
-            # NOTE: Reload chat model from settings
-            self.chat_model = LLM(self.config.chat_settings.primary_model)
-            # TODO: Check if side effects are necessary here
-            self.retriever = None
-            self.rag_chain = None
-            self.set_messages()
+            # self.refresh_rag_state()
+            self.disable_rag_mode()
             return
-        elif prompt == ".s":
+        # Set system message
+        elif prompt == ".sys":
             if self.config.rag_settings.rag_mode:
                 print('Cannot set system message in RAG mode')
                 # TODO: Maybe: Implement rag chain with custom system message.
@@ -658,8 +758,8 @@ class Chatbot:
             self.response_count = 0
             print('Chat history cleared')
             return
+        # Display Vector DB collection names
         elif prompt == ".names":
-            # Get collection names from database
             db_method = self.config.rag_settings.method
             print("Fetching collection names for method:", db_method)
             collection_names = utils.get_db_collection_names(method=db_method)
@@ -668,14 +768,16 @@ class Chatbot:
             print("Collection names:")
             for name in collection_names:
                 print("-", name)
+        
+        # Copy response to clipboard
         elif prompt == ".copy":
-            # Copy response to clipboard
             if len(self.messages) < 2:
                 print('No responses to save')
             else:
-                clipboard_text = self.messages[-1].content
+                clipboard_text = self._get_message(-1).content
                 self.set_clipboard(clipboard_text)
             return
+        # Evaluate vectorstore
         elif prompt == ".eval":
             if not self.config.rag_settings.rag_mode:
                 print('Must evaluate in RAG mode')
@@ -688,69 +790,49 @@ class Chatbot:
                 self.run_eval_tests_on_vectorstore(
                     self.retriever.vectorstore, user_input, criteria)
             return
-
-        elif prompt == ".rm":
+        # Amnesia mode
+        elif prompt == ".a":
+            if self.config.rag_settings.rag_mode:
+                print('Cannot enable amnesia mode in RAG mode')
+                return
+            self.config.optional.amnesia = not self.config.optional.amnesia
+            print('Amnesia mode:', self.config.optional.amnesia)
+            return
+        # Pick exchanges to remove
+        elif prompt == ".pick":
             if self.config.rag_settings.rag_mode:
                 print('Cannot remove messages in RAG mode')
                 return
             # Allow user to choose which exchange to delete
-            if len(self.messages) < 2:
-                print('No messages to delete')
-                return
-            print('Choose an exchange to delete:')
-            exchange_count = 0
-            for i, message in enumerate(self.messages):
-                if self.config.chat_settings.enable_system_message:
-                    if i % 2 == 1:
-                        exchange_count += 1
-                else:
-                    if i % 2 == 0:
-                        exchange_count += 1
-                message_suffix = "" if len(message.content) < 50 else "..."
-                print(exchange_count, message.content[:50] + message_suffix)
-            try:
-                index = input('Enter the index of the exchange to delete: ')
-                if "-" in index:
-                    start, end = map(int, index.split("-"))
-                    if start <= 0 or end > len(self.messages) // 2:
-                        print('Invalid index range')
-                        return
-                    # Adjust for exchange count
-                    if self.config.chat_settings.enable_system_message:
-                        start = (start * 2 - 1)
-                        end = (end * 2)
-                    else:
-                        start = (start * 2 - 2)
-                        end = (end * 2 - 1)
-                    for i in range(start, end + 1):
-                        self.messages.pop(start)
-                        self.response_count -= i % 2
-                    print('Deleted exchanges')
-                    return
-                else:
-                    index = int(index)
-                    if index <= 0 or index > len(self.messages) // 2:
-                        if index == 0:
-                            print('Cannot delete system message')
-                        print('Invalid index')
-                        return
-                    # Adjust for exchange count
-                    if self.config.chat_settings.enable_system_message:
-                        index_to_pop = (index * 2 - 1)
-                    else:
-                        index_to_pop = (index * 2 - 2)
-                    self.messages.pop(index_to_pop)
-                    self.messages.pop(index_to_pop)
-                    self.response_count -= 1
-                    print('Deleted exchange')
-                    return
-            except ValueError:
-                print('Invalid input')
+            self.handle_pick_command()
+            return
         else:
-            print('Invalid command: ', prompt)
+            print(f'Invalid command:{prompt}')
             return
         print("Command executed! (Return before this point.)")
         return
+
+    def enable_rag_mode(self, refresh=False):
+        """
+        Enables RAG mode.
+        """
+        if self.config.rag_settings.rag_mode:
+            print('Already in RAG mode')
+            return
+        self.config.rag_settings.rag_mode = True
+        self.initialize_rag()
+
+    def disable_rag_mode(self):
+        """
+        Disables RAG mode.
+        """
+        if not self.config.rag_settings.rag_mode:
+            print('Already in chat mode')
+            return
+        self.config.rag_settings.rag_mode = False
+        # self.refresh_rag_state()
+        self.chat_model = LLM(self.config.chat_settings.primary_model)
+        self.set_messages()
 
     def get_chat_response(
             self,
@@ -971,7 +1053,7 @@ class Chatbot:
         if save_response:
             if len(self.messages) > 1:
                 utils.save_string_as_markdown_file(
-                    self.messages[-1].content, filename="response.md")
+                    self._get_message(-1), filename="response.md")
                 print('Saved response to response.md')
         return self.messages
 
@@ -984,6 +1066,21 @@ class Chatbot:
         print('Deleted last exchange')
         self.response_count -= 1
 
+    def _add_message(self, message: SystemMessage | AIMessage | HumanMessage):
+        assert message.type in ["system", "ai", "human"]
+        if message.type == "system":
+            if self.messages:
+                raise ValueError("System message must be first message")
+            self.response_count = 0
+        else:
+            self.response_count += 1
+        self.messages.append(message)
+        self.response_count += 1
+    
+    def _get_message(self, index: int) -> SystemMessage | AIMessage | HumanMessage:
+        if index >= len(self.messages):
+            raise ValueError("Index out of range")
+        return self.messages[index]
 
 def run_chat(config: Config | None = None):
     chatbot = Chatbot(config)
@@ -1035,6 +1132,9 @@ def main_cli():
         '--inputs',
         nargs='+',
         help='List of inputs for RAG mode')
+    
+    parser.add_argument(
+        '-a', '--amnesia', action='store_true', help='Enable amnesia mode')
     args = parser.parse_args()
     config_override = {
         "RAG": {},
@@ -1053,6 +1153,9 @@ def main_cli():
             config_override["RAG"]["rag_llm"] = args.model
         else:
             config_override["chat"]["primary_model"] = args.model
+
+    if args.amnesia:
+        config_override["optional"] = {"amnesia": True}
         
 
     if args.rag_mode:
@@ -1064,7 +1167,11 @@ def main_cli():
         config_override["RAG"]["rag_mode"] = args.rag_mode
 
     config = Config(config_override=config_override)
-    prompt = args.prompt
+    if args.prompt is None:
+        prompt = None
+    else:
+        assert isinstance(args.prompt, str)
+        prompt = args.prompt
 
     persistence_enabled = not args.not_persistent
     if prompt is None and persistence_enabled is False:
