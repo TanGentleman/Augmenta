@@ -25,7 +25,9 @@
     },
     "optional": {
         "prompt_prefix": "",
-        "prompt_suffix": "\n Reminder: Only a list[dict] as your output. Do NOT input True, input true for bools."
+        "prompt_suffix": "",
+        "amnesia": false,
+        "display_flashcards": false
     },
     "hyperparameters": {
         "max_tokens": 1000,
