@@ -5,15 +5,16 @@ from models.models import LLM
 from chat import Chatbot
 from pydantic import BaseModel
 from langchain_core.output_parsers import JsonOutputParser
-from .flashcards import load_flashcards_from_json, display_flashcards
+from .flashcards import load_flashcards_from_json, display_flashcards, FLASH_DIR
+from constants import FLASHCARD_SIMPLE_SYSTEM_MESSAGE
 from pyperclip import copy, paste
 from pathlib import Path
 
-MODEL = "local"
-SIMPLE_SYSTEM_MESSAGE = "Generate a list of JSON flashcards with consistent keys appropriate for the given request. Only output a list[dict] with valid JSON."
 
-ROOT = Path(__file__).parent
-FLASHCARD_FILEPATH = ROOT / "flashcards.json"
+MODEL = "llama"
+
+FLASHCARD_FILEPATH = FLASH_DIR / "flashcards.json"
+
 # DEFAULT_PROMPT = "Create a list of JSON flashcards with keys: term, definition, example for the Russian terms. The term and example sentence should appropriately be in Russian."
 DEFAULT_PROMPT = "The context is notes from a Russian class. Create comprehensive flashcards with the keys term, definition, and example. term, definition in russian, example in English."
 # prompt = "The context is notes from a Russian class. Create comprehensive flashcards with the keys term, definition, and example. term, definition in russian, example in English."
@@ -33,6 +34,7 @@ FLASHCARD_SYSTEM_MESSAGE = """You are Flashcard AI. Use the document excerpts to
 
 ENABLE_RAG = False
 
+SUFFIX_INSTRUCTION_TEMPLATE = "\nCreate a {NOUN} with the above context. Include keys {REQUIRED} and ONLY output valid JSON, no preamble.\n\n```json"
 
 class FlashcardSchema(BaseModel):
     term: str
@@ -55,13 +57,13 @@ def get_config() -> Config:
     else:
         print("Not using system message")
         chat_settings = {
-            "primary_model": "get_local_model",
+            "primary_model": MODEL,
             "enable_system_message": False
         }
         optional_settings = {
-            "prompt_prefix": "",
-            "prompt_suffix": "\n" + SIMPLE_SYSTEM_MESSAGE,
-            "amnesia": False
+            "prompt_prefix": FLASHCARD_SIMPLE_SYSTEM_MESSAGE + "\n\n",
+            "prompt_suffix": SUFFIX_INSTRUCTION_TEMPLATE.format(NOUN="flashcard", REQUIRED="(all)"),
+            "amnesia": True
         }
     config_override = {
         "chat": chat_settings,
@@ -121,36 +123,40 @@ def main():
         chatbot = Chatbot()
         # Do rag stuff here
         return
-    max_count = 1
+    max_count = 3
     count = 0
-    AUTOMATIC = False
+    AUTOMATIC = True
+    print("Automatic is true! Empty input => clipboard paste") if AUTOMATIC else None
     while count < max_count:
-        prompt = input("Type a : ")
+        try:
+            prompt = input("Type a prompt for the flashcards!: ")
+        except KeyboardInterrupt:
+            print("Exiting!")
+            exit()
         if AUTOMATIC and not prompt.strip():
-            print("Pasting prompt from clipboard.")
+            print("Reading from clipboard!")
             prompt = paste().strip()
-        # prompt = prompt_prefix + prompt + prompt_suffix
-        messages = chatbot.chat(
-            prompt,
-            persistence_enabled=True)
-        response_string = messages[-1].content
+        response = chatbot.get_chat_response(prompt)
+        if response is None:
+            print("No response, error!")
+            exit()
+        response_string = response.content
         # Check if the JSON output is valid
-        response_object = JsonOutputParser().parse(response_string)
-        if not is_output_valid(response_object):
-            raise ValueError("JSON output is not valid")
+        # response_object = JsonOutputParser().parse(response_string)
+        # if not is_output_valid(response_object):
+        #     raise ValueError("JSON output is not valid")
 
         # Save the response to flashcards.json
-        with open(FLASHCARD_FILEPATH, 'w') as file:
-            json.dump(response_object, file, indent=4)
+        # with open(FLASHCARD_FILEPATH, 'w') as file:
+        #     json.dump(response_object, file, indent=4)
 
-        # Load the flashcards and display them
-        flashcards, keys, styles = load_flashcards_from_json(
-            FLASHCARD_FILEPATH)
-        #
-        display_flashcards(flashcards, "Flashcard")
-        count += 1
-        prompt = None
-        exit()
+        # # Load the flashcards and display them
+        # flashcards, keys, styles = load_flashcards_from_json(
+        #     FLASHCARD_FILEPATH)
+        # #
+        # display_flashcards(flashcards, "Flashcard")
+        # count += 1
+        # prompt = None
     # from pyperclip import copy
     # copy(str(response_object))
 
