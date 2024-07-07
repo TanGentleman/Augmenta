@@ -10,7 +10,7 @@ from pyperclip import copy, paste
 from pathlib import Path
 
 MODEL = "local"
-SIMPLE_SYSTEM_MESSAGE = "Generate a list of JSON flashcards with consistent keys appropriate for the given request. Only output valid JSON."
+SIMPLE_SYSTEM_MESSAGE = "Generate a list of JSON flashcards with consistent keys appropriate for the given request. Only output a list[dict] with valid JSON."
 
 ROOT = Path(__file__).parent
 FLASHCARD_FILEPATH = ROOT / "flashcards.json"
@@ -39,32 +39,52 @@ class FlashcardSchema(BaseModel):
     definition: str
     example: str
 
-
+USE_SYSTEM = False
 def get_config() -> Config:
-    config_override = dict(
-        chat=dict(
-            # primary_model="get_local_model"
-            primary_model=MODEL,
-            system_message=SIMPLE_SYSTEM_MESSAGE
-        ),
-    )
+    if USE_SYSTEM:
+        chat_settings = {
+            "primary_model": MODEL,
+            "system_message": "flashcard",
+            "enable_system_message": True
+        }
+        optional_settings = {
+            "prompt_prefix": "",
+            "prompt_suffix": "",
+            "amnesia": True
+        }
+    else:
+        print("Not using system message")
+        chat_settings = {
+            "primary_model": "get_local_model",
+            "enable_system_message": False
+        }
+        optional_settings = {
+            "prompt_prefix": "",
+            "prompt_suffix": "\n" + SIMPLE_SYSTEM_MESSAGE,
+            "amnesia": False
+        }
+    config_override = {
+        "chat": chat_settings,
+        "optional": optional_settings
+    }
+        
     if ENABLE_RAG:
         # use the dict notation
-        RAG = dict(
-            rag_mode=True,
-            rag_llm="get_local_model",
-            collection_name="russian-flashcards-text_collection"
-        )
+        rag_settings = {
+            "rag_mode": True,
+            "rag_llm": "get_local_model",
+            "collection_name": "russian-flashcards-text_collection"
+        }
         inputs = []
         # inputs = ["discord.txt"]
         # inputs = ["russian-notes.pdf"]
-        # inputs = ["russian.txt"]
+        inputs = ["russian.txt"]
         if inputs:
             print('Found inputs. RAG mode enabled')
             assert isinstance(inputs, list)
             assert all(isinstance(i, str) for i in inputs)
-            RAG["inputs"] = inputs
-        config_override["RAG"] = RAG
+            rag_settings["inputs"] = inputs
+        config_override["RAG"] = rag_settings
 
     config = Config(config_override=config_override)
     return config
@@ -101,28 +121,18 @@ def main():
         chatbot = Chatbot()
         # Do rag stuff here
         return
-    MAX_COUNT = 1
+    max_count = 1
     count = 0
-    prompt_prefix = ""
-    assert chatbot.chat_model
-    if chatbot.chat_model.is_local:
-        print("Using local model")
-    
-    prompt_prefix = chatbot.config.optional["prompt_prefix"]
-    prompt_suffix = chatbot.config.optional["prompt_suffix"]
-    assert isinstance(prompt_prefix, str)
-    print(f"Using prompt prefix: {prompt_prefix}")
-    while count < MAX_COUNT:
-        default_text = "Read clipboard.\n"
-        prompt = input(f"Enter a prompt. One-time default: {default_text}")
-        if not prompt:
-            print("Reading from clipboard")
-            # prompt = ".read"
+    AUTOMATIC = False
+    while count < max_count:
+        prompt = input("Type a : ")
+        if AUTOMATIC and not prompt.strip():
+            print("Pasting prompt from clipboard.")
             prompt = paste().strip()
-        prompt = prompt_prefix + prompt + prompt_suffix
+        # prompt = prompt_prefix + prompt + prompt_suffix
         messages = chatbot.chat(
             prompt,
-            persistence_enabled=False)
+            persistence_enabled=True)
         response_string = messages[-1].content
         # Check if the JSON output is valid
         response_object = JsonOutputParser().parse(response_string)
@@ -140,6 +150,7 @@ def main():
         display_flashcards(flashcards, "Flashcard")
         count += 1
         prompt = None
+        exit()
     # from pyperclip import copy
     # copy(str(response_object))
 
