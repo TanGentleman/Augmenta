@@ -169,6 +169,21 @@ class RagSettings:
         # - inputs
         # - doc_ids ([] unless multivector_enabled is True)
         # TODO: Decide the best way to set these values
+        
+        db_ready = False
+        while not db_ready:
+            if self.database_exists:
+                print(f"Collection {collection_name} exists!")
+                new_collection_name = input("Enter to continue, or type a new collection name.").strip()
+                if new_collection_name:
+                    self.database_exists = utils.database_exists(collection_name, method)
+                    collection_name = new_collection_name
+                    print(f"Collection name set to {collection_name}")
+                else:
+                    db_ready = True
+            else:
+                db_ready = True
+                
         self.collection_name = collection_name
         self.k_excerpts = k_excerpts
         self.multivector_method = multivector_method
@@ -640,8 +655,6 @@ class Config:
                         config["optional"][key] = config_override["optional"][key]
                         logger.info(f"Optional config key {key} overridden")
                     else:
-                        print("aaaah")
-                        print(f"This key from object: {key}")
                         raise ValueError((f"Key {key} not found in config"))
         # Replace the LLM codes with the function name
         if config["chat"]["primary_model"] in MODEL_CODES:
