@@ -1,8 +1,6 @@
 # This file is for functions related to indexing documents and assembling
 # RAG components
 from io import BytesIO
-from os.path import exists, join
-
 from langchain_core.documents import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import WebBaseLoader, TextLoader, NotebookLoader
@@ -11,8 +9,7 @@ from chromadb.config import Settings
 from langchain_community.document_loaders import PyPDFLoader, ArxivLoader
 
 from config.config import EXPERIMENTAL_UNSTRUCTURED, METADATA_MAP
-from constants import CHROMA_FOLDER, FAISS_FOLDER
-from utils import CHROMA_FOLDER_PATH, DOCUMENTS_DIR, DB_DIR, FAISS_FOLDER_PATH, clean_docs, database_exists
+from utils import CHROMA_FOLDER_PATH, DOCUMENTS_DIR, FAISS_FOLDER_PATH, clean_docs, database_exists
 
 def loader_from_arxiv_url(url: str) -> ArxivLoader:
     """
@@ -87,7 +84,7 @@ def documents_from_local_pdf(filename: str) -> list[Document]:
     Returns List[Document]
     """
     filepath = DOCUMENTS_DIR / filename
-    assert exists(filepath), "Local PDF file not found"
+    assert filepath.exists(), "Local PDF file not found"
     if not filepath.suffix == ".pdf":
         print("Warning: File is not a PDF")
     loader = PyPDFLoader(filepath)
@@ -104,7 +101,7 @@ def documents_from_text_file(filename: str = "input.txt") -> list[Document]:
     Returns List[Document]
     """
     filepath = DOCUMENTS_DIR / filepath
-    assert exists(filepath), "Local text file not found"
+    assert filepath.exists(), "Local text file not found"
     loader = TextLoader(filepath)
     docs = loader.load()
     if not docs:

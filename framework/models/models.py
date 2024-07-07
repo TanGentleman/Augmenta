@@ -16,6 +16,8 @@ from langchain_together import TogetherEmbeddings
 # from langchain_anthropic import ChatAnthropic
 from langchain.schema import BaseMessage
 
+from constants import LOCAL_MODELS
+
 # FOR DEBUG
 # from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 # from langchain.callbacks.manager import CallbackManager
@@ -561,11 +563,13 @@ class LLM:
         self.context_size = llm_fn.context_size
         # replace the hyperparameters with the new ones
         self.llm = llm_fn.get_llm(hyperparameters)
+        
 
         if not self.confirm_model_name():
             logger.error(
                 "Critical error. Model name failed in LLM.confirm_model_name. Exiting.")
             raise SystemExit
+        self.is_local = self.model_name in LOCAL_MODELS
         self.is_ollama = self.is_ollama_model()
 
     def confirm_model_name(self) -> bool:

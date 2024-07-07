@@ -763,7 +763,7 @@ class Chatbot:
         assert self.chat_model is not None, "Chat model not initialized"
 
         EXPERIMENTAL_PROMPT_INJECTION = True
-        if EXPERIMENTAL_PROMPT_INJECTION:
+        if EXPERIMENTAL_PROMPT_INJECTION and self.config.optional.amnesia:
             prompt_prefix = self.config.optional.prompt_prefix
             prompt_suffix = self.config.optional.prompt_suffix
             if prompt_prefix or prompt_suffix:
@@ -826,7 +826,12 @@ class Chatbot:
                     assert is_output_valid(response_object)
                     print("Got valid JSON for flashcards.")
                     flashcards, keys, styles = construct_flashcards(response_object)
-                    display_flashcards(flashcards)
+                    display_flashcards(
+                        flashcards, 
+                        panel_name="Flashcard",
+                        delay=0, 
+                        include_answer=True
+                    )
                     with open(FLASHCARD_FILEPATH, 'w') as file:
                         json_dump(response_object, file, indent=4)
                 except:

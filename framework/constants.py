@@ -29,6 +29,9 @@ FLASHCARD_SYSTEM_MESSAGE = """You are Flashcard AI. Use the document excerpts to
     }
 ]"""
 
+FLASHCARD_SIMPLE_SYSTEM_MESSAGE = "Generate a list of JSON flashcards with consistent keys appropriate for the given request. Only output a list[dict] with valid JSON."
+#"Output a list[dict]. Each JSON object should stay consistent to the schema. Use lowercase for boolean values."
+
 MODEL_CODES = {
     "gpt4": "get_openai_gpt4",
     "bigmix": "get_together_bigmix",
@@ -50,8 +53,13 @@ SYSTEM_MESSAGE_CODES = {
     "eval": EVAL_EXCERPT_SYSTEM_MESSAGE,
     "rag": RAG_SYSTEM_MESSAGE,
     "prompting": PROMPT_CHOOSER_SYSTEM_MESSAGE,
-    "flashcard": FLASHCARD_SYSTEM_MESSAGE,
+    "flashcard": FLASHCARD_SIMPLE_SYSTEM_MESSAGE,
 }
+
+MODEL_TO_SYSTEM_MSG = {
+    "Qwen/Qwen2-72B-Instruct": FLASHCARD_SIMPLE_SYSTEM_MESSAGE,
+}
+
 
 RAG_COLLECTION_TO_SYSTEM_MESSAGE = {
     "default": RAG_SYSTEM_MESSAGE,
