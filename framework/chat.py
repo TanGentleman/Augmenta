@@ -1,3 +1,5 @@
+
+from rag import input_to_docs, get_chroma_vectorstore_from_docs, get_faiss_vectorstore_from_docs, load_existing_faiss_vectorstore, load_existing_chroma_vectorstore, split_documents
 from langchain_core.output_parsers import JsonOutputParser
 from flash.flashcards import construct_flashcards, display_flashcards, FLASHCARD_FILEPATH
 from langchain.schema import SystemMessage, AIMessage, HumanMessage, BaseMessage
@@ -13,7 +15,6 @@ from config.config import MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, SAVE_ON
 from classes import Config
 from models.models import LLM_FN, LLM
 from chains import get_summary_chain, get_rag_chain, get_eval_chain
-from rag import input_to_docs, get_chroma_vectorstore_from_docs, get_faiss_vectorstore_from_docs, load_existing_faiss_vectorstore, load_existing_chroma_vectorstore, split_documents
 import pyperclip
 from json import dump as json_dump
 from uuid import uuid4
@@ -21,6 +22,7 @@ from os import get_terminal_size
 from textwrap import fill
 from dotenv import load_dotenv
 load_dotenv()
+
 try:
     import gnureadline
 except ImportError:
@@ -859,12 +861,12 @@ class Chatbot:
 
                 for chunk in self.rag_chain.stream(prompt):
                     if self.rag_model.is_ollama:
-                        print_adjusted(chunk, end="", flush=True)
+                        print(chunk, end="", flush=True)
                         chunk_content = chunk
                     else:
                         chunk_content = chunk.content
                     response_string += chunk_content
-                    print_adjusted(chunk_content, end="", flush=True)
+                    print(chunk_content, end="", flush=True)
                 print()
                 response = AIMessage(content=response_string)
             else:
@@ -1011,6 +1013,12 @@ def main_cli():
         action='store_true',
         help='Enable RAG mode')
     parser.add_argument(
+        '-off',
+        '--rag-mode-off',
+        action='store_true',
+        help='Force RAG mode off')
+    
+    parser.add_argument(
         '-m',
         '--model',
         type=str,
@@ -1028,34 +1036,32 @@ def main_cli():
         nargs='+',
         help='List of inputs for RAG mode')
     args = parser.parse_args()
-
-    config_override = {}
-    # How can I make sure this typechecks correctly?
-
-    config_override["RAG"] = {}
-    config_override["chat"] = {}
+    config_override = {
+        "RAG": {},
+        "chat": {}
+    }
+    if args.inputs:
+        args.rag_mode = True
+        config_override["RAG"]["inputs"] = args.inputs
 
     if args.collection:
         args.rag_mode = True
         config_override["RAG"]["collection_name"] = args.collection
-
-    if args.inputs:
-        print('Found inputs. RAG mode enabled')
-        assert isinstance(args.inputs, list)
-        # assert all(isinstance(i, str) for i in args.inputs)
-        args.rag_mode = True
-        config_override["RAG"]["inputs"] = args.inputs
-
-    if args.rag_mode:
-        # Currently no way to disable rag mode from CLI if True in
-        # settings.json
-        config_override["RAG"]["rag_mode"] = args.rag_mode
 
     if args.model:
         if args.rag_mode:
             config_override["RAG"]["rag_llm"] = args.model
         else:
             config_override["chat"]["primary_model"] = args.model
+        
+
+    if args.rag_mode:
+        # Currently no way to disable rag mode from CLI if True in
+        # settings.json
+        if args.rag_mode_off:
+            print("Forcing RAG mode off")
+            args.rag_mode = False
+        config_override["RAG"]["rag_mode"] = args.rag_mode
 
     config = Config(config_override=config_override)
     prompt = args.prompt
