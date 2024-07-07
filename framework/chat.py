@@ -23,23 +23,18 @@ try:
 except ImportError:
     pass
 
-
-
-# from utils import copy_string_to_clipboard, database_exists, get_clipboard_contents, get_db_collection_names, process_docs, get_doc_ids_from_manifest, save_string_as_markdown_file, read_sample, update_manifest
-
-
 TERMINAL_WIDTH = get_terminal_size().columns
 
 
 def print_adjusted(
-        text: str,
-        end='\n',
-        flush=False,
-        width=TERMINAL_WIDTH) -> None:
+    text: str,
+    end='\n',
+    flush=False,
+    width=TERMINAL_WIDTH) -> None:
     '''
     Prints text with adjusted line wrapping
     '''
-    print(fill(text, width=width), end=end)
+    print(fill(text, width=width), flush=flush, end=end)
     # lines = text.splitlines()
     # for line in lines:
     #     # If line is longer than terminal width, wrap to fit
@@ -127,8 +122,8 @@ class Chatbot:
 
         self.config = config
         self.chat_model = None
-        self.rag_model = None
         self.backup_model = None
+        self.rag_model = None
 
         self.parent_docs = None
         self.doc_ids = []
@@ -214,7 +209,7 @@ class Chatbot:
             doc_ids=self.doc_ids)
 
         # Save current config to active.json
-        self.config.save_to_json()
+        self.config.save_active_settings()
         return True
 
     def refresh_rag_state(self):
@@ -222,7 +217,9 @@ class Chatbot:
         Refreshes the RAG state.
         """
         if not self.config.rag_settings.rag_mode:
-            print('RAG mode not enabled')
+            # print('RAG mode not enabled')
+            # NOTE: Only refreshable when in rag mode
+            return
         self.retriever = None
         self.rag_chain = None
         self.doc_ids = []
@@ -236,17 +233,23 @@ class Chatbot:
         Args:
             config (Config, optional): The configuration object. Defaults to None.
         """
+        self.refresh_rag_state()
         if config is None:
             # Reload config from settings.json
             # Override with the current rag_mode setting
-            config_override = {}
-            config_override["RAG"] = {}
-            config_override["RAG"]["rag_mode"] = self.config.rag_settings.rag_mode
+            config_override = {
+                "RAG": {
+                    "rag_mode": self.config.rag_settings.rag_mode
+                }
+            }
             config = Config(config_override=config_override)
+
         self.config = config
+        
         self.chat_model = None
         self.backup_model = None
 
+        # If rag mode was already set to true True, then this may run initialize_rag again. Shouldn't be a problem.
         if self.config.rag_settings.rag_mode:
             self.initialize_rag()
         else:
@@ -544,8 +547,7 @@ class Chatbot:
                 try:
                     self.chat_model = LLM(
                         self.config.chat_settings.backup_model)
-                    print(
-                        f'Switching to backup model {self.chat_model.model_name}')
+                    print(f'Switching to backup model {self.chat_model.model_name}')
                     return
                 except BaseException:
                     print('Error switching to backup model')
@@ -559,13 +561,13 @@ class Chatbot:
             if len(self.messages) < 2:
                 print('No responses to save')
                 return
-            utils.save_string_as_markdown_file(self.messages[-1].content)
+            utils.save_string_as_markdown_file(self.messages[-1].content, filename="response.md")
             # TODO: Modify this to work with RAG mode
             print('Saved response to response.md')
             return
         elif prompt == "saveall":
             message_string = self.messages_to_string(self.messages)
-            utils.save_string_as_markdown_file(message_string)
+            utils.save_string_as_markdown_file(message_string, filename="response.md")
             print(f'Saved {self.response_count} exchanges to history.md')
             return
         elif prompt == "info":
@@ -800,6 +802,13 @@ class Chatbot:
             return None
         self.messages.append(response)
         self.response_count += 1
+        if self.config.optional.amnesia:
+            print('Amnesia mode enabled')
+            if self.config.optional.display_flashcards:
+                print('Displaying flashcards')
+            else:
+                print('Flashcards disabled')
+            self._pop_last_exchange()
         return response
 
     def get_rag_response(self, prompt: str, stream: bool = False):
@@ -810,14 +819,15 @@ class Chatbot:
         try:
             if stream:
                 response_string = ""
-                if self.rag_model.is_ollama:
-                    for chunk in self.rag_chain.stream(prompt):
-                        print(chunk, end="", flush=True)
-                        response_string += chunk
-                else:
-                    for chunk in self.rag_chain.stream(prompt):
-                        print(chunk.content, end="", flush=True)
-                        response_string += chunk.content
+                
+                for chunk in self.rag_chain.stream(prompt):
+                    if self.rag_model.is_ollama:    
+                        print_adjusted(chunk, end="", flush=True)
+                        chunk_content = chunk
+                    else:
+                        chunk_content = chunk.content
+                    response_string += chunk_content
+                    print_adjusted(chunk_content, end="", flush=True)
                 print()
                 response = AIMessage(content=response_string)
             else:
@@ -896,15 +906,29 @@ class Chatbot:
             if not stripped_prompt:
                 print('No input given, try again')
                 continue
-            if len(prompt) > MAX_CHARS_IN_PROMPT:
-                print(
-                    f'Input too long, max characters is {MAX_CHARS_IN_PROMPT}')
-                continue
+            
 
             if stripped_prompt in COMMAND_LIST:
                 self.handle_command(stripped_prompt)
                 continue
             # Generate response
+            EXPERIMENTAL_PROMPT_INJECTION = True
+            if EXPERIMENTAL_PROMPT_INJECTION:
+                prompt_prefix = self.config.optional.prompt_prefix
+                prompt_suffix = self.config.optional.prompt_suffix
+                if prompt_prefix or prompt_suffix:
+                    print("Injecting text to prompt!")
+                # prompt_refactor_fn = self.config.optional.prompt_refactor_fn
+                # NOTE: Assertions should be made here to ensure safe injection
+                assert isinstance(prompt_prefix, str)
+                assert isinstance(prompt_suffix, str)
+                prompt = prompt_prefix + prompt + prompt_suffix
+            
+            if len(prompt) > MAX_CHARS_IN_PROMPT:
+                print(
+                    f'Input too long, max characters is {MAX_CHARS_IN_PROMPT}')
+                continue
+
             stream = self.config.chat_settings.stream
             if self.config.rag_settings.rag_mode:
                 # NOTE: Stream value obtained from chat settings
@@ -915,8 +939,9 @@ class Chatbot:
                     print('No response generated')
                     continue
         if save_response:
-            utils.save_string_as_markdown_file(self.messages[-1].content)
-            print('Saved response to response.md')
+            if len(self.messages) > 1:
+                utils.save_string_as_markdown_file(self.messages[-1].content, filename="response.md")
+                print('Saved response to response.md')
         return self.messages
 
     def _pop_last_exchange(self) -> None:
