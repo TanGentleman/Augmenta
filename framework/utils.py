@@ -1,4 +1,4 @@
-from constants import VECTOR_DB_SUFFIX
+from constants import CHROMA_FOLDER, FAISS_FOLDER, VECTOR_DB_SUFFIX
 from json import JSONDecodeError, load as json_load
 from json import dump as json_dump
 from re import sub as regex_sub
@@ -9,12 +9,14 @@ from datetime import datetime
 # Get the root path of the repository
 from pathlib import Path
 ROOT = Path(__file__).resolve().parent
-LLM_RESPONSE_PATH = ROOT / "data" / "llm-outputs" / "markdown"
-TEXT_FILE_DIR = ROOT / "data" / "txt"
-CONFIG_DIR = ROOT / "config"
+DOCUMENTS_DIR = ROOT / "documents"
 DATA_DIR = ROOT / "data"
-DB_PATH = DATA_DIR / "databases"
-
+LLM_RESPONSE_PATH = DATA_DIR / "llm-outputs" / "markdown"
+TEXT_FILE_DIR = DATA_DIR / "txt"
+CONFIG_DIR = ROOT / "config"
+DB_DIR = DATA_DIR / "databases"
+CHROMA_FOLDER_PATH = DB_DIR / CHROMA_FOLDER
+FAISS_FOLDER_PATH = DB_DIR / FAISS_FOLDER
 
 def copy_string_to_clipboard(string: str) -> str | None:
     """
@@ -26,6 +28,7 @@ def copy_string_to_clipboard(string: str) -> str | None:
     try:
         from pyperclip import copy
         copy(string)
+        print("INFO: CLIPBOARD WRITE")
         return string
     except ImportError:
         print("pyperclip is not installed. Install it using 'pip install pyperclip'")
@@ -38,6 +41,7 @@ def get_clipboard_contents() -> str | None:
     """
     try:
         from pyperclip import paste
+        print("INFO: CLIPBOARD READ")
         return paste()
     except ImportError:
         print("pyperclip is not installed. Install it using 'pip install pyperclip'")
@@ -221,11 +225,17 @@ def database_exists(collection_name: str, method: str) -> bool:
     Check if a vector database exists from the given collection name and method.
     """
     # filepath = path_join(f"{method}{VECTOR_DB_SUFFIX}", collection_name)
-    filepath = DB_PATH / f"{method}{VECTOR_DB_SUFFIX}" / collection_name
+    if method == "faiss":
+        filepath = FAISS_FOLDER_PATH / collection_name
+    elif method == "chroma":
+        filepath = CHROMA_FOLDER_PATH / collection_name
+    else:
+        raise ValueError("Invalid method")
+
     return filepath.exists()
 
 
-def get_current_time() -> str:
+def get_timestamp() -> str:
     """
     Get the current time in the format "YYYY-MM-DD"
     """
@@ -256,7 +266,7 @@ def get_db_collection_names(method: str) -> list[str]:
     """
     assert method in ["chroma", "faiss"], "Invalid method"
     collection_names = []
-    filepath = DB_PATH / method / VECTOR_DB_SUFFIX
+    filepath = DB_DIR / method / VECTOR_DB_SUFFIX
     if filepath.exists():
         collection_names = [
             name for name in filepath.iterdir() if name.is_dir()]
@@ -314,7 +324,7 @@ def update_manifest(
             "chunk_size": str(chunk_size),
             "chunk_overlap": str(chunk_overlap),
             "inputs": inputs,
-            "timestamp": get_current_time(),
+            "timestamp": get_timestamp(),
             "doc_ids": doc_ids
         }
     }
