@@ -1,5 +1,14 @@
 from dotenv import load_dotenv
 load_dotenv()
+from textwrap import fill
+from os import get_terminal_size
+from uuid import uuid4
+import pyperclip
+try:
+    import gnureadline
+except ImportError:
+    pass
+
 from rag import input_to_docs, get_chroma_vectorstore_from_docs, get_faiss_vectorstore_from_docs, load_existing_faiss_vectorstore, load_existing_chroma_vectorstore, split_documents
 from chains import get_summary_chain, get_rag_chain, get_eval_chain
 from models.models import LLM_FN, LLM
@@ -14,17 +23,13 @@ from langchain_core.vectorstores import VectorStoreRetriever
 from langchain_community.vectorstores.faiss import FAISS
 from langchain_community.vectorstores.chroma import Chroma
 from langchain.schema import SystemMessage, AIMessage, HumanMessage, BaseMessage
-from textwrap import fill
-from os import get_terminal_size
-from uuid import uuid4
-import pyperclip
-try:
-    import gnureadline
-except ImportError:
-    pass
+
+from flash.flashcards import construct_flashcards, display_flashcards
+from langchain_core.output_parsers import JsonOutputParser
+
 
 TERMINAL_WIDTH = get_terminal_size().columns
-
+# NOTE: The get_terminal_size function can be called at runtime if the terminal width changes
 
 def print_adjusted(
     text: str,
@@ -35,14 +40,6 @@ def print_adjusted(
     Prints text with adjusted line wrapping
     '''
     print(fill(text, width=width), flush=flush, end=end)
-    # lines = text.splitlines()
-    # for line in lines:
-    #     # If line is longer than terminal width, wrap to fit
-    #     if len(line) > width:
-    #         wrapped_line = fill(line, width=width)
-    #         line = wrapped_line
-    #     print(line, end=end, flush=flush)
-    # Easier method
 
 
 PROCESSING_DOCS_FN = utils.process_docs
@@ -763,6 +760,19 @@ class Chatbot:
         - AIMessage: The AI's response message.
         """
         assert self.chat_model is not None, "Chat model not initialized"
+
+        EXPERIMENTAL_PROMPT_INJECTION = True
+        if EXPERIMENTAL_PROMPT_INJECTION:
+            prompt_prefix = self.config.optional.prompt_prefix
+            prompt_suffix = self.config.optional.prompt_suffix
+            if prompt_prefix or prompt_suffix:
+                print("Injecting text to prompt!")
+            # prompt_refactor_fn = self.config.optional.prompt_refactor_fn
+            # NOTE: Assertions should be made here to ensure safe injection
+            assert isinstance(prompt_prefix, str)
+            assert isinstance(prompt_suffix, str)
+            prompt = prompt_prefix + prompt + prompt_suffix
+
         if stream is None:
             stream = self.config.chat_settings.stream
         self.messages.append(HumanMessage(content=prompt))
@@ -806,6 +816,18 @@ class Chatbot:
             print('Amnesia mode enabled')
             if self.config.optional.display_flashcards:
                 print('Displaying flashcards')
+                # TODO: Implement flashcards
+                try:
+                    def is_output_valid(output):
+                        # is it a list of dicts?
+                        return isinstance(output, list) and isinstance(output[0], dict)
+                    response_object = JsonOutputParser().parse(response_string)
+                    assert is_output_valid(response_object)
+                    print("Got valid JSON for flashcards.")
+                    flashcards, keys, styles = construct_flashcards(response_object)
+                    display_flashcards(flashcards)
+                except:
+                    print("Did not get valid JSON for flashcards.")
             else:
                 print('Flashcards disabled')
             self._pop_last_exchange()
@@ -912,18 +934,6 @@ class Chatbot:
                 self.handle_command(stripped_prompt)
                 continue
             # Generate response
-            EXPERIMENTAL_PROMPT_INJECTION = True
-            if EXPERIMENTAL_PROMPT_INJECTION:
-                prompt_prefix = self.config.optional.prompt_prefix
-                prompt_suffix = self.config.optional.prompt_suffix
-                if prompt_prefix or prompt_suffix:
-                    print("Injecting text to prompt!")
-                # prompt_refactor_fn = self.config.optional.prompt_refactor_fn
-                # NOTE: Assertions should be made here to ensure safe injection
-                assert isinstance(prompt_prefix, str)
-                assert isinstance(prompt_suffix, str)
-                prompt = prompt_prefix + prompt + prompt_suffix
-            
             if len(prompt) > MAX_CHARS_IN_PROMPT:
                 print(
                     f'Input too long, max characters is {MAX_CHARS_IN_PROMPT}')
