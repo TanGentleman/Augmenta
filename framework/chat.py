@@ -149,16 +149,13 @@ class Chatbot:
             self.response_count = len(messages) // 2
             return
 
-        messages = []
+        self.messages = []
         if not self.config.rag_settings.rag_mode:
             if self.config.chat_settings.enable_system_message:
-                self._add_message(SystemMessage(
-                        content=self.config.chat_settings.system_message))
+                self.messages = [SystemMessage(content=self.config.chat_settings.system_message)]
             else:
                 print('System message disabled')
-        
         # NOTE: Switch to a a setter method to avoid misalignment of response count
-        self.messages = messages
         self.response_count = 0
         return
 
@@ -538,14 +535,16 @@ class Chatbot:
         # NOTE: Messages must alternate between AI and Human
         has_sys_message = bool(self._get_message(0).type == "system")
         for i, message in enumerate(self.messages):
+            display_index = exchange_count + 1
             if message.type == "system":
+                display_index = 0
                 assert i == 0, "System message not at start"
             elif message.type == "ai":
                 exchange_count += 1
-                display_index = exchange_count
+                # display_index = exchange_count
             else:
                 assert message.type == "human", "Message type not human"
-                display_index = exchange_count + 1
+                # display_index = exchange_count + 1
             
             message_suffix = "" if len(message.content) < 50 else "..."
             print(f"{display_index}. {message.content[:50]}{message_suffix}")
@@ -587,6 +586,41 @@ class Chatbot:
                 return
         except ValueError:
             print('Invalid input')
+
+    def print_info(self, show_all=False):
+        ""
+        print('Chatbot Information')
+        print('-------------------')
+        print('Chat model:', self.chat_model.model_name)
+        if self.config.rag_settings.rag_mode:
+            print('RAG settings:')
+            print('RAG LLM:', self.rag_model.model_name)
+            print('RAG embedding model:', self.config.rag_settings.embedding_model.model_name)
+            print('RAG collection:', self.config.rag_settings.collection_name)
+            print('RAG method:', self.config.rag_settings.method)
+            print('RAG inputs (dependent on manifest: double check!):', self.config.rag_settings.inputs)
+            print('RAG chunk size:', self.config.rag_settings.chunk_size)
+            print('RAG chunk overlap:', self.config.rag_settings.chunk_overlap)
+            print('RAG k excerpts in context:', self.config.rag_settings.k_excerpts)
+            if self.config.rag_settings.multivector_enabled:
+                print('RAG multivector enabled:', True)
+        if show_all or not self.config.rag_settings.rag_mode:
+            print('Chat settings:')
+            if self.config.chat_settings.enable_system_message:
+                print('System message:', self.config.chat_settings.system_message)
+            else:
+                print('System message enabled:', False)
+            print('Primary model:', self.config.chat_settings.primary_model)
+            print('Backup model:', self.config.chat_settings.backup_model)
+        print('Stream:', self.config.chat_settings.stream)
+        
+        optional_settings = self.config.optional.model_dump()
+        if any(optional_settings.values()):
+            print('Optional settings:')
+            print('Amnesia mode:', self.config.optional.amnesia)
+            print('Display flashcards:', self.config.optional.display_flashcards)
+            print('Prompt prefix:', self.config.optional.prompt_prefix)
+            print('Prompt suffix:', self.config.optional.prompt_suffix)
 
     def handle_command(self, prompt):
         """
@@ -647,6 +681,7 @@ class Chatbot:
                     raise SystemExit
             else:
                 raise ValueError("Backup model is neither None nor LLM")
+            return
         # Refresh configuration
         elif prompt in [".r", ".refresh"]:
             self.refresh_config()
@@ -670,37 +705,8 @@ class Chatbot:
             return
         # Display session information
         elif prompt in [".i", ".info"]:
-            print(f'RAG mode: {self.config.rag_settings.rag_mode}')
-            if self.config.rag_settings.rag_mode is False:
-                print(f'Exchanges: {self.response_count}')
-                if self.config.chat_settings.enable_system_message:
-                    print(
-                        f'System message: {self.config.chat_settings.system_message}')
-                print(f'LLM: {self.chat_model.model_name}')
-                return
-            else:
-                # TODO: Make sure important fields are consistent with manifest
-                assert isinstance(
-                    self.rag_model, LLM), "RAG LLM not initialized"
-
-                rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE.get(
-                    self.config.rag_settings.collection_name, "default")
-                print(f'System message: {rag_system_message}')
-                print(f'RAG LLM: {self.rag_model.model_name}')
-                print(
-                    f'Using vectorstore: {self.config.rag_settings.collection_name}')
-                print(
-                    f'Embedding model: {self.config.rag_settings.embedding_model.model_name}')
-                print(f'Method: {self.config.rag_settings.method}')
-                print(f'Chunk size: {self.config.rag_settings.chunk_size}')
-                print(
-                    f'Chunk overlap: {self.config.rag_settings.chunk_overlap}')
-                print(
-                    f'Excerpts in context: {self.config.rag_settings.k_excerpts}')
-                if self.config.rag_settings.multivector_enabled:
-                    print(
-                        f'Multivector enabled! Using method: {self.config.rag_settings.multivector_method}')
-                return
+            self.print_info()
+            return
         # Toggle RAG mode on/off
         elif prompt == ".rt":
             if self.config.rag_settings.rag_mode:
