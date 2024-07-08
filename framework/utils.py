@@ -18,6 +18,7 @@ DB_DIR = DATA_DIR / "databases"
 CHROMA_FOLDER_PATH = DB_DIR / CHROMA_FOLDER
 FAISS_FOLDER_PATH = DB_DIR / FAISS_FOLDER
 
+MANIFEST_FILEPATH = DATA_DIR / "manifest.json"
 
 def copy_string_to_clipboard(string: str) -> str | None:
     """
@@ -235,31 +236,52 @@ def database_exists(collection_name: str, method: str) -> bool:
 
     return filepath.exists()
 
+def clear_database(collection_name: str, method: str) -> bool:
+    """
+    Clear the database from the given collection name and method.
+    """
+    if method == "faiss":
+        filepath = FAISS_FOLDER_PATH / collection_name
+    elif method == "chroma":
+        filepath = CHROMA_FOLDER_PATH / collection_name
+    else:
+        raise ValueError("Invalid method")
+
+    if filepath.exists():
+        # Rename the folder to a temporary name
+        temp_name = filepath.with_name(f"{collection_name}-trash")
+        filepath.rename(temp_name)
+        print(f"Renamed {filepath.name} to {temp_name.name}")
+        return True
+    print(f"WARNING: Database not found!")
+    return False
+
+def get_manifest_data(collection_name: str, method: str) -> dict | None:
+    """
+    Check if an entry exists in the manifest.json file.
+    """
+    filepath = MANIFEST_FILEPATH
+    try:
+        with open(filepath, "r") as f:
+            data = json_load(f)
+            if not data:
+                print("manifest.json is empty")
+                return None
+    except FileNotFoundError:
+        print("manifest.json not found")
+        with open(filepath, "w") as f:
+            json_dump({"databases": []}, f, indent=4)
+        return None
+    for item in data["databases"]:
+        if item["collection_name"] == collection_name and item["metadata"]["method"] == method:
+            return item
+    return None
 
 def get_timestamp() -> str:
     """
     Get the current time in the format "YYYY-MM-DD"
     """
     return str(datetime.now().strftime("%Y-%m-%d"))
-
-
-def get_doc_ids_from_manifest(collection_name):
-    """
-    Scan the manifest.json file for the collection name and return the doc_ids
-    """
-    doc_ids = []
-    filepath = DATA_DIR / "manifest.json"
-    with open(filepath, "r") as f:
-        data = json_load(f)
-        if not data:
-            print("manifest.json is empty")
-            return doc_ids
-        for item in data["databases"]:
-            if item["collection_name"] == collection_name:
-                doc_ids = item["metadata"]["doc_ids"]
-                return doc_ids
-    return doc_ids
-
 
 def get_db_collection_names(method: str) -> list[str]:
     """
@@ -284,7 +306,6 @@ def update_manifest(
         inputs: list[str],
         collection_name: str,
         doc_ids: list[str] = []):
-    # rag_settings, doc_ids=[]):
     """
     Update the manifest.json file with the new collection
 
@@ -296,23 +317,14 @@ def update_manifest(
     - metadata includes embedding model, method, chunk size, chunk overlap, inputs, timestamp
     """
     # assert rag_settings is appropriately formed
-    data = {}
-    filepath = DATA_DIR / "manifest.json"
-    try:
-        with open(filepath, "r") as f:
-            data = json_load(f)
-    except FileNotFoundError:
-        with open(filepath, "w") as f:
-            json_dump({"databases": []}, f)
-            data = {"databases": []}
-            return
-    assert isinstance(data, dict), "manifest.json is not a dict"
-    assert "databases" in data, "databases key not found in manifest.json"
+    manifest_entry = get_manifest_data(collection_name, method)
+    if manifest_entry:
+        print("EXPERIMENTAL: Should this overwrite the manifest.json chunk?")
+        print("Entry already found in manifest.json. Returning False")
+        return False
+    filepath = MANIFEST_FILEPATH
+    
     # assert that the id is unique
-    for item in data["databases"]:
-        if item["collection_name"] == collection_name:
-            # No need to update manifest.json
-            return
     # get unique id
     unique_id = str(uuid4())
     # This is temporary since embedding model
@@ -329,6 +341,12 @@ def update_manifest(
             "doc_ids": doc_ids
         }
     }
+    with open (filepath, "r") as f:
+        data = json_load(f)
+
+    assert isinstance(data, dict), "manifest.json is not a dict"
+    assert "databases" in data, "databases key not found in manifest.json"
+    assert isinstance(data["databases"], list), "databases key is not a list"
     data["databases"].append(manifest)
     with open(filepath, "w") as f:
         json_dump(data, f, indent=4)
