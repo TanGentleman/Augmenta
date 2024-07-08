@@ -3,17 +3,14 @@ from fastapi.responses import StreamingResponse, FileResponse
 import time
 import spotify
 import os
-from models import get_ollama_mistral, LLM_FN, LLM, get_together_llama3
+from models.models import get_ollama_mistral, LLM_FN, LLM, get_together_llama3
 # from mutagen.mp4 import MP4
 from langchain.schema import SystemMessage, AIMessage, HumanMessage
+from utils import ROOT
 #
 app = FastAPI()
 
-# MUSIC_FILEPATH = "musicdir"
-# This file is in the folder GitHub/Augmenta. Make the music filepath
-# GitHub/AugmentaMusic/HQMusic
-MUSIC_FILEPATH = "/Users/tanujvasudeva/Documents/GitHub/AugmentaMusic/HQMusic"
-
+MUSIC_FILEPATH = ROOT.parent / "music"
 
 def stream_llm_response(query, llm, is_Ollama=False):
     messages = [

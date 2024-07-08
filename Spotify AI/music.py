@@ -8,9 +8,9 @@ from youtube_search import YoutubeSearch
 from pydantic import BaseModel
 from yt_dlp import YoutubeDL
 
-from helpers import ROOT
+from utils import ROOT
 from rag import get_eval_chain, get_music_chain
-from models import get_ollama_llama3, LLM_FN, LLM, get_together_fn_mix
+from models.models import get_ollama_llama3, LLM_FN, LLM, get_together_fn_mix
 
 # Configuration flags
 DISABLE_DOWNLOADING = True
