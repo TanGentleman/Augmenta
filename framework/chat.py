@@ -64,7 +64,8 @@ COMMAND_LIST = [
     ".copy", 
     ".eval", 
     ".a", 
-    ".pick"
+    ".pick",
+    ".flush"
 ]
 
 class Chatbot:
@@ -119,18 +120,22 @@ class Chatbot:
         # TODO: Migrate filter topic into rag_settings
         self.filter_topic = FILTER_TOPIC
 
+        ### The daddy config ###
         self.config = config
+        
+        # Chatbot chat state
         self.chat_model = None
         self.backup_model = None
-        self.rag_model = None
+        self.messages = []
+        self.response_count = 0
+        self.exit = False
 
+        # Chatbot RAG state
+        self.rag_model = None
         self.parent_docs = None
         self.doc_ids = []
         self.rag_chain = None
         self.retriever = None
-        self.response_count = 0
-        self.exit = False
-        self.messages = []
 
         if self.config.rag_settings.rag_mode:
             self.initialize_rag()
@@ -159,7 +164,7 @@ class Chatbot:
         self.response_count = 0
         return
 
-    def initialize_rag(self) -> bool:
+    def initialize_rag(self, force=False) -> bool:
         """
         Initializes the retriever and RAG chain.
 
@@ -171,30 +176,33 @@ class Chatbot:
             bool: Whether the initialization was successful.
         """
         if self.retriever is not None:
-            print('Retriever already exists. Use "refresh" to clear it first')
+            print('Retriever already exists! Clear state using .flush')
             return False
-        if not self.config.rag_settings.rag_mode:
-            print('RAG mode not enabled')
-            raise Exception('RAG mode not enabled')
-        assert self.config.rag_settings.rag_mode, "RAG mode not enabled"
+        assert self.config.rag_settings.rag_mode, "RAG mode must be enabled for intitialize_rag()"
+        manifest_data = utils.get_manifest_data(self.config.rag_settings.collection_name, self.config.rag_settings.method)
+        
+        
         self.rag_model = LLM(self.config.rag_settings.rag_llm)
 
         # Get doc_ids
         if self.config.rag_settings.multivector_enabled:
-            doc_ids = utils.get_doc_ids_from_manifest(
-                self.config.rag_settings.collection_name)
+            doc_ids = manifest_data["doc_ids"]
             if self.config.rag_settings.database_exists and not doc_ids:
                 raise ValueError("Doc IDs not initialized")
             self.doc_ids = doc_ids
 
         self.retriever = self.get_retriever()
         rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE.get(
-            self.config.rag_settings.collection_name, "default")
+            self.config.rag_settings.collection_name, RAG_COLLECTION_TO_SYSTEM_MESSAGE.get("default"))
+        if not rag_system_message:
+            raise ValueError("System message failure")
         self.rag_chain = get_rag_chain(
             self.retriever,
             self.rag_model.llm,
             system_message=rag_system_message)
         self.set_messages()
+        print("HERE IS WHERE I MAY NEED CHANGE!")
+        print("I am about to call utils.update_manifest, but am I certain that it's the right call?")
         utils.update_manifest(
             embedding_model_name=self.config.rag_settings.embedding_model.model_name,
             method=self.config.rag_settings.method,
@@ -217,9 +225,18 @@ class Chatbot:
             # NOTE: Only refreshable when in rag mode
             return
         self.retriever = None
+        self.rag_model = None
         self.rag_chain = None
         self.doc_ids = []
         self.parent_docs = None
+        self.set_messages()
+
+    def refresh_chat_state(self):
+        """
+        Refreshes the chat state.
+        """
+        self.chat_model = None
+        self.backup_model = None
         self.set_messages()
 
     def refresh_config(self, config: Config | None = None):
@@ -229,28 +246,38 @@ class Chatbot:
         Args:
             config (Config, optional): The configuration object. Defaults to None.
         """
-        self.refresh_rag_state()
         if config is None:
-            # Reload config from settings.json
-            # Override with the current rag_mode setting
-            config_override = {
-                "RAG": {
-                    "rag_mode": self.config.rag_settings.rag_mode
-                }
-            }
-            config = Config(config_override=config_override)
-
+            config = Config(config_file="active.json")
+        
+        cached_collection_name = None
+        if self.config.rag_settings.rag_mode:
+            cached_collection_name = self.config.rag_settings.collection_name
+        
         self.config = config
 
         self.chat_model = None
         self.backup_model = None
-
+        
+        # Check if we need to re-index
+        if self.config.rag_settings.rag_mode:
+            # I'm gonna use self.retriever as a proxy for if there's a rag state
+            if self.retriever and cached_collection_name == self.config.rag_settings.collection_name:
+                print("Experimental! Preserving RAG state")
+                self.set_messages()
+            else:
+                self.refresh_rag_state()
+                self.initialize_rag()
+        else:
+            self.chat_model = LLM(self.config.chat_settings.primary_model)
+            self.set_messages()
+            print("Experimental! RAG mode is off but I'm preserving RAG state(?)")
+        
         # If rag mode was already set to true True, then this may run
         # initialize_rag again. Shouldn't be a problem.
-        if self.config.rag_settings.rag_mode:
-            self.enable_rag_mode()
-        else:
-            self.disable_rag_mode()
+        # if self.config.rag_settings.rag_mode:
+        #     self.enable_rag_mode()
+        # else:
+        #     self.disable_rag_mode()
 
     def _set_doc_ids(self):
         assert self.config.rag_settings.rag_mode, "RAG mode must be on"
@@ -422,6 +449,7 @@ class Chatbot:
             k_excerpts (int, optional): Number of excerpts to retrieve. Defaults to 1.
             enable_llm_eval (bool, optional): Whether to enable LLM evaluation. Defaults to False.
         """
+        assert self.config.rag_settings.rag_mode, "RAG mode not enabled"
         if not criteria:
             print("Error: Criteria not provided")
             criteria = "This document is about dolphins"
@@ -587,11 +615,11 @@ class Chatbot:
         except ValueError:
             print('Invalid input')
 
-    def print_info(self, show_all=False):
+    def print_info(self, show_all_unsafe=False):
         ""
         print('Chatbot Information')
         print('-------------------')
-        print('Chat model:', self.chat_model.model_name)
+        print('RAG Mode:', self.config.rag_settings.rag_mode)
         if self.config.rag_settings.rag_mode:
             print('RAG settings:')
             print('RAG LLM:', self.rag_model.model_name)
@@ -604,14 +632,15 @@ class Chatbot:
             print('RAG k excerpts in context:', self.config.rag_settings.k_excerpts)
             if self.config.rag_settings.multivector_enabled:
                 print('RAG multivector enabled:', True)
-        if show_all or not self.config.rag_settings.rag_mode:
+        if show_all_unsafe or not self.config.rag_settings.rag_mode:
             print('Chat settings:')
+            print('Chat model:', self.chat_model.model_name)
             if self.config.chat_settings.enable_system_message:
                 print('System message:', self.config.chat_settings.system_message)
             else:
                 print('System message enabled:', False)
-            print('Primary model:', self.config.chat_settings.primary_model)
-            print('Backup model:', self.config.chat_settings.backup_model)
+            print('Primary model:', self.config.chat_settings.primary_model.model_name)
+            print('Backup model:', self.config.chat_settings.backup_model.model_name)
         print('Stream:', self.config.chat_settings.stream)
         
         optional_settings = self.config.optional.model_dump()
@@ -811,6 +840,17 @@ class Chatbot:
                 return
             # Allow user to choose which exchange to delete
             self.handle_pick_command()
+            return
+        # Flush RAG and Chat state
+        elif prompt == ".flush":
+            self.refresh_rag_state()
+            self.refresh_chat_state()
+            print('Flushed state')
+            if self.config.rag_settings.rag_mode:
+                self.initialize_rag()
+            else:
+                self.chat_model = LLM(self.config.chat_settings.primary_model)
+                self.set_messages()
             return
         else:
             print(f'Invalid command:{prompt}')

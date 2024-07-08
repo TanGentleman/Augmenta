@@ -140,68 +140,72 @@ class RagSettings:
             # The other attributes are ONLY set if RAG mode is enabled
         else:
             self.rag_mode = False
+    
+    def _set_rag_attributes(self, embedding_model, method, chunk_size, chunk_overlap, inputs, multivector_enabled):
+        self.embedding_model = embedding_model
+        self.method = method
+        self.chunk_size = chunk_size
+        self.chunk_overlap = chunk_overlap
+        self.inputs = inputs
+        self.multivector_enabled = multivector_enabled
 
-    def __enable_rag_mode(
-            self,
-            collection_name,
-            embedding_model,
-            method,
-            chunk_size,
-            chunk_overlap,
-            k_excerpts,
-            rag_llm,
-            inputs,
-            multivector_enabled,
-            multivector_method):
-        """
-        Enable RAG mode
-        """
-        assert self.rag_mode, "RAG mode must be enabled"
-        if self.database_exists is not None:
-            logger.warning(
-                "Found value for rag_settings.database_exists! Resetting.")
-        self.database_exists = utils.database_exists(collection_name, method)
-        # NOTE: Metadata:
-        # - embedding_model
-        # - method
-        # - chunk_size
-        # - chunk_overlap
-        # - inputs
-        # - doc_ids ([] unless multivector_enabled is True)
-        # TODO: Decide the best way to set these values
-        
-        db_ready = False
-        while not db_ready:
-            if self.database_exists:
-                print(f"Collection {collection_name} exists!")
-                new_collection_name = input("Enter to continue, or type a new collection name.").strip()
-                if new_collection_name:
-                    self.database_exists = utils.database_exists(collection_name, method)
-                    collection_name = new_collection_name
-                    print(f"Collection name set to {collection_name}")
-                else:
-                    db_ready = True
-            else:
-                db_ready = True
-                
+    def _set_final_attributes(self, collection_name, k_excerpts, multivector_method, rag_llm_name):
         self.collection_name = collection_name
         self.k_excerpts = k_excerpts
         self.multivector_method = multivector_method
-        self.multivector_enabled = multivector_enabled
+        self.rag_llm = rag_llm_name
 
-        if self.database_exists:
-            logger.info("DB exists! Replacing the manifest.json settings.")
-            self.update_rag_settings(override_all=True)
-            # Passing override_all will ensure that the model, chunk size,
-            # overlap, inputs, and multivector are updated
-        else:
-            self.method = method
-            self.embedding_model = embedding_model
-            self.chunk_size = chunk_size
-            self.chunk_overlap = chunk_overlap
-            self.inputs = inputs
+    def __enable_rag_mode(
+        self,
+        collection_name: str,
+        embedding_model: str,
+        method: Literal["faiss", "chroma"],
+        chunk_size: int,
+        chunk_overlap: int,
+        k_excerpts: int,
+        rag_llm_name: str,
+        inputs: list[str],
+        multivector_enabled: bool,
+        multivector_method: str
+        ):
+        """Enable RAG mode"""
+        assert self.rag_mode, "RAG mode must be enabled"
 
-        self.rag_llm = rag_llm
+        if self.database_exists is not None:
+            logger.warning("Found value for rag_settings.database_exists! Resetting. Is this after switching RAG modes?")
+            logger.warning("Sure you don't need to clear some RAG attributes after switching RAG modes?")
+            self.database_exists = None
+
+        while True:
+            if utils.database_exists(collection_name, method):
+                print(f"Database {collection_name} exists!")
+                new_collection_name = input("Enter to continue, or type a new collection name: ").strip()
+                
+                if new_collection_name:
+                    collection_name = new_collection_name
+                    continue
+
+                self.database_exists = True
+                manifest_data = utils.get_manifest_data(collection_name, method)["metadata"]
+                if manifest_data:
+                    print("Manifest data found!")
+                    manifest_metadata = manifest_data["metadata"]
+                    self.adjust_rag_settings(manifest_metadata, override_all=True)
+                else:
+                    print("Manifest data not found!")
+                    if not utils.clear_database(collection_name, method):
+                        print("Aborting quietly.")
+                        exit()
+                    print("Database cleared!")
+                    self._set_rag_attributes(embedding_model, method, chunk_size, chunk_overlap, inputs, multivector_enabled)
+                break
+            else:
+                print(f"Collection name set to {collection_name}")
+                self.database_exists = False
+                self._set_rag_attributes(embedding_model, method, chunk_size, chunk_overlap, inputs, multivector_enabled)
+                break
+
+        self._set_final_attributes(collection_name, k_excerpts, multivector_method, rag_llm_name)
         print(self.props())
 
     def adjust_rag_settings(
@@ -215,10 +219,10 @@ class RagSettings:
         - chunk_size
         - chunk_overlap
         - inputs
-        - doc_ids ([] unless multivector_enabled is True)
+        - doc_ids (The function modifies multivector_enabled if doc_ids exist)
         """
         assert "embedding_model" in metadata, "Embedding model key not found"
-        # Replace the manifest "embedKding model" value from the model name to
+        # Replace the manifest "embedding model" value from the model name to
         # the MODEL_DICT key
         for model, model_info in MODEL_DICT.items():
             if model_info["model_name"] == metadata["embedding_model"]:
@@ -227,7 +231,12 @@ class RagSettings:
         else:
             raise ValueError("Model not found in MODEL_DICT")
         ManifestSchema(**metadata)
-
+        # method, chunk_size, chunk_overlap, inputs, doc_ids
+        if override_all or (metadata["method"] != self.method):
+                    self.method = metadata["method"]
+                    logger.warning(
+                        f"Switched method to {self.method} from manifest.json.")
+        
         manifest_chunk_size = int(metadata["chunk_size"])
         if override_all or (manifest_chunk_size != self.chunk_size):
             self.chunk_size = manifest_chunk_size
@@ -245,10 +254,7 @@ class RagSettings:
             self.embedding_model = metadata["embedding_model"]
             logger.warning(
                 f"Switched embedding model to {self.embedding_model.model_name} from manifest.json.")
-        if override_all or (metadata["method"] != self.method):
-            self.method = metadata["method"]
-            logger.warning(
-                f"Switched method to {self.method} from manifest.json.")
+        
         if override_all or (metadata["inputs"] != self.inputs):
             self.inputs = metadata["inputs"]
             logger.warning(
@@ -277,57 +283,9 @@ class RagSettings:
             #     logger.error("Multivector should not be enabled with no doc ids! Aborting.")
             #     raise ValueError("Error in manifest.json")
 
-    def update_rag_settings(self, override_all=False):
-        """
-        Make sure documents folder and manifest.json initialized correctly.
-        """
-        # Check if the collection exists in manifest.json/vector DB
-        # Adjust RAG settings with correct fields (include print statements)
-        if override_all:
-            assert self.database_exists is True, "DB must exist to override all settings"
-        filepath = utils.DATA_DIR / "manifest.json"
-        with open(filepath, "r") as f:
-            data = json_load(f)
-        assert "databases" in data, "databases key not found in manifest.json"
-        if self.rag_mode:
-            prune_collection = False
-            if self.database_exists is None:
-                logger.error(
-                    "This check should not ever be called! Set DB exists first!")
-                self.set_database_exists()
-
-            for item in data["databases"]:
-                if item["collection_name"] == self.collection_name:
-                    if self.database_exists:
-                        logger.info("Collection found in vector DB")
-                        # Adjust rag config to match the collection
-                        self.adjust_rag_settings(
-                            item["metadata"], override_all=override_all)
-                        logger.info("RAG settings adjusted.")
-                        break
-                    else:
-                        logger.warning(
-                            "Collection found in manifest.json but not in vector DB")
-                        prune_collection = True
-                        break
-            else:
-                if self.database_exists:
-                    logger.warning(
-                        "Collection from DB not found in manifest.json")
-
-            if prune_collection:
-                # Happens when DB is deleted but collection in manifest
-                logger.warning(
-                    "Removing this collection from manifest.json")
-                # Remove by collection name
-                data["databases"] = [item for item in data["databases"]
-                                     if item["collection_name"] != self.collection_name]
-                with open(filepath, "w") as f:
-                    json_dump(data, f, indent=2)
-                # NOTE: What happens to the values in the config?
-
     @property
     def rag_mode(self):
+        """When this is first set to true, all of the other RAG attributes are unbound."""
         return self.__rag_mode
 
     @rag_mode.setter
@@ -350,14 +308,7 @@ class RagSettings:
                 self.__config.inputs,
                 self.__config.multivector_enabled,
                 self.__config.multivector_method)
-
-    def set_database_exists(self, collection_name: str, method: str):
-        """
-        Check if the collection exists in vector DB
-        """
-        logger.warning(
-            "This is deprecated. Directly call database_exists, sparingly.")
-        self.database_exists = utils.database_exists(collection_name, method)
+        # Here can I assert that self.database_exists is correct?
 
     @property
     def collection_name(self):
@@ -440,6 +391,9 @@ class RagSettings:
             raise ValueError("RAG LLM cannot be empty")
         if not isinstance(model_name, str):
             raise ValueError("RAG LLM must be a string")
+        
+        if not self.chunk_size:
+            raise ValueError("Chunk size must be set before setting the RAG LLM")
 
         rag_llm_fn = get_llm_fn(model_name, "llm")
         self.__rag_llm = rag_llm_fn
@@ -631,13 +585,14 @@ class Config:
             config_file="settings.json",):
 
         config = utils.read_settings(config_file)
-
+        if config["RAG"]["rag_mode"] is False:
+            print("The RAG mode is disabled. The RAG settings could be unreliable.")
         if config_override is not None:
             if "RAG" in config_override:
                 for key in config_override["RAG"]:
                     if key in config["RAG"]:
                         config["RAG"][key] = config_override["RAG"][key]
-                        logger.info(f"Rag config key {key} overridden")
+                        logger.info(f"RAG config key {key} overridden")
                     else:
                         raise ValueError(
                             f"Key {key} not found in RAG settings")
@@ -663,8 +618,10 @@ class Config:
         if config["chat"]["backup_model"] in MODEL_CODES:
             config["chat"]["backup_model"] = MODEL_CODES[config["chat"]
                                                          ["backup_model"]]
-        if config["RAG"]["rag_llm"] in MODEL_CODES:
-            config["RAG"]["rag_llm"] = MODEL_CODES[config["RAG"]["rag_llm"]]
+        
+        if "rag_llm" in config["RAG"]:
+            if config["RAG"]["rag_llm"] in MODEL_CODES:
+                config["RAG"]["rag_llm"] = MODEL_CODES[config["RAG"]["rag_llm"]]
 
         self.rag_settings = RagSettings(**config["RAG"])
         self.chat_settings = ChatSettings(**config["chat"])
@@ -701,7 +658,7 @@ class Config:
         if not path.exists(utils.DOCUMENTS_DIR):
             mkdir(utils.DOCUMENTS_DIR)
 
-        filepath = utils.DATA_DIR / "manifest.json"
+        filepath = utils.MANIFEST_FILEPATH
         if not path.exists(filepath):
             with open(filepath, "w") as f:
                 # Make databases key
@@ -714,8 +671,38 @@ class Config:
         data = {
             "RAG": self.rag_settings.to_dict(),
             "chat": self.chat_settings.to_dict(),
+            "hyperparameters": self.hyperparameters.model_dump(),
             "optional": self.optional.model_dump(),
         }
+        # Fix the types for the llms
+        # Get the key for model dict that corresponds to the model name
+        if self.rag_settings.rag_mode:
+            assert len(data["RAG"]) > 1
+            embedding_model_name = data["RAG"]["embedding_model"]
+            rag_llm_name = data["RAG"]["rag_llm"]
+        else:
+            assert len(data["RAG"]) == 1
+        chat_primary_name = data["chat"]["primary_model"]
+        chat_backup_name = data["chat"]["backup_model"]
+        for key in MODEL_DICT:
+            dict_model_name = MODEL_DICT[key]["model_name"]
+            if self.rag_settings.rag_mode:
+                assert len(embedding_model_name) > 0 and len(rag_llm_name) > 0
+                if dict_model_name == embedding_model_name:
+                    data["RAG"]["embedding_model"] = key
+                    assert MODEL_DICT[key]["model_type"] == "embedder"
+                if dict_model_name == rag_llm_name:
+                    data["RAG"]["rag_llm"] = key
+            if dict_model_name == chat_primary_name:
+                data["chat"]["primary_model"] = key
+            if dict_model_name == chat_backup_name:
+                data["chat"]["backup_model"] = key
+            
+        if not self.rag_settings.rag_mode:
+            # Inject the settings for RAG from settings.json
+            data["RAG"] = utils.read_settings("settings.json")["RAG"]
+            data["RAG"]["rag_mode"] = self.rag_settings.rag_mode
+        
         utils.save_config_as_json(data, filename)
 
     def __str__(self):
