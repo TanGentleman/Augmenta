@@ -1114,20 +1114,22 @@ class Chatbot:
     def chat(
             self,
             prompt: str | None = None,
-            persistence_enabled=True,
+            persist=True,
             stream: bool | None = None):
         """
         Main chat loop for the chatbot.
 
         Args:
         - prompt (str, optional): Initial prompt for the chatbot.
-        - persistence_enabled (bool): Whether to enable persistent chat mode.
+        - persist (bool): Whether to enable persistent chat mode.
 
         Returns:
         - list: The message history.
         """
-        if stream is None:
-            stream = self.config.chat_settings.stream
+        if stream is not None:
+            assert isinstance(stream, bool), "stream must be a boolean"
+            self.config.chat_settings.stream = stream
+        
         force_prompt = False
         forced_prompt = ""
         save_response = False
@@ -1135,9 +1137,8 @@ class Chatbot:
         if prompt is not None:
             force_prompt = True
             forced_prompt = prompt
-        if persistence_enabled is False:
-            if prompt is None:
-                prompt = DEFAULT_QUERY
+        if persist is False:
+            print('Persistent chat mode is False!')
             max_responses = 1
             if SAVE_ONESHOT_RESPONSE:
                 save_response = True
@@ -1326,18 +1327,11 @@ def main_cli():
         assert isinstance(args.prompt, str)
         prompt = args.prompt
 
-    persistence_enabled = not args.not_persistent
-    if prompt is None and persistence_enabled is False:
-        if DEFAULT_TO_SAMPLE:
-            excerpt_as_prompt = utils.read_sample()
-            if EXPLAIN_EXCERPT:
-                excerpt_as_prompt = SUMMARY_TEMPLATE.format(
-                    excerpt=excerpt_as_prompt)
-            prompt = excerpt_as_prompt
+    persist = not args.not_persistent
 
     try:
         chatbot = Chatbot(config)
-        chatbot.chat(prompt, persistence_enabled=persistence_enabled)
+        chatbot.chat(prompt, persist=persist)
     except KeyboardInterrupt:
         print('Keyboard interrupt, exiting.')
         raise SystemExit
