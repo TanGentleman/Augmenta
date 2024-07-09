@@ -2,19 +2,13 @@
 .env
 __pycache__/
 .venv/
-!framework/data/manifest.json
-!framework/config/settings.json
-!requirements.txt
-!TODO.md
 *.pdf
 *.md
 *.txt
 *.json
 *.png
 
-framework/data/databases/faiss-vector-dbs/
-framework/data/databases/chroma-vector-dbs/
+framework/data/databases/
 deprecated/
 images/
 notebooks/
-
