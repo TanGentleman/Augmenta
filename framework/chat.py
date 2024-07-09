@@ -10,8 +10,8 @@ from langchain.retrievers.multi_vector import MultiVectorRetriever
 from langchain_core.documents import Document
 from langchain.storage import InMemoryByteStore
 import utils
-from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SUMMARY_TEMPLATE, SYSTEM_MESSAGE_CODES
-from config.config import DEFAULT_CONFIG_FILENAME, MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, OVERRIDE_FILENAME_KEY, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, EXPLAIN_EXCERPT, FILTER_TOPIC
+from constants import MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SYSTEM_MESSAGE_CODES
+from config.config import DEFAULT_CONFIG_FILENAME, MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, OVERRIDE_FILENAME_KEY, SAVE_ONESHOT_RESPONSE, FILTER_TOPIC
 from classes import Config
 from models.models import LLM_FN, LLM
 from chains import get_summary_chain, get_rag_chain, get_eval_chain
@@ -1330,6 +1330,7 @@ def main_cli():
     persist = not args.not_persistent
 
     try:
+        utils.ensure_valid_framework()
         chatbot = Chatbot(config)
         chatbot.chat(prompt, persist=persist)
     except KeyboardInterrupt:

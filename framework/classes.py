@@ -696,7 +696,7 @@ class Config:
             **config["hyperparameters"])
 
         # Validate the optional settings
-        # # NOTE: Due to weird finickiness, the amnesia key does not fail if it is not a boolean
+        # NOTE: Due to wacky type validations, strings "true" and "false" pass the boolean check
         # Exceptions are the strings "True" and "False"
         amnesia_value = config["optional"]["amnesia"]
         if isinstance(amnesia_value, str):
@@ -712,22 +712,9 @@ class Config:
                 self.chat_settings.system_message = MODEL_TO_SYSTEM_MSG[model_name]
                 print(f"Forced custom system message for model {model_name}.")
 
-        self.__validate_rag_settings()
+        
         self.save_active_settings()
         logger.info(f"Config initialized and set in {ACTIVE_JSON_FILE}.")
-
-    def __validate_rag_settings(self):
-        """
-        Validate the RAG settings
-        """
-        if not path.exists(utils.DOCUMENTS_DIR):
-            mkdir(utils.DOCUMENTS_DIR)
-
-        filepath = utils.MANIFEST_FILEPATH
-        if not path.exists(filepath):
-            with open(filepath, "w") as f:
-                # Make databases key
-                f.write('{"databases": []}')
 
     def save_active_settings(self, filename=ACTIVE_JSON_FILE):
         """
