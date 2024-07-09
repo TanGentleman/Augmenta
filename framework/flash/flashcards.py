@@ -16,6 +16,8 @@ import logging
 from time import sleep
 
 from pathlib import Path
+
+from utils import MANIFEST_FILEPATH
 FLASH_DIR = Path(__file__).resolve().parent
 FLASHCARD_FILEPATH = FLASH_DIR / "flashcards.json"
 
@@ -240,12 +242,37 @@ def save_flashcards_to_json(
         raise
 
 
-if __name__ == "__main__":
+def get_flashcards_from_manifest():
+    """
+    Get flashcards from the manifest file.
+    """
     try:
-        file_path = FLASHCARD_FILEPATH
-        flashcards, keys, styles = load_flashcards_from_json(file_path)
+        with open(MANIFEST_FILEPATH, 'r') as file:
+            manifest = json.load(file)
+            data = manifest['databases']
+            flashcards, keys, styles = construct_flashcards(data)
+            return flashcards, keys, styles
+    except Exception as e:
+        logger.error(f"Failed to load or display flashcards: {str(e)}")
+        return None, None, None
+
+def main():
+    METHOD = "manifest"
+    try:
+        if METHOD == "manifest":
+            flashcards, keys, styles = get_flashcards_from_manifest()
+        elif METHOD == "flashcards":
+            file_path = FLASHCARD_FILEPATH
+            flashcards, keys, styles = load_flashcards_from_json(file_path)
+        else:
+            raise ValueError(
+                "Invalid method specified. Please choose 'manifest' or 'flashcards'.")
         logger.info(f"Generated mapping: {keys}")
         logger.info(f"Generated styles: {styles}")
+        flashcards = flashcards[:10]
         display_flashcards(flashcards, include_answer=True)
     except Exception as e:
         logger.error(f"Failed to load or display flashcards: {str(e)}")
+
+if __name__ == "__main__":
+    main()

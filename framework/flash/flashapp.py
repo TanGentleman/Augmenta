@@ -85,7 +85,7 @@ class TypedPrompt:
         while True:
             if default is not None:
                 result = RichPrompt.ask(
-                    prompt + f" [default: {default}]", choices=choices)
+                    choices=choices, default=default, show_default=True)
             else:
                 result = RichPrompt.ask(prompt, choices=choices)
             try:
@@ -734,9 +734,13 @@ class FlashcardApp:
             updated_data: Dict[str, str] = {}
             for key in self.flashcard_manager.get_key_names():
                 current_value = str(card.card_data.get(key, ""))
+                # TODO: In the future, reconsider forcing a string type?
                 value = str(
                     TypedPrompt.get_input_with_default(
-                        f"Enter the new {key}", str, current_value))
+                        prompt=f"Enter the new {key}",
+                        type_=str,
+                        default=current_value)
+                )
                 if value.strip():
                     updated_data[key] = value
                 else:

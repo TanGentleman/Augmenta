@@ -12,29 +12,18 @@ from pathlib import Path
 
 
 MODEL = "llama"
-
+ENABLE_RAG = False
+USE_SYSTEM = False
 FLASHCARD_FILEPATH = FLASH_DIR / "flashcards.json"
 
-# DEFAULT_PROMPT = "Create a list of JSON flashcards with keys: term, definition, example for the Russian terms. The term and example sentence should appropriately be in Russian."
-DEFAULT_PROMPT = "The context is notes from a Russian class. Create comprehensive flashcards with the keys term, definition, and example. term, definition in russian, example in English."
+RUSSIAN_PROMPT = "The context is notes from a Russian class. Create comprehensive flashcards with the keys term, definition, and example. term, definition in russian, example in English."
 # prompt = "The context is notes from a Russian class. Create comprehensive flashcards with the keys term, definition, and example. term, definition in russian, example in English."
-FLASHCARD_SYSTEM_MESSAGE = """You are Flashcard AI. Use the document excerpts to generate a list of JSON flashcards. Example output:
-[
-    {
-        "term": "Python",
-        "definition": "A high-level, interpreted programming language with a focus on code readability.",
-        "example": "print('Hello, World!')"
-    },
-    {
-        "term": "JavaScript",
-        "definition": "A high-level, dynamic, and interpreted programming language that is primarily used for building web applications and adding interactive elements to websites.",
-        "example": "console.log('Hello, World!');"
-    }
-]"""
+FINAL_PROMPT_TEMPLATE = "{goal}. Include keys {required} and ONLY output valid JSON, no preamble.\n\n```json"
 
-ENABLE_RAG = False
-
-SUFFIX_INSTRUCTION_TEMPLATE = "\nCreate a {NOUN} with the above context. Include keys {REQUIRED} and ONLY output valid JSON, no preamble.\n\n```json"
+# DEFAULT_GOAL = "Create Q/A pairs that comprehensively cover the main ideas of the paper's excerpts. The answers should be supported by the text."
+DEFAULT_GOAL = "Create witty facts about penguins"
+DEFAULT_REQUIRED_KEYS = ["question", "answer"]
+DEFAULT_INPUTS = (DEFAULT_GOAL, DEFAULT_REQUIRED_KEYS)
 
 
 class FlashcardSchema(BaseModel):
@@ -43,10 +32,15 @@ class FlashcardSchema(BaseModel):
     example: str
 
 
-USE_SYSTEM = False
+def unpack_inputs(inputs: tuple[str, list[str]]) -> tuple[str, str]:
+    goal, required_keys = inputs
+    required_string = ", ".join(required_keys)
+    return goal, required_string
 
 
-def get_config() -> Config:
+def get_config(inputs: tuple = DEFAULT_INPUTS) -> Config:
+    goal, required_string = unpack_inputs(inputs)
+
     if USE_SYSTEM:
         chat_settings = {
             "primary_model": MODEL,
@@ -66,9 +60,7 @@ def get_config() -> Config:
         }
         optional_settings = {
             "prompt_prefix": FLASHCARD_SIMPLE_SYSTEM_MESSAGE + "\n\n",
-            "prompt_suffix": SUFFIX_INSTRUCTION_TEMPLATE.format(
-                NOUN="flashcard",
-                REQUIRED="(all)"),
+            "prompt_suffix": "",
             "amnesia": True}
     config_override = {
         "chat": chat_settings,
@@ -79,13 +71,13 @@ def get_config() -> Config:
         # use the dict notation
         rag_settings = {
             "rag_mode": True,
-            "rag_llm": "get_local_model",
-            "collection_name": "russian-flashcards-text_collection"
+            "rag_llm": "local",
+            "collection_name": "flashrag_collection"
         }
         inputs = []
-        # inputs = ["discord.txt"]
+        inputs = ["discord.txt"]
         # inputs = ["russian-notes.pdf"]
-        inputs = ["russian.txt"]
+        # inputs = ["russian.txt"]
         if inputs:
             print('Found inputs. RAG mode enabled')
             assert isinstance(inputs, list)
@@ -114,56 +106,61 @@ def is_output_valid(response_object):
 
 
 def main():
-    config = get_config()
+    AUTOMATIC = True
+    MAX_COUNT = 3
+
+    goal = ""
+    required_keys = []
+
+    if not ENABLE_RAG:
+        user_input = input("Enter a goal for the flashcards (leave empty for default inputs): ")
+        
+        # if empty response, use default inputs
+        if not user_input.strip():
+            goal, required_keys = DEFAULT_INPUTS
+        else:
+            print("Goal set!")
+            goal = user_input
+            while True:
+                print("Enter a required key for the flashcards (leave empty to finish): ")
+                key = input()
+                if not key.strip():
+                    break
+                required_keys.append(key)
+    assert goal and required_keys
+    inputs = (goal, required_keys)
+    config = get_config(inputs=inputs)
     chatbot = Chatbot(config)
     if ENABLE_RAG:
         chatbot.rag_chain = get_rag_chain(
             retriever=chatbot.retriever,
-            llm=LLM(chatbot.config.rag_settings.rag_llm).llm,
+            llm=LLM(chatbot.config.rag_settings.rag_llm),
             format_fn=lambda docs: [doc.page_content for doc in docs],
-            system_message=FLASHCARD_SYSTEM_MESSAGE
+            system_message=FLASHCARD_SIMPLE_SYSTEM_MESSAGE
         )
-        # prompt = input("Enter the prompt: ")
-        prompt = DEFAULT_PROMPT
+        # prompt = RUSSIAN_PROMPT
         chatbot = Chatbot()
         # Do rag stuff here
-        return
-    max_count = 3
-    count = 0
-    AUTOMATIC = True
-    print("Automatic is true! Empty input => clipboard paste") if AUTOMATIC else None
-    while count < max_count:
-        try:
-            prompt = input("Type a prompt for the flashcards!: ")
-        except KeyboardInterrupt:
-            print("Exiting!")
-            exit()
-        if AUTOMATIC and not prompt.strip():
-            print("Reading from clipboard!")
-            prompt = paste().strip()
-        response = chatbot.get_chat_response(prompt)
-        if response is None:
-            print("No response, error!")
-            exit()
-        response_string = response.content
-        # Check if the JSON output is valid
-        # response_object = JsonOutputParser().parse(response_string)
-        # if not is_output_valid(response_object):
-        #     raise ValueError("JSON output is not valid")
-
-        # Save the response to flashcards.json
-        # with open(FLASHCARD_FILEPATH, 'w') as file:
-        #     json.dump(response_object, file, indent=4)
-
-        # # Load the flashcards and display them
-        # flashcards, keys, styles = load_flashcards_from_json(
-        #     FLASHCARD_FILEPATH)
-        # #
-        # display_flashcards(flashcards, "Flashcard")
-        # count += 1
-        # prompt = None
-    # from pyperclip import copy
-    # copy(str(response_object))
+        print("Implement Chatbot.chat() to use RAG mode!")
+        print("Exiting!")
+        raise SystemExit
+    else:
+        count = 0
+        print("Automatic is true! Empty input => clipboard paste") if AUTOMATIC else None
+        while count < MAX_COUNT:
+            try:
+                prompt = input("Type a prompt for the flashcards!: ")
+            except KeyboardInterrupt:
+                print("Exiting!")
+                exit()
+            if AUTOMATIC and not prompt.strip():
+                print("Reading from clipboard!")
+                prompt = paste().strip()
+            response = chatbot.chat(prompt)
+            if response is None:
+                print("No response, error!")
+                exit()
+            response_string = response.content
 
 
 if __name__ == "__main__":
