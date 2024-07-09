@@ -1,33 +1,31 @@
 {
     "RAG": {
         "rag_mode": false,
-        "collection_name": "deepseek_example_collection",
+        "collection_name": "example_collection",
         "embedding_model": "get_together_embedder_large",
         "method": "faiss",
         "chunk_size": 1000,
         "chunk_overlap": 100,
         "k_excerpts": 3,
-        "rag_llm": "qwen",
+        "rag_llm": "bigmix",
         "inputs": [
-            "https://platform.deepseek.com/api-docs/",
-            "https://platform.deepseek.com/api-docs/pricing",
-            "https://platform.deepseek.com/api-docs/api/list-models"
+            "https://example.com"
         ],
         "multivector_enabled": false,
         "multivector_method": "summary"
     },
     "chat": {
-        "primary_model": "code",
-        "backup_model": "llama",
+        "primary_model": "llama",
+        "backup_model": "qwen",
         "enable_system_message": true,
-        "system_message": "flashcard",
+        "system_message": "default",
         "stream": true
     },
     "optional": {
         "prompt_prefix": "",
         "prompt_suffix": "",
         "amnesia": false,
-        "display_flashcards": false
+        "display_flashcards": true
     },
     "hyperparameters": {
         "max_tokens": 1000,
