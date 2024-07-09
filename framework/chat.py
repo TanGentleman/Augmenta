@@ -1192,7 +1192,7 @@ class Chatbot:
         if save_response:
             if len(self.messages) > 1:
                 utils.save_string_as_markdown_file(
-                    self._get_message(-1), filename="response.md")
+                    self._get_message(-1).content, filename="response.md")
                 print('Saved response to response.md')
         return self.messages
 
