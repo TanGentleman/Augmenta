@@ -21,6 +21,7 @@ FAISS_FOLDER_PATH = DB_DIR / FAISS_FOLDER
 
 MANIFEST_FILEPATH = DATA_DIR / "manifest.json"
 
+
 def copy_string_to_clipboard(string: str) -> str | None:
     """
     Copy a string to the clipboard.
@@ -239,6 +240,7 @@ def database_exists(collection_name: str, method: str) -> bool:
 
     return filepath.exists()
 
+
 def clear_database(collection_name: str, method: str) -> bool:
     """
     Clear the database from the given collection name and method.
@@ -258,6 +260,7 @@ def clear_database(collection_name: str, method: str) -> bool:
         return True
     print(f"WARNING: Database not found!")
     return False
+
 
 def get_manifest_data(collection_name: str, method: str) -> dict | None:
     """
@@ -282,11 +285,13 @@ def get_manifest_data(collection_name: str, method: str) -> dict | None:
             return manifest_entry
     return None
 
+
 def get_timestamp() -> str:
     """
     Get the current time in the format "YYYY-MM-DD"
     """
     return str(datetime.now().strftime("%Y-%m-%d"))
+
 
 def get_subfolder_names(filepath: Path | str) -> list[str]:
     """
@@ -297,7 +302,9 @@ def get_subfolder_names(filepath: Path | str) -> list[str]:
     assert filepath.exists(), "Path does not exist"
     return [name.name for name in filepath.iterdir() if name.is_dir()]
 
-def get_db_collection_names(db_type: Literal["chroma", "faiss", "all"]) -> dict[Literal["chroma", "faiss"], list[str]]:
+
+def get_db_collection_names(
+        db_type: Literal["chroma", "faiss", "all"]) -> dict[Literal["chroma", "faiss"], list[str]]:
     """
     Get the collection names from the manifest.json file
     """
@@ -352,7 +359,7 @@ def update_manifest(
         print("Entry already found in manifest.json. Returning False")
         return False
     filepath = MANIFEST_FILEPATH
-    
+
     # assert that the id is unique
     # get unique id
     unique_id = str(uuid4())
@@ -370,7 +377,7 @@ def update_manifest(
             "doc_ids": doc_ids
         }
     }
-    with open (filepath, "r") as f:
+    with open(filepath, "r") as f:
         data = json_load(f)
 
     assert isinstance(data, dict), "manifest.json is not a dict"
@@ -389,6 +396,7 @@ def save_config_as_json(data, filename: str):
     filepath = CONFIG_DIR / filename
     with open(filepath, "w") as f:
         json_dump(data, f, indent=2)
+
 
 def fix_filename(filename: str | Path) -> str:
     """

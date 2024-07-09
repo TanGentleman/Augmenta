@@ -60,13 +60,14 @@ COMMAND_LIST = [
     ".i", ".info",
     ".rt", ".rag", ".reg", 
     ".sys",
-    ".names", 
-    ".copy", 
-    ".eval", 
-    ".a", 
+    ".names",
+    ".copy",
+    ".eval",
+    ".a",
     ".pick",
     ".flush"
 ]
+
 
 class Chatbot:
     """
@@ -122,7 +123,7 @@ class Chatbot:
 
         ### The daddy config ###
         self.config = config
-        
+
         # Chatbot chat state
         self.chat_model = None
         self.backup_model = None
@@ -183,9 +184,10 @@ class Chatbot:
                 print('Retriever already exists! Clear state using .flush')
                 return False
         assert self.config.rag_settings.rag_mode, "RAG mode must be enabled for intitialize_rag()"
-        manifest_data = utils.get_manifest_data(self.config.rag_settings.collection_name, self.config.rag_settings.method)
-        
-        
+        manifest_data = utils.get_manifest_data(
+            self.config.rag_settings.collection_name,
+            self.config.rag_settings.method)
+
         self.rag_model = LLM(self.config.rag_settings.rag_llm)
 
         # Get doc_ids
@@ -197,7 +199,8 @@ class Chatbot:
 
         self.retriever = self.get_retriever()
         rag_system_message = RAG_COLLECTION_TO_SYSTEM_MESSAGE.get(
-            self.config.rag_settings.collection_name, RAG_COLLECTION_TO_SYSTEM_MESSAGE.get("default"))
+            self.config.rag_settings.collection_name,
+            RAG_COLLECTION_TO_SYSTEM_MESSAGE.get("default"))
         if not rag_system_message:
             raise ValueError("System message failure")
         self.rag_chain = get_rag_chain(
@@ -249,21 +252,22 @@ class Chatbot:
             config (Config, optional): The configuration object. Defaults to None.
         """
         if config is None:
-            config_override = {"override_filename" : "active.json"}
+            config_override = {"override_filename": "active.json"}
             config = Config(config_override)
-        
+
         cached_collection_name = None
         if self.config.rag_settings.rag_mode:
             cached_collection_name = self.config.rag_settings.collection_name
-        
+
         self.config = config
 
         self.chat_model = None
         self.backup_model = None
-        
+
         # Check if we need to re-index
         if self.config.rag_settings.rag_mode:
-            # I'm gonna use self.retriever as a proxy for if there's a rag state
+            # I'm gonna use self.retriever as a proxy for if there's a rag
+            # state
             if self.retriever and cached_collection_name == self.config.rag_settings.collection_name:
                 print("Experimental! Preserving RAG state")
                 self.set_messages()
@@ -274,7 +278,7 @@ class Chatbot:
             self.chat_model = LLM(self.config.chat_settings.primary_model)
             self.set_messages()
             print("Experimental! RAG mode is off but I'm preserving RAG state(?)")
-        
+
     def _set_doc_ids(self):
         assert self.config.rag_settings.rag_mode, "RAG mode must be on"
         assert self.config.rag_settings.multivector_enabled, "Multivector not enabled"
@@ -555,7 +559,7 @@ class Chatbot:
             return
         print('Choose an exchange to delete:')
         exchange_count = 0
-        
+
         # NOTE: Messages must alternate between AI and Human
         has_sys_message = bool(self._get_message(0).type == "system")
         for i, message in enumerate(self.messages):
@@ -569,7 +573,7 @@ class Chatbot:
             else:
                 assert message.type == "human", "Message type not human"
                 # display_index = exchange_count + 1
-            
+
             message_suffix = "" if len(message.content) < 50 else "..."
             print(f"{display_index}. {message.content[:50]}{message_suffix}")
         try:
@@ -619,31 +623,45 @@ class Chatbot:
         if self.config.rag_settings.rag_mode:
             print('RAG settings:')
             print('RAG LLM:', self.rag_model.model_name)
-            print('RAG embedding model:', self.config.rag_settings.embedding_model.model_name)
+            print(
+                'RAG embedding model:',
+                self.config.rag_settings.embedding_model.model_name)
             print('RAG collection:', self.config.rag_settings.collection_name)
             print('RAG method:', self.config.rag_settings.method)
-            print('RAG inputs (dependent on manifest: double check!):', self.config.rag_settings.inputs)
+            print(
+                'RAG inputs (dependent on manifest: double check!):',
+                self.config.rag_settings.inputs)
             print('RAG chunk size:', self.config.rag_settings.chunk_size)
             print('RAG chunk overlap:', self.config.rag_settings.chunk_overlap)
-            print('RAG k excerpts in context:', self.config.rag_settings.k_excerpts)
+            print(
+                'RAG k excerpts in context:',
+                self.config.rag_settings.k_excerpts)
             if self.config.rag_settings.multivector_enabled:
                 print('RAG multivector enabled:', True)
         if show_all_unsafe or not self.config.rag_settings.rag_mode:
             print('Chat settings:')
             print('Chat model:', self.chat_model.model_name)
             if self.config.chat_settings.enable_system_message:
-                print('System message:', self.config.chat_settings.system_message)
+                print(
+                    'System message:',
+                    self.config.chat_settings.system_message)
             else:
                 print('System message enabled:', False)
-            print('Primary model:', self.config.chat_settings.primary_model.model_name)
-            print('Backup model:', self.config.chat_settings.backup_model.model_name)
+            print(
+                'Primary model:',
+                self.config.chat_settings.primary_model.model_name)
+            print(
+                'Backup model:',
+                self.config.chat_settings.backup_model.model_name)
         print('Stream:', self.config.chat_settings.stream)
-        
+
         optional_settings = self.config.optional.model_dump()
         if any(optional_settings.values()):
             print('Optional settings:')
             print('Amnesia mode:', self.config.optional.amnesia)
-            print('Display flashcards:', self.config.optional.display_flashcards)
+            print(
+                'Display flashcards:',
+                self.config.optional.display_flashcards)
             print('Prompt prefix:', self.config.optional.prompt_prefix)
             print('Prompt suffix:', self.config.optional.prompt_suffix)
 
@@ -795,7 +813,8 @@ class Chatbot:
                 db_type = "all"
             print("Fetching collection names for method:", db_type)
             collection_names = utils.get_db_collection_names(db_type=db_type)
-            assert isinstance(collection_names, dict), "Collection names not dict"
+            assert isinstance(
+                collection_names, dict), "Collection names not dict"
             chroma_names = collection_names.get("chroma", [])
             faiss_names = collection_names.get("faiss", [])
             if chroma_names:
@@ -873,7 +892,7 @@ class Chatbot:
         self.config.rag_settings.rag_mode = True
         self.initialize_rag()
 
-    def disable_rag_mode(self, flush = False):
+    def disable_rag_mode(self, flush=False):
         """
         Disables RAG mode.
         """
@@ -899,7 +918,7 @@ class Chatbot:
         if not all(isinstance(m, BaseMessage) for m in messages):
             print('Invalid message type')
             return False
-        
+
         if messages[0].type == "system":
             if len(messages) % 2 == 1:
                 print('ERROR: Expected even message count since system message: True')
@@ -910,8 +929,14 @@ class Chatbot:
                 return False
         return True
 
-    def invoke(self, messages: list[BaseMessage], llm = None, stream: bool = None, is_ollama = False) -> AIMessage | None:
-        # TODO: Ensure that get_rag_response doesn't reuse a lot of the same code!
+    def invoke(
+            self,
+            messages: list[BaseMessage],
+            llm=None,
+            stream: bool = None,
+            is_ollama=False) -> AIMessage | None:
+        # TODO: Ensure that get_rag_response doesn't reuse a lot of the same
+        # code!
         """
         Invokes the chatbot with the given prompt.
 
@@ -922,11 +947,12 @@ class Chatbot:
         Returns:
         - AIMessage: The AI's response message.
         """
-        # This function should be made easy to run statelessly! Do not mutate the messages list!
+        # This function should be made easy to run statelessly! Do not mutate
+        # the messages list!
         if stream is None:
             stream = self.config.chat_settings.stream
             print("WARNING: Stateless fn: pass it a stream value!")
-        
+
         if llm is None:
             llm = self.chat_model
             print("WARNING: Stateless fn: pass it an LLM class model!")
@@ -961,6 +987,7 @@ class Chatbot:
                 print_adjusted(response.content)
         return response
         # Can have other exceptions!
+
     def get_chat_response(
             self,
             prompt: str) -> AIMessage | None:
@@ -968,7 +995,7 @@ class Chatbot:
         Gets a chat response from the chat model.
 
         This method should be called *after* handling commands and transforming the prompt.
-        The prompt prefix and suffix are the last injections before the messages is 
+        The prompt prefix and suffix are the last injections before the messages is
 
         Args:
         - prompt (str): The user's input prompt.
@@ -993,7 +1020,10 @@ class Chatbot:
         self.messages.append(HumanMessage(content=prompt))
         print(f'Fetching response #{self.response_count + 1}!')
         try:
-            response = self.invoke(messages=self.messages, llm=self.chat_model, stream=self.config.chat_settings.stream)
+            response = self.invoke(
+                messages=self.messages,
+                llm=self.chat_model,
+                stream=self.config.chat_settings.stream)
         except KeyboardInterrupt:
             print('Keyboard interrupt, aborting generation.')
             self.messages.pop()
@@ -1013,7 +1043,8 @@ class Chatbot:
                 print('Displaying flashcards')
                 # TODO: Implement flashcards
                 try:
-                    is_output_valid = lambda x: isinstance(x, list) and isinstance(x[0], dict)
+                    def is_output_valid(x): return isinstance(
+                        x, list) and isinstance(x[0], dict)
                     response_object = JsonOutputParser().parse(response.content)
                     assert is_output_valid(response_object)
                     print("Got valid JSON for flashcards.")
@@ -1038,12 +1069,13 @@ class Chatbot:
         assert self.config.rag_settings.rag_mode, "RAG mode not enabled"
         assert self.rag_model is not None, "RAG LLM not initialized"
         assert self.rag_chain is not None, "RAG chain not initialized"
-        
+
         self.messages.append(HumanMessage(content=prompt))
         print(f'RAG engine response #{self.response_count + 1}!')
         # TODO: Use self.invoke here instead of repeating code! The difference is chain versus LLM!
         # TODO: Strictly type chains and allow them in .invoke (The output type must remain consistent)
-        # NOTE: This is not too difficult, but I may run into problems with arbitrary chains later, I want to be careful
+        # NOTE: This is not too difficult, but I may run into problems with
+        # arbitrary chains later, I want to be careful
         stream = self.config.chat_settings.stream
         try:
             if stream:
@@ -1147,13 +1179,13 @@ class Chatbot:
                 print(
                     f'Input too long, max characters is {MAX_CHARS_IN_PROMPT}')
                 continue
-            
+
             if self.config.rag_settings.rag_mode:
                 # NOTE: Stream value obtained from chat settings
                 res = self.get_rag_response(prompt)
             else:
                 res = self.get_chat_response(prompt)
-            
+
             if res is None:
                 print('No response generated')
                 continue
@@ -1183,11 +1215,14 @@ class Chatbot:
             self.response_count += 1
         self.messages.append(message)
         self.response_count += 1
-    
-    def _get_message(self, index: int) -> SystemMessage | AIMessage | HumanMessage:
+
+    def _get_message(
+            self,
+            index: int) -> SystemMessage | AIMessage | HumanMessage:
         if index >= len(self.messages):
             raise ValueError("Index out of range")
         return self.messages[index]
+
 
 def run_chat(config: Config | None = None):
     chatbot = Chatbot(config)
@@ -1221,7 +1256,7 @@ def main_cli():
         '--rag-mode-off',
         action='store_true',
         help='Force RAG mode off')
-    
+
     parser.add_argument(
         '-m',
         '--model',
@@ -1239,18 +1274,21 @@ def main_cli():
         '--inputs',
         nargs='+',
         help='List of inputs for RAG mode')
-    
+
     parser.add_argument(
         '-a', '--amnesia', action='store_true', help='Enable amnesia mode')
-    
+
     # Add load command for loading a JSON file as a Config
-    parser.add_argument(   
-        '-l', '--load-json', type=str, default=DEFAULT_CONFIG_FILENAME, help='Load a JSON file as a Config'
-    )
+    parser.add_argument(
+        '-l',
+        '--load-json',
+        type=str,
+        default=DEFAULT_CONFIG_FILENAME,
+        help='Load a JSON file as a Config')
     args = parser.parse_args()
     if args.load_json is not None:
         print(f"Using JSON file: {args.load_json} as base config")
-        
+
     config_override = {
         OVERRIDE_FILENAME_KEY: args.load_json,
         "RAG": {},
@@ -1272,7 +1310,6 @@ def main_cli():
 
     if args.amnesia:
         config_override["optional"] = {"amnesia": True}
-        
 
     if args.rag_mode:
         # Currently no way to disable rag mode from CLI if True in

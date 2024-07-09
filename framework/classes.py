@@ -140,8 +140,15 @@ class RagSettings:
             # The other attributes are ONLY set if RAG mode is enabled
         else:
             self.rag_mode = False
-    
-    def _set_rag_attributes(self, embedding_model, method, chunk_size, chunk_overlap, inputs, multivector_enabled):
+
+    def _set_rag_attributes(
+            self,
+            embedding_model,
+            method,
+            chunk_size,
+            chunk_overlap,
+            inputs,
+            multivector_enabled):
         self.embedding_model = embedding_model
         self.method = method
         self.chunk_size = chunk_size
@@ -149,7 +156,12 @@ class RagSettings:
         self.inputs = inputs
         self.multivector_enabled = multivector_enabled
 
-    def _set_final_attributes(self, collection_name, k_excerpts, multivector_method, rag_llm_name):
+    def _set_final_attributes(
+            self,
+            collection_name,
+            k_excerpts,
+            multivector_method,
+            rag_llm_name):
         self.collection_name = collection_name
         self.k_excerpts = k_excerpts
         self.multivector_method = multivector_method
@@ -167,45 +179,66 @@ class RagSettings:
         inputs: list[str],
         multivector_enabled: bool,
         multivector_method: str
-        ):
+    ):
         """Enable RAG mode"""
         assert self.rag_mode, "RAG mode must be enabled"
 
         if self.database_exists is not None:
-            logger.warning("Found value for rag_settings.database_exists! Resetting. Is this after switching RAG modes?")
-            logger.warning("Sure you don't need to clear some RAG attributes after switching RAG modes?")
+            logger.warning(
+                "Found value for rag_settings.database_exists! Resetting. Is this after switching RAG modes?")
+            logger.warning(
+                "Sure you don't need to clear some RAG attributes after switching RAG modes?")
             self.database_exists = None
 
         while True:
             if utils.database_exists(collection_name, method):
                 print(f"Database {collection_name} exists!")
-                new_collection_name = input("Enter to continue, or type a new collection name: ").strip()
-                
+                new_collection_name = input(
+                    "Enter to continue, or type a new collection name: ").strip()
+
                 if new_collection_name:
                     collection_name = new_collection_name
                     continue
 
                 self.database_exists = True
-                manifest_data = utils.get_manifest_data(collection_name, method)
+                manifest_data = utils.get_manifest_data(
+                    collection_name, method)
                 if manifest_data is None:
                     print("Manifest data not found!")
                     if not utils.clear_database(collection_name, method):
                         print("Aborting quietly.")
                         exit()
-                    self._set_rag_attributes(embedding_model, method, chunk_size, chunk_overlap, inputs, multivector_enabled)
+                    self._set_rag_attributes(
+                        embedding_model,
+                        method,
+                        chunk_size,
+                        chunk_overlap,
+                        inputs,
+                        multivector_enabled)
                 else:
                     print("Manifest data found!")
                     manifest_metadata = manifest_data.get("metadata", {})
                     assert manifest_metadata, "Metadata not found in manifest data"
-                    self.adjust_rag_settings(manifest_metadata, override_all=True)
+                    self.adjust_rag_settings(
+                        manifest_metadata, override_all=True)
                 break
             else:
                 print(f"Collection name set to {collection_name}")
                 self.database_exists = False
-                self._set_rag_attributes(embedding_model, method, chunk_size, chunk_overlap, inputs, multivector_enabled)
+                self._set_rag_attributes(
+                    embedding_model,
+                    method,
+                    chunk_size,
+                    chunk_overlap,
+                    inputs,
+                    multivector_enabled)
                 break
 
-        self._set_final_attributes(collection_name, k_excerpts, multivector_method, rag_llm_name)
+        self._set_final_attributes(
+            collection_name,
+            k_excerpts,
+            multivector_method,
+            rag_llm_name)
         print(self.props())
 
     def adjust_rag_settings(
@@ -233,10 +266,10 @@ class RagSettings:
         ManifestSchema(**metadata)
         # method, chunk_size, chunk_overlap, inputs, doc_ids
         if override_all or (metadata["method"] != self.method):
-                    self.method = metadata["method"]
-                    logger.warning(
-                        f"Switched method to {self.method} from manifest.json.")
-        
+            self.method = metadata["method"]
+            logger.warning(
+                f"Switched method to {self.method} from manifest.json.")
+
         manifest_chunk_size = int(metadata["chunk_size"])
         if override_all or (manifest_chunk_size != self.chunk_size):
             self.chunk_size = manifest_chunk_size
@@ -254,7 +287,7 @@ class RagSettings:
             self.embedding_model = metadata["embedding_model"]
             logger.warning(
                 f"Switched embedding model to {self.embedding_model.model_name} from manifest.json.")
-        
+
         if override_all or (metadata["inputs"] != self.inputs):
             self.inputs = metadata["inputs"]
             logger.warning(
@@ -391,9 +424,10 @@ class RagSettings:
             raise ValueError("RAG LLM cannot be empty")
         if not isinstance(model_name, str):
             raise ValueError("RAG LLM must be a string")
-        
+
         if not self.chunk_size:
-            raise ValueError("Chunk size must be set before setting the RAG LLM")
+            raise ValueError(
+                "Chunk size must be set before setting the RAG LLM")
 
         rag_llm_fn = get_llm_fn(model_name, "llm")
         self.__rag_llm = rag_llm_fn
@@ -573,6 +607,7 @@ class ChatSettings:
     def __str__(self):
         return str(self.props())
 
+
 def get_config_filename(config_override: dict) -> str:
     """
     Get the filename for the config and return the dict with override_filename key popped.
@@ -582,27 +617,34 @@ def get_config_filename(config_override: dict) -> str:
         filename = config_override.get(OVERRIDE_FILENAME_KEY, None)
         if filename is None:
             return DEFAULT_CONFIG_FILENAME, config_override
-        
-        assert isinstance(filename, str), "Config override filename must be a string"
+
+        assert isinstance(
+            filename, str), "Config override filename must be a string"
         if not filename.endswith(".json"):
-            raise ValueError("Config override filename must be a valid JSON file")
+            raise ValueError(
+                "Config override filename must be a valid JSON file")
         full_filepath = utils.CONFIG_DIR / filename
         if full_filepath.exists():
             config_override.pop(OVERRIDE_FILENAME_KEY)
             return filename, config_override
         else:
-            # NOTE: It's possible to use default file rather than raise an error
+            # NOTE: It's possible to use default file rather than raise an
+            # error
             raise ValueError(f"File {filename} not found in config directory")
     else:
         print("Using default config filename")
         return DEFAULT_CONFIG_FILENAME, {}
+
+
 class Config:
     """
     Configuration class
     """
+
     def __init__(
-            self,
-            config_override: dict = {OVERRIDE_FILENAME_KEY : DEFAULT_CONFIG_FILENAME},
+        self,
+        config_override: dict = {
+            OVERRIDE_FILENAME_KEY: DEFAULT_CONFIG_FILENAME},
     ):
         # TODO: Make sure safety/correctness are all up to par here
         config_filename, config_override = get_config_filename(config_override)
@@ -641,7 +683,7 @@ class Config:
         if config["chat"]["backup_model"] in MODEL_CODES:
             config["chat"]["backup_model"] = MODEL_CODES[config["chat"]
                                                          ["backup_model"]]
-        
+
         if "rag_llm" in config["RAG"]:
             if config["RAG"]["rag_llm"] in MODEL_CODES:
                 config["RAG"]["rag_llm"] = MODEL_CODES[config["RAG"]["rag_llm"]]
@@ -707,6 +749,7 @@ class Config:
             assert len(data["RAG"]) == 1
         chat_primary_name = data["chat"]["primary_model"]
         chat_backup_name = data["chat"]["backup_model"]
+        # TODO: change the logic to use helpers like get_model_key_from_name
         for key in MODEL_DICT:
             dict_model_name = MODEL_DICT[key]["model_name"]
             if self.rag_settings.rag_mode:
@@ -720,14 +763,14 @@ class Config:
                 data["chat"]["primary_model"] = key
             if dict_model_name == chat_backup_name:
                 data["chat"]["backup_model"] = key
-        
+
         # NOTE: I'm not making any assertions about the filename here!
         if not self.rag_settings.rag_mode:
             # Inject the settings for RAG from settings.json
-            config_settings = utils.read_settings(filename) 
+            config_settings = utils.read_settings(filename)
             data["RAG"] = config_settings["RAG"]
             data["RAG"]["rag_mode"] = self.rag_settings.rag_mode
-        
+
         utils.save_config_as_json(data, filename)
 
     def __str__(self):

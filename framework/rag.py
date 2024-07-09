@@ -3,7 +3,7 @@
 from io import BytesIO
 from langchain_core.documents import Document
 from langchain.text_splitter import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import WebBaseLoader, TextLoader, NotebookLoader
+from langchain_community.document_loaders import TextLoader, NotebookLoader
 from langchain_community.vectorstores import Chroma, FAISS
 from chromadb.config import Settings
 from langchain_community.document_loaders import PyPDFLoader, ArxivLoader
@@ -61,6 +61,8 @@ def documents_from_url(url: str) -> list[Document]:
     """
     Load documents from a URL, return List[Document]
     """
+    from langchain_community.document_loaders import WebBaseLoader
+
     def is_link_valid(url: str):
         # This can be nuanced in the future
         return url.startswith("http")
@@ -145,7 +147,8 @@ def get_chroma_vectorstore(
     if exists is False:
         assert not database_exists(
             collection_name, "chroma"), "Collection does not exist"
-    filepath = CHROMA_FOLDER_PATH / collection_name
+    filepath = str(CHROMA_FOLDER_PATH / collection_name)
+    # make filepath a string
     vectorstore = Chroma(
         collection_name=collection_name,
         embedding_function=embedder,
