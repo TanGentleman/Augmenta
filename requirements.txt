@@ -16,3 +16,4 @@ pymupdf
 python-dotenv
 pyperclip
 
+typeguard
