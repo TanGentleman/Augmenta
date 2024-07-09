@@ -1,3 +1,4 @@
+from typing import Literal
 from constants import CHROMA_FOLDER, FAISS_FOLDER, VECTOR_DB_SUFFIX
 from json import JSONDecodeError, load as json_load
 from json import dump as json_dump
@@ -90,14 +91,15 @@ def read_sample():
     return read_text_file("sample.txt")
 
 
-def read_settings(config_file="settings.json") -> dict:
+def read_settings(config_filename="settings.json") -> dict:
     """
     Read the settings file and return the settings as a dictionary.
     """
     settings = {}
-    filepath = CONFIG_DIR / config_file
+    filepath = CONFIG_DIR / config_filename
     if not filepath.exists():
         print(f"File not found: {filepath}")
+        print("Try tossing a .json file in the framework/config directory!")
         raise FileNotFoundError
     if not filepath.suffix == ".json":
         print("CRITICAL: settings file is not a .json file")
@@ -108,8 +110,7 @@ def read_settings(config_file="settings.json") -> dict:
         except JSONDecodeError:
             print("CRITICAL: Error reading settings file")
             raise JSONDecodeError
-
-        assert isinstance(settings, dict), "Settings file is not a dictionary"
+    assert isinstance(settings, dict), "Settings file is not a dictionary"
     return settings
 
 
@@ -151,7 +152,7 @@ def process_docs(docs: list[Document]) -> list[Document]:
     """
     left_string = "try it for yourself"
     right_string = "Example output"
-    res_docs = []
+    res_docs: list[Document] = []
     for doc in docs:
         start_index = doc.page_content.find(left_string)
         end_index = doc.page_content.find(right_string)
@@ -179,6 +180,9 @@ def format_docs(
     - docs (list[Document]): A list of Document objects.
     - save_excerpts (bool, optional): Whether to save the excerpts to a markdown file. Defaults to True.
     """
+    filename = fix_filename(filename)
+    filepath = LLM_RESPONSE_PATH / filename
+
     summaries = []
     # save documents here to excerpts.md
     context_string = ""
@@ -215,7 +219,6 @@ def format_docs(
         context_string += doc.page_content + "\n\n"
 
     if save_excerpts:
-        filepath = LLM_RESPONSE_PATH / filename
         with open(filepath, "w") as f:
             f.write(f"Context:\n{context_string}")
     context_string = context_string.strip()
@@ -261,6 +264,7 @@ def get_manifest_data(collection_name: str, method: str) -> dict | None:
     Check if an entry exists in the manifest.json file.
     """
     filepath = MANIFEST_FILEPATH
+    manifest_entry = {}
     try:
         with open(filepath, "r") as f:
             data = json_load(f)
@@ -274,7 +278,8 @@ def get_manifest_data(collection_name: str, method: str) -> dict | None:
         return None
     for item in data["databases"]:
         if item["collection_name"] == collection_name and item["metadata"]["method"] == method:
-            return item
+            manifest_entry = item
+            return manifest_entry
     return None
 
 def get_timestamp() -> str:
@@ -283,19 +288,43 @@ def get_timestamp() -> str:
     """
     return str(datetime.now().strftime("%Y-%m-%d"))
 
-def get_db_collection_names(method: str) -> list[str]:
+def get_subfolder_names(filepath: Path | str) -> list[str]:
+    """
+    Get the collection names from the given path
+    """
+    if isinstance(filepath, str):
+        filepath = Path(filepath)
+    assert filepath.exists(), "Path does not exist"
+    return [name.name for name in filepath.iterdir() if name.is_dir()]
+
+def get_db_collection_names(db_type: Literal["chroma", "faiss", "all"]) -> dict[Literal["chroma", "faiss"], list[str]]:
     """
     Get the collection names from the manifest.json file
     """
-    assert method in ["chroma", "faiss"], "Invalid method"
-    collection_names = []
-    filepath = DB_DIR / method / VECTOR_DB_SUFFIX
-    if filepath.exists():
-        collection_names = [
-            name for name in filepath.iterdir() if name.is_dir()]
+    assert db_type in ["chroma", "faiss", "all"], "Invalid method"
+    chroma_collection_names = []
+    faiss_collection_names = []
+    # collection_names = []
+    if db_type == "chroma":
+        filepath = CHROMA_FOLDER_PATH
+        if filepath.exists():
+            print("Chroma databases")
+            chroma_collection_names = get_subfolder_names(filepath)
+    elif db_type == "faiss":
+        filepath = CHROMA_FOLDER_PATH
+        if filepath.exists():
+            print("Faiss databases")
+            faiss_collection_names = get_subfolder_names(filepath)
+    elif db_type == "all":
+        print("Collecting all databases!")
+        chroma_collection_names = get_subfolder_names(CHROMA_FOLDER_PATH)
+        faiss_collection_names += get_subfolder_names(FAISS_FOLDER_PATH)
     else:
-        print("No databases found")
-    return collection_names
+        raise ValueError("Invalid database type")
+    return {
+        "chroma": chroma_collection_names,
+        "faiss": faiss_collection_names
+    }
 
 
 def update_manifest(
@@ -319,7 +348,7 @@ def update_manifest(
     # assert rag_settings is appropriately formed
     manifest_entry = get_manifest_data(collection_name, method)
     if manifest_entry:
-        print("EXPERIMENTAL: Should this overwrite the manifest.json chunk?")
+        # NOTE: It is possible to override the manifest.json chunk here
         print("Entry already found in manifest.json. Returning False")
         return False
     filepath = MANIFEST_FILEPATH
@@ -360,3 +389,20 @@ def save_config_as_json(data, filename: str):
     filepath = CONFIG_DIR / filename
     with open(filepath, "w") as f:
         json_dump(data, f, indent=2)
+
+def fix_filename(filename: str | Path) -> str:
+    """
+    Fixes the filename by ensuring it is an appropriate string format.
+
+    Args:
+        filename (str | Path): The filename to be fixed.
+
+    Returns:
+        str: The fixed filename.
+    """
+    if isinstance(filename, Path):
+        if not filename.exists():
+            raise FileNotFoundError(f"File not found: {filename}")
+        print("Warning: Converting path to just the filename")
+        return str(filename.name)
+    return filename
