@@ -886,16 +886,92 @@ class Chatbot:
         self.chat_model = LLM(self.config.chat_settings.primary_model)
         self.set_messages()
 
+    def is_messages_valid(self, messages: list[BaseMessage]) -> bool:
+        """
+        Checks if the messages are valid.
+
+        Args:
+        - messages (list[BaseMessage]): The list of messages.
+
+        Returns:
+        - bool: Whether the messages are valid.
+        """
+        if not all(isinstance(m, BaseMessage) for m in messages):
+            print('Invalid message type')
+            return False
+        
+        if messages[0].type == "system":
+            if len(messages) % 2 == 1:
+                print('ERROR: Expected even message count since system message: True')
+                return False
+        else:
+            if len(messages) % 2 == 0:
+                print("Error: Expected odd message count since system message: False")
+                return False
+        return True
+
+    def invoke(self, messages: list[BaseMessage], llm = None, stream: bool = None, is_ollama = False) -> AIMessage | None:
+        # TODO: Ensure that get_rag_response doesn't reuse a lot of the same code!
+        """
+        Invokes the chatbot with the given prompt.
+
+        Args:
+        - messages (list[BaseMessage]): The list of system | human | ai messages.
+        - stream (bool): Whether to stream the response.
+
+        Returns:
+        - AIMessage: The AI's response message.
+        """
+        # This function should be made easy to run statelessly! Do not mutate the messages list!
+        if stream is None:
+            stream = self.config.chat_settings.stream
+            print("WARNING: Stateless fn: pass it a stream value!")
+        
+        if llm is None:
+            llm = self.chat_model
+            print("WARNING: Stateless fn: pass it an LLM class model!")
+
+        if not self.is_messages_valid(messages):
+            raise ValueError("Messages are not valid")
+        assert isinstance(llm, LLM), "Model must be of class LLM"
+        assert isinstance(stream, bool), "Stream must be a boolean"
+        # From this point on, this function should be stateless!
+        if stream:
+            response_string = ""
+            for chunk in llm.stream(messages):
+                if is_ollama:
+                    print(chunk, end="", flush=True)
+                    response_string += chunk
+                else:
+                    print(chunk.content, end="", flush=True)
+                    response_string += chunk.content
+            print()
+            if not response_string:
+                raise ValueError('No response generated')
+            response = AIMessage(content=response_string)
+        else:
+            response = llm.invoke(messages)
+            if is_ollama:
+                assert isinstance(response, str), "Response not str"
+                print_adjusted(response)
+                response = AIMessage(content=response)
+            else:
+                assert isinstance(
+                    response, AIMessage), "Response not AIMessage"
+                print_adjusted(response.content)
+        return response
+        # Can have other exceptions!
     def get_chat_response(
             self,
-            prompt: str,
-            stream: bool | None = None) -> AIMessage | None:
+            prompt: str) -> AIMessage | None:
         """
         Gets a chat response from the chat model.
 
+        This method should be called *after* handling commands and transforming the prompt.
+        The prompt prefix and suffix are the last injections before the messages is 
+
         Args:
         - prompt (str): The user's input prompt.
-        - stream (bool): Whether to stream the response.
 
         Returns:
         - AIMessage: The AI's response message.
@@ -914,35 +990,10 @@ class Chatbot:
             assert isinstance(prompt_suffix, str)
             prompt = prompt_prefix + prompt + prompt_suffix
 
-        if stream is None:
-            stream = self.config.chat_settings.stream
         self.messages.append(HumanMessage(content=prompt))
         print(f'Fetching response #{self.response_count + 1}!')
         try:
-            if stream:
-                response_string = ""
-                if self.chat_model.is_ollama:
-                    for chunk in self.chat_model.stream(self.messages):
-                        print(chunk, end="", flush=True)
-                        response_string += chunk
-                else:
-                    for chunk in self.chat_model.stream(self.messages):
-                        print(chunk.content, end="", flush=True)
-                        response_string += chunk.content
-                print()
-                if not response_string:
-                    raise ValueError('No response generated')
-                response = AIMessage(content=response_string)
-            else:
-                response = self.chat_model.invoke(self.messages)
-                if self.chat_model.is_ollama:
-                    assert isinstance(response, str), "Response not str"
-                    print_adjusted(response)
-                    response = AIMessage(content=response)
-                else:
-                    assert isinstance(
-                        response, AIMessage), "Response not AIMessage"
-                    print_adjusted(response.content)
+            response = self.invoke(messages=self.messages, llm=self.chat_model, stream=self.config.chat_settings.stream)
         except KeyboardInterrupt:
             print('Keyboard interrupt, aborting generation.')
             self.messages.pop()
@@ -951,20 +1002,19 @@ class Chatbot:
             print(f'Error!: {e}')
             self.messages.pop()
             return None
+
+        assert isinstance(response, AIMessage), "Response not AIMessage"
         self.messages.append(response)
         self.response_count += 1
         if self.config.optional.amnesia:
+            ### Amnesia mode ###
             print('Amnesia mode enabled')
             if self.config.optional.display_flashcards:
                 print('Displaying flashcards')
                 # TODO: Implement flashcards
                 try:
-                    def is_output_valid(output):
-                        # is it a list of dicts?
-                        return isinstance(
-                            output, list) and isinstance(
-                            output[0], dict)
-                    response_object = JsonOutputParser().parse(response_string)
+                    is_output_valid = lambda x: isinstance(x, list) and isinstance(x[0], dict)
+                    response_object = JsonOutputParser().parse(response.content)
                     assert is_output_valid(response_object)
                     print("Got valid JSON for flashcards.")
                     flashcards, keys, styles = construct_flashcards(
@@ -984,11 +1034,17 @@ class Chatbot:
             self._pop_last_exchange()
         return response
 
-    def get_rag_response(self, prompt: str, stream: bool = False):
+    def get_rag_response(self, prompt: str):
+        assert self.config.rag_settings.rag_mode, "RAG mode not enabled"
         assert self.rag_model is not None, "RAG LLM not initialized"
         assert self.rag_chain is not None, "RAG chain not initialized"
+        
         self.messages.append(HumanMessage(content=prompt))
         print(f'RAG engine response #{self.response_count + 1}!')
+        # TODO: Use self.invoke here instead of repeating code! The difference is chain versus LLM!
+        # TODO: Strictly type chains and allow them in .invoke (The output type must remain consistent)
+        # NOTE: This is not too difficult, but I may run into problems with arbitrary chains later, I want to be careful
+        stream = self.config.chat_settings.stream
         try:
             if stream:
                 response_string = ""
@@ -1013,7 +1069,6 @@ class Chatbot:
                     assert isinstance(
                         response, AIMessage), "Response not AIMessage"
                     print_adjusted(response.content)
-
         except KeyboardInterrupt:
             print('Keyboard interrupt, aborting generation.')
             return None
@@ -1092,16 +1147,16 @@ class Chatbot:
                 print(
                     f'Input too long, max characters is {MAX_CHARS_IN_PROMPT}')
                 continue
-
-            stream = self.config.chat_settings.stream
+            
             if self.config.rag_settings.rag_mode:
                 # NOTE: Stream value obtained from chat settings
-                self.get_rag_response(prompt, stream=stream)
+                res = self.get_rag_response(prompt)
             else:
-                res = self.get_chat_response(prompt, stream=stream)
-                if res is None:
-                    print('No response generated')
-                    continue
+                res = self.get_chat_response(prompt)
+            
+            if res is None:
+                print('No response generated')
+                continue
         if save_response:
             if len(self.messages) > 1:
                 utils.save_string_as_markdown_file(
