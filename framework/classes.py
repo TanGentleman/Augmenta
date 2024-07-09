@@ -766,8 +766,15 @@ class Config:
 
         # NOTE: I'm not making any assertions about the filename here!
         if not self.rag_settings.rag_mode:
+            # Handling case where this file does not exist
+            full_filepath = utils.CONFIG_DIR / filename
+            if path.exists(full_filepath):
+                base_config_filename = filename
+            else:
+                base_config_filename = DEFAULT_CONFIG_FILENAME
+                
             # Inject the settings for RAG from settings.json
-            config_settings = utils.read_settings(filename)
+            config_settings = utils.read_settings(base_config_filename)
             data["RAG"] = config_settings["RAG"]
             data["RAG"]["rag_mode"] = self.rag_settings.rag_mode
 
