@@ -11,7 +11,7 @@ from langchain_core.documents import Document
 from langchain.storage import InMemoryByteStore
 import utils
 from constants import DEFAULT_QUERY, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SUMMARY_TEMPLATE, SYSTEM_MESSAGE_CODES
-from config.config import MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, EXPLAIN_EXCERPT, FILTER_TOPIC
+from config.config import DEFAULT_CONFIG_FILENAME, MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, OVERRIDE_FILENAME_KEY, SAVE_ONESHOT_RESPONSE, DEFAULT_TO_SAMPLE, EXPLAIN_EXCERPT, FILTER_TOPIC
 from classes import Config
 from models.models import LLM_FN, LLM
 from chains import get_summary_chain, get_rag_chain, get_eval_chain
@@ -205,8 +205,6 @@ class Chatbot:
             self.rag_model.llm,
             system_message=rag_system_message)
         self.set_messages()
-        print("HERE IS WHERE I MAY NEED CHANGE!")
-        print("I am about to call utils.update_manifest, but am I certain that it's the right call?")
         utils.update_manifest(
             embedding_model_name=self.config.rag_settings.embedding_model.model_name,
             method=self.config.rag_settings.method,
@@ -225,7 +223,7 @@ class Chatbot:
         Refreshes the RAG state.
         """
         if not self.config.rag_settings.rag_mode:
-            # print('RAG mode not enabled')
+            print('Reminder: Enable RAG mode to flush RAG cache!')
             # NOTE: Only refreshable when in rag mode
             return
         self.retriever = None
@@ -251,7 +249,8 @@ class Chatbot:
             config (Config, optional): The configuration object. Defaults to None.
         """
         if config is None:
-            config = Config(config_file="active.json")
+            config_override = {"override_filename" : "active.json"}
+            config = Config(config_override)
         
         cached_collection_name = None
         if self.config.rag_settings.rag_mode:
@@ -737,7 +736,7 @@ class Chatbot:
         elif prompt == ".rt":
             if self.config.rag_settings.rag_mode:
                 print("Not refreshing rag state!")
-                # self.refresh_rag_state()
+                self.disable_rag_mode()
                 return
             self.enable_rag_mode()
             return
@@ -796,12 +795,20 @@ class Chatbot:
                 db_type = "all"
             print("Fetching collection names for method:", db_type)
             collection_names = utils.get_db_collection_names(db_type=db_type)
-            # sort collection names
-            collection_names.sort()
-            print("Collection names:")
-            for name in collection_names:
-                print("-", name)
-        
+            assert isinstance(collection_names, dict), "Collection names not dict"
+            chroma_names = collection_names.get("chroma", [])
+            faiss_names = collection_names.get("faiss", [])
+            if chroma_names:
+                print("Chroma collections:")
+                chroma_names.sort()
+                for name in chroma_names:
+                    print("-", name)
+            if faiss_names:
+                print("Faiss collections:")
+                faiss_names.sort()
+                for name in faiss_names:
+                    print("-", name)
+            return
         # Copy response to clipboard
         elif prompt == ".copy":
             if len(self.messages) < 2:
@@ -866,15 +873,16 @@ class Chatbot:
         self.config.rag_settings.rag_mode = True
         self.initialize_rag()
 
-    def disable_rag_mode(self):
+    def disable_rag_mode(self, flush = False):
         """
         Disables RAG mode.
         """
         if not self.config.rag_settings.rag_mode:
             print('Already in chat mode')
             return
+        if flush:
+            self.refresh_rag_state()
         self.config.rag_settings.rag_mode = False
-        # self.refresh_rag_state()
         self.chat_model = LLM(self.config.chat_settings.primary_model)
         self.set_messages()
 
@@ -1179,8 +1187,17 @@ def main_cli():
     
     parser.add_argument(
         '-a', '--amnesia', action='store_true', help='Enable amnesia mode')
+    
+    # Add load command for loading a JSON file as a Config
+    parser.add_argument(   
+        '-l', '--load-json', type=str, default=DEFAULT_CONFIG_FILENAME, help='Load a JSON file as a Config'
+    )
     args = parser.parse_args()
+    if args.load_json is not None:
+        print(f"Using JSON file: {args.load_json} as base config")
+        
     config_override = {
+        OVERRIDE_FILENAME_KEY: args.load_json,
         "RAG": {},
         "chat": {}
     }

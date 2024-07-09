@@ -8,6 +8,8 @@ LOCAL_MODEL_ONLY = False
 EXPLAIN_EXCERPT = False  # if true, -np will format sample.txt
 
 ### RAG ###
+DEFAULT_CONFIG_FILENAME = "settings.json"
+OVERRIDE_FILENAME_KEY = "override_filename"
 MAX_PARENT_DOCS = 10  # This is only relevant for the multiretrieval mode with child docs
 MAX_CHARACTERS_IN_PARENT_DOC = 20000
 

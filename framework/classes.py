@@ -1,4 +1,4 @@
-from config.config import LOCAL_MODEL_ONLY
+from config.config import DEFAULT_CONFIG_FILENAME, LOCAL_MODEL_ONLY, OVERRIDE_FILENAME_KEY
 from constants import LOCAL_MODELS, MODEL_CODES, MODEL_TO_SYSTEM_MSG, SYSTEM_MESSAGE_CODES
 # use pydantic to enforce Config schema
 from typing import Literal, Union
@@ -186,18 +186,18 @@ class RagSettings:
                     continue
 
                 self.database_exists = True
-                manifest_data = utils.get_manifest_data(collection_name, method)["metadata"]
-                if manifest_data:
-                    print("Manifest data found!")
-                    manifest_metadata = manifest_data["metadata"]
-                    self.adjust_rag_settings(manifest_metadata, override_all=True)
-                else:
+                manifest_data = utils.get_manifest_data(collection_name, method)
+                if manifest_data is None:
                     print("Manifest data not found!")
                     if not utils.clear_database(collection_name, method):
                         print("Aborting quietly.")
                         exit()
-                    print("Database cleared!")
                     self._set_rag_attributes(embedding_model, method, chunk_size, chunk_overlap, inputs, multivector_enabled)
+                else:
+                    print("Manifest data found!")
+                    manifest_metadata = manifest_data.get("metadata", {})
+                    assert manifest_metadata, "Metadata not found in manifest data"
+                    self.adjust_rag_settings(manifest_metadata, override_all=True)
                 break
             else:
                 print(f"Collection name set to {collection_name}")
@@ -573,18 +573,41 @@ class ChatSettings:
     def __str__(self):
         return str(self.props())
 
-
+def get_config_filename(config_override: dict) -> str:
+    """
+    Get the filename for the config and return the dict with override_filename key popped.
+    """
+    assert isinstance(config_override, dict)
+    if config_override:
+        filename = config_override.get(OVERRIDE_FILENAME_KEY, None)
+        if filename is None:
+            return DEFAULT_CONFIG_FILENAME, config_override
+        
+        assert isinstance(filename, str), "Config override filename must be a string"
+        if not filename.endswith(".json"):
+            raise ValueError("Config override filename must be a valid JSON file")
+        full_filepath = utils.CONFIG_DIR / filename
+        if full_filepath.exists():
+            config_override.pop(OVERRIDE_FILENAME_KEY)
+            return filename, config_override
+        else:
+            # NOTE: It's possible to use default file rather than raise an error
+            raise ValueError(f"File {filename} not found in config directory")
+    else:
+        print("Using default config filename")
+        return DEFAULT_CONFIG_FILENAME, {}
 class Config:
     """
     Configuration class
     """
-
     def __init__(
             self,
-            config_override: dict | None = None,
-            config_file="settings.json",):
-
-        config = utils.read_settings(config_file)
+            config_override: dict = {OVERRIDE_FILENAME_KEY : DEFAULT_CONFIG_FILENAME},
+    ):
+        # TODO: Make sure safety/correctness are all up to par here
+        config_filename, config_override = get_config_filename(config_override)
+        assert OVERRIDE_FILENAME_KEY not in config_override, "Override filename key should be popped"
+        config = utils.read_settings(config_filename)
         if config["RAG"]["rag_mode"] is False:
             print("The RAG mode is disabled. The RAG settings could be unreliable.")
         if config_override is not None:
@@ -697,10 +720,12 @@ class Config:
                 data["chat"]["primary_model"] = key
             if dict_model_name == chat_backup_name:
                 data["chat"]["backup_model"] = key
-            
+        
+        # NOTE: I'm not making any assertions about the filename here!
         if not self.rag_settings.rag_mode:
             # Inject the settings for RAG from settings.json
-            data["RAG"] = utils.read_settings("settings.json")["RAG"]
+            config_settings = utils.read_settings(filename) 
+            data["RAG"] = config_settings["RAG"]
             data["RAG"]["rag_mode"] = self.rag_settings.rag_mode
         
         utils.save_config_as_json(data, filename)
