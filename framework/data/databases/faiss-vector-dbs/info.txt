@@ -1,0 +1,3 @@
+Please do not rename this folder or any of its contents. 
+Subfolder names must stay consistent with values indexed in framework/data/manifest.json.
+These values are stored as "collection_name" in the manifest.
