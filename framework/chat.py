@@ -164,7 +164,7 @@ class Chatbot:
         self.response_count = 0
         return
 
-    def initialize_rag(self, force=False) -> bool:
+    def initialize_rag(self, flush=False) -> bool:
         """
         Initializes the retriever and RAG chain.
 
@@ -176,8 +176,12 @@ class Chatbot:
             bool: Whether the initialization was successful.
         """
         if self.retriever is not None:
-            print('Retriever already exists! Clear state using .flush')
-            return False
+            if flush:
+                print('Forcing reinitialization of RAG')
+                self.refresh_rag_state()
+            else:
+                print('Retriever already exists! Clear state using .flush')
+                return False
         assert self.config.rag_settings.rag_mode, "RAG mode must be enabled for intitialize_rag()"
         manifest_data = utils.get_manifest_data(self.config.rag_settings.collection_name, self.config.rag_settings.method)
         
@@ -272,13 +276,6 @@ class Chatbot:
             self.set_messages()
             print("Experimental! RAG mode is off but I'm preserving RAG state(?)")
         
-        # If rag mode was already set to true True, then this may run
-        # initialize_rag again. Shouldn't be a problem.
-        # if self.config.rag_settings.rag_mode:
-        #     self.enable_rag_mode()
-        # else:
-        #     self.disable_rag_mode()
-
     def _set_doc_ids(self):
         assert self.config.rag_settings.rag_mode, "RAG mode must be on"
         assert self.config.rag_settings.multivector_enabled, "Multivector not enabled"
@@ -767,37 +764,38 @@ class Chatbot:
                 print('Cannot set system message in RAG mode')
                 # TODO: Maybe: Implement rag chain with custom system message.
                 return
+            if not self.config.chat_settings.enable_system_message:
+                print('Re-enabling system message!')
+                self.config.chat_settings.enable_system_message = True
             # Print the current codes
             print(f"Available codes:")
             for k, v in SYSTEM_MESSAGE_CODES.items():
                 print(f"- {k}: {v[:50]}{'[...]'if len(v)>50 else ''}")
             user_system_message = input(
-                'Enter a code or type a system message: ')
-            if not user_system_message:
-                print('No input given, try again')
-                return
-            if user_system_message == "None":
+                'Type "None" (to disable), any valid code, or a system message here: ')
+            if not user_system_message.strip():
+                # print('No input given, try again')
+                user_system_message = "default"
+            elif user_system_message == "None":
                 self.config.chat_settings.enable_system_message = False
-                print('System message disabled')
-                self.messages = []
-                self.response_count = 0
+                self.set_messages()
                 return
             # Check against SYSTEM_MESSAGE_CODES
             if user_system_message in SYSTEM_MESSAGE_CODES:
                 print("System message code detected")
                 user_system_message = SYSTEM_MESSAGE_CODES[user_system_message]
             self.config.chat_settings.system_message = user_system_message
-            self.messages = [
-                SystemMessage(
-                    content=user_system_message)]
-            self.response_count = 0
+            self.set_messages()
             print('Chat history cleared')
             return
         # Display Vector DB collection names
         elif prompt == ".names":
-            db_method = self.config.rag_settings.method
-            print("Fetching collection names for method:", db_method)
-            collection_names = utils.get_db_collection_names(method=db_method)
+            if self.config.rag_settings.rag_mode:
+                db_type = self.config.rag_settings.method
+            else:
+                db_type = "all"
+            print("Fetching collection names for method:", db_type)
+            collection_names = utils.get_db_collection_names(db_type=db_type)
             # sort collection names
             collection_names.sort()
             print("Collection names:")
@@ -841,7 +839,7 @@ class Chatbot:
             # Allow user to choose which exchange to delete
             self.handle_pick_command()
             return
-        # Flush RAG and Chat state
+        # Flush RAG and Chat state (will re-initialize if in rag mode)
         elif prompt == ".flush":
             self.refresh_rag_state()
             self.refresh_chat_state()
