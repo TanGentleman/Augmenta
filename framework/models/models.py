@@ -3,9 +3,7 @@
 # TODO: Implement embedding model context size checks, potentially issues
 # during vectorstore steps?
 
-# NOTE: IF DOTENV NOT LOADED, API KEYS WILL NEED TO BE SET MANUALLY
-# from dotenv import load_dotenv
-# load_dotenv()
+# TODO: Implement a YAML file to store model names and their corresponding values
 
 from os import getenv
 import logging
@@ -16,11 +14,12 @@ from langchain_together import TogetherEmbeddings
 # from langchain_anthropic import ChatAnthropic
 from langchain.schema import BaseMessage
 
-from constants import LOCAL_MODELS
+from constants import LOCAL_MODELS, MODEL_CODES
 
-# FOR DEBUG
-# from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
-# from langchain.callbacks.manager import CallbackManager
+# FOR DEBUG OR PIPING OUTPUT
+# NOTE: Is this usable in any use cases like asynchronously populating convex tables?
+from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
+from langchain.callbacks.manager import CallbackManager
 
 # DEPRECATED
 # from langchain_community.embeddings import OllamaEmbeddings
@@ -37,8 +36,20 @@ logger = logging.getLogger(__name__)
 TOGETHER_BASE_URL = "https://api.together.xyz"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
-VALID_TOGETHER_MODELS = []
-VALID_OPENAI_MODELS = ["gpt-4o"]
+VALID_TOGETHER_MODELS = [
+    "cognitivecomputations/dolphin-2.5-mixtral-8x7b",
+    "Qwen/Qwen2-72B-Instruct",
+    "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
+    "mistralai/Mixtral-8x7B-Instruct-v0.1",
+    "mistralai/Mixtral-8x22B-Instruct-v0.1",
+    "databricks/dbrx-instruct",
+    "Snowflake/snowflake-arctic-instruct",
+    "meta-llama/Llama-3-70b-chat-hf",
+    "mistralai/Mistral-7B-Instruct-v0.1",
+    "deepseek-ai/deepseek-llm-67b-chat",
+    "deepseek-ai/deepseek-coder-33b-instruct",
+]
+VALID_OPENAI_MODELS = ["gpt-4o", "gpt-3.5-turbo"]
 VALID_DEEPSEEK_MODELS = ["deepseek-coder"]
 VALID_LOCAL_MODELS = ["local-model"]
 VALID_OLLAMA_MODELS = [
@@ -52,53 +63,66 @@ allowed_models = {
         "together": VALID_TOGETHER_MODELS,
         "deepseek": VALID_DEEPSEEK_MODELS,
         "local": VALID_LOCAL_MODELS,
-        "ollama": [
-            "local-ollama3",
-            "mistral:7b-instruct-v0.3-q6_K",
-            "local-hermes"]}}
+        "ollama": VALID_OLLAMA_MODELS}}
 
+DEFAULT_TEMPERATURE = 0
+DEFAULT_MAX_TOKENS = 1000
 
 def get_together_model(model_name: str, hyperparameters=None) -> ChatOpenAI:
-    if model_name in VALID_TOGETHER_MODELS:
-        api_key = getenv("TOGETHER_API_KEY")
-        assert api_key, "Please set TOGETHER_API_KEY in .env file"
-        return ChatOpenAI(
-            base_url=TOGETHER_BASE_URL,
-            api_key=api_key,
-            model=model_name,
-            temperature=0,
-            max_tokens=1000,
-            streaming=True,
-            # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
-        )
-
-
-def get_openai_gpt4(hyperparameters=None) -> ChatOpenAI:
-    api_key = getenv("OPENAI_API_KEY")
-    assert api_key, "Please set OPENAI_API_KEY in .env file"
-    return ChatOpenAI(
-        model="gpt-4o",
-        api_key=api_key,
-        temperature=0.1,
-        max_tokens=4096,
-        streaming=True,
-        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
-    )
-
-
-def get_together_dolphin(hyperparameters=None) -> ChatOpenAI:
+    assert model_name in VALID_TOGETHER_MODELS
     api_key = getenv("TOGETHER_API_KEY")
     assert api_key, "Please set TOGETHER_API_KEY in .env file"
+    
+    # TODO: Rename hyperparameters to model_settings
+    # Other hyperparameters here
+    if hyperparameters:
+        temperature = hyperparameters.get("temperature", DEFAULT_TEMPERATURE)
+        max_tokens = hyperparameters.get("max_tokens", DEFAULT_MAX_TOKENS)
+    else:
+        temperature = DEFAULT_TEMPERATURE
+        max_tokens = DEFAULT_MAX_TOKENS
+
     return ChatOpenAI(
         base_url=TOGETHER_BASE_URL,
         api_key=api_key,
-        model="cognitivecomputations/dolphin-2.5-mixtral-8x7b",
-        temperature=0,
-        max_tokens=1000,
+        model=model_name,
+        temperature=temperature,
+        max_tokens=max_tokens,
         streaming=True,
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
+def get_openai_model(model_name: str, hyperparameters=None) -> ChatOpenAI:
+    assert model_name in VALID_OPENAI_MODELS
+    api_key = getenv("OPENAI_API_KEY")
+    assert api_key, "Please set OPENAI_API_KEY in .env file"
+    if hyperparameters:
+        temperature = hyperparameters.get("temperature", DEFAULT_TEMPERATURE)
+        max_tokens = hyperparameters.get("max_tokens", DEFAULT_MAX_TOKENS)
+    else:
+        temperature = DEFAULT_TEMPERATURE
+        max_tokens = DEFAULT_MAX_TOKENS
+    return ChatOpenAI(
+        model=model_name,
+        api_key=api_key,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        streaming=True,
+        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+    )
+        
+
+def get_openai_gpt4(hyperparameters=None) -> ChatOpenAI:
+    model="gpt-4o"
+    return get_openai_model(model, hyperparameters)
+
+def get_openai_gpt3(hyperparameters=None) -> ChatOpenAI:
+    model="gpt-3.5-turbo"
+    return get_openai_model(model, hyperparameters)
+
+def get_together_dolphin(hyperparameters=None) -> ChatOpenAI:
+    model="cognitivecomputations/dolphin-2.5-mixtral-8x7b"
+    return get_together_model(model, hyperparameters)
 
 def get_together_qwen(hyperparameters=None) -> ChatOpenAI:
     api_key = getenv("TOGETHER_API_KEY")
@@ -178,7 +202,7 @@ def get_together_llama3(hyperparameters=None) -> ChatOpenAI:
         api_key=api_key,
         model="meta-llama/Llama-3-70b-chat-hf",
         temperature=0,
-        max_tokens=1000,
+        max_tokens=2000,
         streaming=True,
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
@@ -196,21 +220,6 @@ def get_together_fn_mix(hyperparameters=None) -> ChatOpenAI:
         streaming=True,
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
-
-
-def get_together_fn_mistral(hyperparameters=None) -> ChatOpenAI:
-    api_key = getenv("TOGETHER_API_KEY")
-    assert api_key, "Please set TOGETHER_API_KEY in .env file"
-    return ChatOpenAI(
-        base_url=TOGETHER_BASE_URL,
-        api_key=api_key,
-        model="mistralai/Mistral-7B-Instruct-v0.1",
-        temperature=0,
-        max_tokens=1000,
-        streaming=True,
-        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
-    )
-
 
 def get_together_deepseek_4k(hyperparameters=None) -> ChatOpenAI:
     api_key = getenv("TOGETHER_API_KEY")
@@ -238,18 +247,6 @@ def get_together_deepseek_32k(hyperparameters=None) -> ChatOpenAI:
         streaming=True,
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
-
-# def get_claude_sonnet(hyperparameters=None) -> ChatAnthropic:
-#     api_key = getenv("ANTHROPIC_API_KEY")
-#     assert api_key, "Please set ANTHROPIC_API_KEY in .env file"
-#     return ChatAnthropic(
-#         model_name="claude-3-5-sonnet-20240620",
-#         anthropic_api_key=api_key,
-#         temperature=0,
-#         streaming=True,
-#         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
-#     )
-
 
 def get_claude_sonnet(hyperparameters=None) -> ChatOpenAI:
     api_key = getenv("OPENROUTER_API_KEY")
@@ -367,12 +364,20 @@ def get_lmstudio_local_embedder(hyperparameters=None) -> OpenAIEmbeddings:
         api_key="lm-studio"
     )
 
-
+# This will be defined in a YAML file
+# This should include either provider or base_url
 MODEL_DICT = {
     "get_openai_gpt4": {
+        # "provider": "openai",
         "function": get_openai_gpt4,
         "context_size": 128000,
         "model_name": "gpt-4o",
+        "model_type": "llm"
+    },
+    "get_openai_gpt3": {
+        "function": get_openai_gpt3,
+        "context_size": 128000,
+        "model_name": "gpt-3.5-turbo",
         "model_type": "llm"
     },
     "get_together_dolphin": {
@@ -497,6 +502,23 @@ MODEL_DICT = {
         "model_type": "embedder"
     }
 }
+MODEL_KEYS = list(MODEL_DICT.keys())
+MODEL_NAMES = [model["model_name"] for model in MODEL_DICT.values()]
+MODEL_FUNCTIONS = [model["function"] for model in MODEL_DICT.values()]
+
+def model_key_from_name(model_name: str) -> str:
+    """Get the model key from the model name"""
+    for key, model in MODEL_DICT.items():
+        if model["model_name"] == model_name:
+            return key
+    return None
+
+
+def model_name_from_key(model_key: str) -> str | None:
+    """Get the model name from the model key"""
+    model_name = MODEL_DICT.get(model_key, {}).get("model_name", None)
+    return model_name
+
 
 EMBEDDING_CONTEXT_SIZE_DICT = {
     "get_openai_embedder_large": 128000,
@@ -508,35 +530,45 @@ EMBEDDING_CONTEXT_SIZE_DICT = {
 
 
 class LLM_FN:
-    def __init__(self, model_fn, hyperparameters=None):
+    def __init__(self, model_fn=None, hyperparameters=None, model_experimental: str | None = None):
         # If it's not a value in MODEL_DICT, raise an error
         # This means embedding models pass here (for now)
-        self.model_name = ""
-        self.context_size = 0
-        for model in MODEL_DICT.values():
-            if model["function"] == model_fn:
-                self.model_name = str(model["model_name"])
-                self.context_size = int(model["context_size"])
-
-                if not self.model_name:
-                    raise ValueError("Model name not found")
-                if self.context_size <= 0:
-                    raise ValueError(
-                        "Context size must be a positive integer")
-                break
+        if model_experimental is not None:
+            if model_experimental in MODEL_CODES:
+                model_fn = MODEL_DICT[MODEL_CODES[model_experimental]]["function"]
+        for key, info in MODEL_DICT.items():
+            if model_fn is not None:
+                if model_fn == info["function"]:
+                    self.model_name = str(info["model_name"])
+                    self.context_size = int(info["context_size"])
+                    self.model_fn = model_fn
+                    break
+            else:
+                if model_experimental is not None:
+                    if key == model_experimental:
+                        self.model_fn = info["function"]
+                        self.model_name = str(info["model_name"])
+                        self.context_size = int(info["context_size"])
+                        break
+                    if info["model_name"] == model_experimental:
+                        self.model_fn = info["function"]
+                        self.model_name = model_experimental
+                        self.context_size = int(info["context_size"])
+                        break
         else:
-            raise ValueError("Model function not found in MODEL_DICT")
-        self.model_fn = model_fn
-        self.hyperparameters = None
-        if hyperparameters is not None:
-            # assert isinstance(hyperparameters, dict), "This can be any check to make sure hyperparams are valid"
-            self.hyperparameters = hyperparameters
+            raise ValueError("Model not found in MODEL_DICT")
+        
+        self.hyperparameters = hyperparameters
+        assert self.model_fn in MODEL_FUNCTIONS
+        assert self.model_name in MODEL_NAMES
+        assert self.context_size > 0
+        assert hyperparameters is None or isinstance(
+            hyperparameters, dict), "Hyperparameters must be a dictionary"
 
     def get_llm(self, hyperparameters=None):
-        if hyperparameters is not None:
-            return self.model_fn(hyperparameters)
-        else:
-            return self.model_fn(self.hyperparameters)
+        if hyperparameters is None:
+            hyperparameters = self.hyperparameters
+        return self.model_fn(hyperparameters)
 
     def __str__(self):
         return f"LLM: model_name={self.model_name}, context_size={self.context_size}"
