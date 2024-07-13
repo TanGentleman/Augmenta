@@ -1,19 +1,21 @@
 
-from rag import input_to_docs, get_chroma_vectorstore_from_docs, get_faiss_vectorstore_from_docs, load_existing_faiss_vectorstore, load_existing_chroma_vectorstore, split_documents
+# from rag import input_to_docs, get_chroma_vectorstore_from_docs, get_faiss_vectorstore_from_docs, load_existing_faiss_vectorstore, load_existing_chroma_vectorstore, split_documents
+import rag
+import utils
+from constants import MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SYSTEM_MESSAGE_CODES
+from config.config import DEFAULT_CONFIG_FILENAME, MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, OVERRIDE_FILENAME_KEY, SAVE_ONESHOT_RESPONSE, FILTER_TOPIC
+from classes import Config
+from models.models import LLM_FN, LLM
 from langchain_core.output_parsers import JsonOutputParser
 from flash.flashcards import construct_flashcards, display_flashcards, FLASHCARD_FILEPATH
-from langchain.schema import SystemMessage, AIMessage, HumanMessage, BaseMessage
+from langchain_core.messages import SystemMessage, AIMessage, HumanMessage, BaseMessage
 from langchain_community.vectorstores.chroma import Chroma
 from langchain_community.vectorstores.faiss import FAISS
 from langchain_core.vectorstores import VectorStoreRetriever
 from langchain.retrievers.multi_vector import MultiVectorRetriever
 from langchain_core.documents import Document
 from langchain.storage import InMemoryByteStore
-import utils
-from constants import MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SYSTEM_MESSAGE_CODES
-from config.config import DEFAULT_CONFIG_FILENAME, MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, OVERRIDE_FILENAME_KEY, SAVE_ONESHOT_RESPONSE, FILTER_TOPIC
-from classes import Config
-from models.models import LLM_FN, LLM
+
 from chains import get_summary_chain, get_rag_chain, get_eval_chain
 import pyperclip
 from json import dump as json_dump
@@ -330,6 +332,9 @@ class Chatbot:
         """
         Indexes documents for the vectorstore.
 
+        Args:
+            processing_docs_fn (function, optional): Function to process documents before indexing. Defaults to PROCESSING_DOCS_FN.
+            
         Returns:
             list[Document]: The indexed documents.
         """
@@ -346,7 +351,7 @@ class Chatbot:
             if not inputs[i]:
                 print(f'Input {i} is empty, skipping')
                 continue
-            new_docs = input_to_docs(inputs[i])
+            new_docs = rag.input_to_docs(inputs[i])
             if not new_docs:
                 print(f'No documents found in input {i}')
                 continue
@@ -359,7 +364,7 @@ class Chatbot:
             if processing_docs_fn:
                 print("Prompt chooser detected, processing documents...")
                 docs = processing_docs_fn(docs)
-        docs = split_documents(docs,
+        docs = rag.split_documents(docs,
                                self.config.rag_settings.chunk_size,
                                self.config.rag_settings.chunk_overlap)
         if not docs:
@@ -392,10 +397,10 @@ class Chatbot:
         if utils.database_exists(collection_name, method):
             print(f"Loading existing Vector DB: {collection_name}")
             if method == "chroma":
-                vectorstore = load_existing_chroma_vectorstore(
+                vectorstore = rag.load_existing_chroma_vectorstore(
                     collection_name, embedder)
             elif method == "faiss":
-                vectorstore = load_existing_faiss_vectorstore(
+                vectorstore = rag.load_existing_faiss_vectorstore(
                     collection_name, embedder)
             assert vectorstore is not None, "Collection exists but not loaded properly"
             if self.config.rag_settings.multivector_enabled:
@@ -424,10 +429,10 @@ class Chatbot:
                 child_docs = self._get_child_docs()
                 docs = child_docs
             if method == "chroma":
-                vectorstore = get_chroma_vectorstore_from_docs(
+                vectorstore = rag.get_chroma_vectorstore_from_docs(
                     collection_name, embedder, docs)
             elif method == "faiss":
-                vectorstore = get_faiss_vectorstore_from_docs(
+                vectorstore = rag.get_faiss_vectorstore_from_docs(
                     collection_name, embedder, docs)
             assert vectorstore is not None, "Vectorstore not created properly"
             return vectorstore
@@ -665,7 +670,7 @@ class Chatbot:
             print('Prompt prefix:', self.config.optional.prompt_prefix)
             print('Prompt suffix:', self.config.optional.prompt_suffix)
 
-    def handle_command(self, prompt):
+    def handle_command(self, prompt) -> None:
         """
         Handles commands in the chat loop.
 
@@ -673,7 +678,7 @@ class Chatbot:
         - prompt (str): The string from COMMAND_LIST to be called.
 
         Commands:
-        - q, .q, quit: Exits the chat loop.
+        - quit, q, .q: Exits the chat loop.
         - .d, .del: Deletes the last exchange.
         - .swap, .switch: Switches the chat model.
         - .r, .refresh: Refreshes the configuration.
@@ -933,7 +938,7 @@ class Chatbot:
             self,
             messages: list[BaseMessage],
             llm=None,
-            stream: bool = None,
+            stream: bool | None = None,
             is_ollama=False) -> AIMessage | None:
         # TODO: Ensure that get_rag_response doesn't reuse a lot of the same
         # code!
