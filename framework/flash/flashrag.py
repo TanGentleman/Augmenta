@@ -1,4 +1,6 @@
 import json
+
+from typeguard import typechecked
 from classes import Config
 from chains import get_rag_chain
 from models.models import LLM
@@ -16,8 +18,6 @@ ENABLE_RAG = False
 USE_SYSTEM = False
 FLASHCARD_FILEPATH = FLASH_DIR / "flashcards.json"
 
-RUSSIAN_PROMPT = "The context is notes from a Russian class. Create comprehensive flashcards with the keys term, definition, and example. term, definition in russian, example in English."
-# prompt = "The context is notes from a Russian class. Create comprehensive flashcards with the keys term, definition, and example. term, definition in russian, example in English."
 FINAL_PROMPT_TEMPLATE = "{goal}. Include keys {required} and ONLY output valid JSON, no preamble.\n\n```json"
 
 # DEFAULT_GOAL = "Create Q/A pairs that comprehensively cover the main ideas of the paper's excerpts. The answers should be supported by the text."
@@ -31,16 +31,13 @@ class FlashcardSchema(BaseModel):
     definition: str
     example: str
 
-
+@typechecked
 def unpack_inputs(inputs: tuple[str, list[str]]) -> tuple[str, str]:
     goal, required_keys = inputs
     required_string = ", ".join(required_keys)
     return goal, required_string
 
-
-def get_config(inputs: tuple = DEFAULT_INPUTS) -> Config:
-    goal, required_string = unpack_inputs(inputs)
-
+def get_config() -> Config:
     if USE_SYSTEM:
         chat_settings = {
             "primary_model": MODEL,
@@ -88,82 +85,93 @@ def get_config(inputs: tuple = DEFAULT_INPUTS) -> Config:
     config = Config(config_override=config_override)
     return config
 
-
-def is_output_valid(response_object):
-    if not isinstance(response_object, list):
-        return False
-    # NOTE: The schema is not validated for the JSON response, only ensuring
-    # valid JSON.
-    for item in response_object:
-        try:
-            assert isinstance(item, dict)
+@typechecked
+def is_output_valid(response_object: list[dict]) -> bool:
+    """
+    Check if the response object is valid
+    """
+    try:
+        for obj in response_object:
             continue
-            FlashcardSchema(**item)
-        except Exception as e:
-            print(f"Error: {e}")
-            return False
+            FlashcardSchema(**obj)
+    except Exception as e:
+        print(f"Error: {e}")
+        return False
     return True
 
-
-def main():
-    AUTOMATIC = True
-    MAX_COUNT = 3
-
-    goal = ""
+def get_goal_and_keys() -> tuple[str, list[str]]:
+    """
+    Get user input for goal and required keys
+    """
+    goal_input = ""
     required_keys = []
-
-    if not ENABLE_RAG:
-        user_input = input("Enter a goal for the flashcards (leave empty for default inputs): ")
-        
+    finished = False
+    while not finished:
+        goal_input = input("Enter a goal for the flashcards (leave empty for default inputs): ")
         # if empty response, use default inputs
-        if not user_input.strip():
+        if not goal_input.strip():
             goal, required_keys = DEFAULT_INPUTS
+            print("Using default inputs!")
+            return goal, required_keys
         else:
             print("Goal set!")
-            goal = user_input
-            while True:
+            goal = goal_input
+            while not finished:
                 print("Enter a required key for the flashcards (leave empty to finish): ")
                 key = input()
                 if not key.strip():
+                    finished = True
                     break
                 required_keys.append(key)
-    assert goal and required_keys
-    inputs = (goal, required_keys)
-    config = get_config(inputs=inputs)
-    chatbot = Chatbot(config)
-    if ENABLE_RAG:
-        chatbot.rag_chain = get_rag_chain(
-            retriever=chatbot.retriever,
-            llm=LLM(chatbot.config.rag_settings.rag_llm),
-            format_fn=lambda docs: [doc.page_content for doc in docs],
-            system_message=FLASHCARD_SIMPLE_SYSTEM_MESSAGE
-        )
-        # prompt = RUSSIAN_PROMPT
-        chatbot = Chatbot()
-        # Do rag stuff here
-        print("Implement Chatbot.chat() to use RAG mode!")
-        print("Exiting!")
-        raise SystemExit
-    else:
-        count = 0
-        print("Automatic is true! Empty input => clipboard paste") if AUTOMATIC else None
-        while count < MAX_COUNT:
-            try:
-                prompt = input("Type a prompt for the flashcards!: ")
-            except KeyboardInterrupt:
-                print("Exiting!")
-                exit()
-            if AUTOMATIC and not prompt.strip():
-                print("Reading from clipboard!")
-                prompt = paste().strip()
-            response = chatbot.chat(prompt)
-            if response is None:
-                print("No response, error!")
-                exit()
-            response_string = response.content
+    return goal, required_keys
 
+@typechecked
+def convert_inputs_to_prompt(inputs: tuple[str, list[str]]) -> str:
+    """
+    Convert the inputs to a prompt string
+    """
+    goal_string, required_keys = inputs
+    required_string = ", ".join(required_keys or ["None"])
+    prompt = FINAL_PROMPT_TEMPLATE.format(goal=goal_string, required=required_string)
+    return prompt
+
+def run_rag_chain(inputs: tuple[str, list[str]]) -> None:
+    """
+    Run the RAG chain
+    """
+    config = get_config()
+    chatbot = Chatbot(config)
+    chatbot.rag_chain = get_rag_chain(
+        retriever=chatbot.retriever,
+        llm=LLM(chatbot.config.rag_settings.rag_llm),
+        format_fn=lambda docs: [doc.page_content for doc in docs],
+        system_message=FLASHCARD_SIMPLE_SYSTEM_MESSAGE
+    )
+    chatbot = Chatbot()
+    print("Implement Chatbot.chat() to use RAG mode!")
+    print("Exiting!")
+    raise SystemExit
+
+def run_flashrag(set_goal = True) -> None:
+    """
+    Run the flashrag program
+    """
+    config = get_config()
+    chatbot = Chatbot(config)
+    inputs = (goal, required_keys)
+    print("First, let's construct a prompt fitting for this task.")
+    goal, required_keys = get_goal_and_keys()
+    prompt = convert_inputs_to_prompt(inputs)
+    messages = chatbot.chat(prompt)
+    if not messages:
+        exit()
+    response = messages[0]
+    response_string = response.content
+    return response_string
+
+def main():
+    
+    run_flashrag()
 
 if __name__ == "__main__":
     main()
-    # get the keys as a dictionary from the FlashcardSchema
-    # print(keys)
