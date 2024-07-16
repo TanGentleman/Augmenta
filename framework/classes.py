@@ -17,6 +17,7 @@ ACTIVE_JSON_FILE = "active.json"
 
 VALID_LLM = Literal[
     "get_openai_gpt4",
+    "get_openai_gpt3",
     "get_together_dolphin",
     "get_together_qwen",
     "get_together_nous_mix",
@@ -100,6 +101,7 @@ class OptionalSchema(BaseModel):
     prompt_suffix: str
     amnesia: bool
     display_flashcards: bool
+    filter: dict[str, str | int]
 
 
 def get_llm_fn(model_name: str,

@@ -120,9 +120,6 @@ class Chatbot:
         if config is None:
             config = Config()
 
-        # TODO: Migrate filter topic into rag_settings
-        self.filter_topic = FILTER_TOPIC
-
         ### The daddy config ###
         self.config = config
 
@@ -459,9 +456,9 @@ class Chatbot:
             print("Error: Criteria not provided")
             criteria = "This document is about dolphins"
         print('Running evaluation tests on vectorstore')
-        filter = {}
-        if self.filter_topic is not None:
-            filter = {"topic": self.filter_topic}
+        # NOTE: Watch aliasing in the future
+        if self.config.optional.filter:
+            filter = {"topic": self.config.optional.filter}
 
         docs: list[Document] = vectorstore.similarity_search(
             similarity_query, k=k_excerpts, filter=filter)
@@ -515,9 +512,9 @@ class Chatbot:
         # self.run_eval_tests_on_vectorstore(vectorstore)
         search_kwargs = {}
         search_kwargs["k"] = self.config.rag_settings.k_excerpts
-        if self.filter_topic is not None:
-            search_kwargs["filter"] = {'topic': self.filter_topic}
-        # search_kwargs["filter"] = {'page': 0}
+        filter_kwargs = self.config.optional.filter
+        if filter_kwargs:
+            search_kwargs["filter"] = filter_kwargs
         if self.config.rag_settings.multivector_enabled:
             assert self.parent_docs, "Parent docs not initialized"
             assert self.doc_ids, "Doc IDs not initialized"

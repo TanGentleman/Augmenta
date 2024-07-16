@@ -25,7 +25,8 @@
         "prompt_prefix": "",
         "prompt_suffix": "",
         "amnesia": false,
-        "display_flashcards": true
+        "display_flashcards": true,
+        "filter": {}
     },
     "hyperparameters": {
         "max_tokens": 1000,
