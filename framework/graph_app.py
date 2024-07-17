@@ -12,8 +12,8 @@ from dotenv import load_dotenv
 load_dotenv()
 
 MAX_MUTATION_COUNT = 50
-MAX_RESPONSE_COUNT = 1
-
+MAX_RESPONSE_COUNT = 3
+COMMAND_LIST = ["q", "test"]
 # Define state
 class GraphState(TypedDict):
     """
@@ -46,6 +46,41 @@ def start_node(state: GraphState) -> GraphState:
         "is_done": False
     }
 
+def apply_command_node(state: GraphState) -> GraphState:
+    """
+    This function is responsible for applying the command to the state.
+
+    Args:
+        command (str): _description_
+
+    Returns:
+        None: _description_
+    """
+    state_dict = state["keys"]
+    def handle_input(input: str) -> None | str:
+        if input == "q":
+            return None
+        elif input == "test":
+            print("Test command applied.")
+            return "I successfully applied the test command. Celebrate with JSON of this moment."
+        return input
+    assert "user_input" in state_dict, "No command in state keys!"
+    command_string = state_dict["user_input"].strip()
+    assert command_string in COMMAND_LIST, "Command not in command list!"
+    new_input = handle_input(command_string)
+    if new_input is None:
+        return {
+            "keys": state_dict,
+            "mutation_count": state["mutation_count"] + 1,
+            "is_done": True
+        }
+    state_dict["user_input"] = new_input
+    return {
+        "keys": state_dict,
+        "mutation_count": state["mutation_count"] + 1,
+        "is_done": False
+    }
+
 def chatbot_node(state: GraphState) -> GraphState:
     """
     This node is responsible for handling the chatbot conversation.
@@ -56,10 +91,6 @@ def chatbot_node(state: GraphState) -> GraphState:
     Returns:
         GraphState: Update: 
     """
-    def handle_input(input: str) -> None | str:
-        if input == "q":
-            return None
-        return input
     state_dict = state["keys"]
     config: Config = state_dict["config"]
     if state["mutation_count"] == 1: # This is first entry to the chatbot node
@@ -75,16 +106,10 @@ def chatbot_node(state: GraphState) -> GraphState:
         
     elif state_dict.get("user_input", ""):
         user_input = state_dict["user_input"]
-        res = handle_input(user_input) # Should this be permitted to return the state or have side effects instead? No!
-        if res is None: # This is the exit condition
-            # Probably should do stuff before clearing keys, since end_node can do it
-            return {
-                "keys": {},
-                "mutation_count": state["mutation_count"] + 1,
-                "is_done": True
-            }
+        if user_input.strip() in COMMAND_LIST:
+            raise ValueError("Command must be handled in human node. If this is legal, this error should be a warning.")
         messages = state_dict["messages"]
-        messages.append(HumanMessage(content=res))
+        messages.append(HumanMessage(content=user_input))
         # Here you can validate the messages array before assigning them to the state
         new_keys = {
             "chat_model": state_dict["chat_model"],
@@ -118,10 +143,11 @@ def human_node(state: GraphState) -> GraphState:
         GraphState: Update: 
     """
     def validate(user_input: str) -> str | None:
-        processed_input = user_input.strip()
-        if not processed_input:
+        if not user_input.strip():
             return None
-        return processed_input
+        return user_input
+    
+    state_dict = state["keys"]
     is_valid = False
     user_input = ""
     while not is_valid:
@@ -130,8 +156,6 @@ def human_node(state: GraphState) -> GraphState:
         if validated is not None:
             user_input = validated
             is_valid = True
-    assert user_input, "Invalidated user input!"
-    state_dict = state["keys"]
     return {
         "keys": {
             "user_input": user_input,
@@ -287,6 +311,23 @@ def decide_from_chatbot(state: GraphState) -> Literal["end_node", "human_node", 
         return "human_node"
     return "tools_node"
 
+def decide_from_human(state: GraphState) -> Literal["chatbot_node", "apply_command_node"]:
+    """
+    This function is responsible for deciding whether the next node should be the chatbot node or the apply_command node.
+
+    Args:
+        state (GraphState): _description_
+
+    Returns:
+        Literal["chatbot_node", "apply_command_node"]: _description_
+    """
+    state_dict = state["keys"]
+    assert "user_input" in state_dict, "No user input in state keys!"
+    user_input = state_dict["user_input"]
+    if user_input.strip() in COMMAND_LIST:
+        return "apply_command_node"
+    return "chatbot_node"
+
 def decide_from_tools(state: GraphState) -> Literal["chatbot_node", "generate_node"]:
     """
     This function is responsible for deciding whether the next node should be the generate node or the end node.
@@ -311,6 +352,7 @@ workflow = StateGraph(GraphState)
 workflow.add_node("start_node", start_node)
 workflow.add_node("chatbot_node", chatbot_node)
 workflow.add_node("human_node", human_node)
+workflow.add_node("apply_command_node", apply_command_node)
 workflow.add_node("tools_node", tools_node)
 workflow.add_node("generate_node", generate_node)
 workflow.add_node("end_node", end_node)
@@ -327,7 +369,18 @@ workflow.add_conditional_edges(
         "tools_node": "tools_node"
     }
 )
-workflow.add_edge("human_node", "chatbot_node")
+# workflow.add_edge("human_node", "chatbot_node")
+
+workflow.add_conditional_edges(
+    "human_node", 
+    decide_from_human, 
+    {
+        "chatbot_node": "chatbot_node",
+        "apply_command_node": "apply_command_node"
+    }
+)
+workflow.add_edge("apply_command_node", "chatbot_node")
+
 workflow.add_edge("end_node", END)
 
 workflow.add_conditional_edges(
