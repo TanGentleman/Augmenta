@@ -9,11 +9,13 @@ from langchain_core.messages import AIMessage, SystemMessage
 from classes import Config
 from models.models import LLM
 from dotenv import load_dotenv
+
+from utils import read_sample
 load_dotenv()
 
 MAX_MUTATION_COUNT = 50
 MAX_RESPONSE_COUNT = 3
-COMMAND_LIST = ["q", "test"]
+COMMAND_LIST = ["q", ".test", ".read"]
 # Define state
 class GraphState(TypedDict):
     """
@@ -57,23 +59,19 @@ def apply_command_node(state: GraphState) -> GraphState:
         None: _description_
     """
     state_dict = state["keys"]
-    def handle_input(input: str) -> None | str:
+    def handle_input(input: str) ->  str:
         if input == "q":
-            return None
-        elif input == "test":
+            return "QUIT"
+        elif input == ".test":
             print("Test command applied.")
             return "I successfully applied the test command. Celebrate with JSON of this moment."
+        elif input == ".read":
+            return read_sample()
         return input
     assert "user_input" in state_dict, "No command in state keys!"
     command_string = state_dict["user_input"].strip()
     assert command_string in COMMAND_LIST, "Command not in command list!"
     new_input = handle_input(command_string)
-    if new_input is None:
-        return {
-            "keys": state_dict,
-            "mutation_count": state["mutation_count"] + 1,
-            "is_done": True
-        }
     state_dict["user_input"] = new_input
     return {
         "keys": state_dict,
@@ -106,9 +104,13 @@ def chatbot_node(state: GraphState) -> GraphState:
         
     elif state_dict.get("user_input", ""):
         user_input = state_dict["user_input"]
-        if user_input.strip() in COMMAND_LIST:
-            raise ValueError("Command must be handled in human node. If this is legal, this error should be a warning.")
         messages = state_dict["messages"]
+        if user_input == "QUIT":
+            return {
+                "keys": state_dict,
+                "mutation_count": state["mutation_count"] + 1,
+                "is_done": True
+            }
         messages.append(HumanMessage(content=user_input))
         # Here you can validate the messages array before assigning them to the state
         new_keys = {
@@ -117,7 +119,6 @@ def chatbot_node(state: GraphState) -> GraphState:
             "response_count": state_dict["response_count"],
             "config": state_dict["config"],
         }
-        
     else:
         # Go to the tools node
         new_keys = state_dict
