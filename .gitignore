@@ -1,7 +1,10 @@
 .DS_Store
 .env
-__pycache__/
 .venv/
+.venv310/
+.venv312/
+__pycache__/
+
 *.pdf
 *.md
 *.txt
