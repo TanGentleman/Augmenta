@@ -1,6 +1,6 @@
 # Constants for chat.py
 from langchain_core.prompts import ChatPromptTemplate
-from langchain.schema import SystemMessage
+from langchain_core.messages import SystemMessage
 
 ### MISC ###
 VECTOR_DB_SUFFIX = "-vector-dbs"
@@ -35,16 +35,17 @@ FLASHCARD_SIMPLE_SYSTEM_MESSAGE = "Generate a list of JSON flashcards with consi
 MODEL_CODES = {
     "gpt4": "get_openai_gpt4",
     "bigmix": "get_together_bigmix",
+    "mix": "get_together_fn_mix",
     "code": "get_deepseek_coder",
     "dbrx": "get_together_dbrx",
     "arctic": "get_together_arctic",
     "llama": "get_together_llama3",
+    "llama400": "get_together_llama_400b",
     "deepseek": "get_together_deepseek_4k",
     "qwen": "get_together_qwen",
-    "opus": "get_claude_opus",
+    "sonnet": "get_openrouter_sonnet",
     "local": "get_local_model",
-    "ollama3": "get_ollama_llama3",
-    "ollama": "get_ollama_mistral",
+    "ollama": "get_ollama_llama3",
 }
 
 SYSTEM_MESSAGE_CODES = {
@@ -57,9 +58,8 @@ SYSTEM_MESSAGE_CODES = {
 }
 
 MODEL_TO_SYSTEM_MSG = {
-    "Qwen/Qwen2-72B-Instruct": FLASHCARD_SIMPLE_SYSTEM_MESSAGE,
+    # "meta-llama/Llama-3-70b-chat-hf": FLASHCARD_SIMPLE_SYSTEM_MESSAGE,
 }
-
 
 RAG_COLLECTION_TO_SYSTEM_MESSAGE = {
     "default": RAG_SYSTEM_MESSAGE,
@@ -69,18 +69,13 @@ RAG_COLLECTION_TO_SYSTEM_MESSAGE = {
 }
 
 LOCAL_MODELS = [
-    "local-ollama3",
+    "llama3",
     "mistral:7b-instruct-v0.3-q6_K",
     "local-model",
     "nomic-embed-text",
     "lmstudio-embedding-model",
-    "local-hermes"
 ]
 
-
-DEFAULT_QUERY = '''Name 5 strange vegetables that I am unlikely to see in Western countries.'''
-# DEFAULT_SYSTEM_MESSAGE = "You are a domain expert AI for a graduate class. Be articulate, clear, and concise and your response."
-DEFAULT_SYSTEM_MESSAGE = "You are a helpful AI."
 MAX_CHARS_IN_PROMPT = 200000
 MAX_CHAT_EXCHANGES = 20
 

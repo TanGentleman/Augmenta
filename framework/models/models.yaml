@@ -17,19 +17,21 @@ valid_together_models:
 
 valid_openai_models:
   - gpt-4o
-  - gpt-3.5-turbo
+  - gpt-4o-mini
 
 valid_deepseek_models:
   - deepseek-coder
   - deepseek-chat
 
+valid_openrouter_models:
+  - anthropic/claude-3.5-sonnet
+
 valid_local_models:
   - local-model
 
 valid_ollama_models:
-  - local-ollama3
+  - llama3
   - mistral:7b-instruct-v0.3-q6_K
-  - local-hermes
 
 models:
   - key: get_openai_gpt4
@@ -37,10 +39,10 @@ models:
     type: llm
     model: gpt-4o
     context_size: 128000
-  - key: get_openai_gpt3
+  - key: get_openai_gpt4_mini
     provider: openai
     type: llm
-    model: gpt-3.5-turbo
+    model: gpt-4o-mini
     context_size: 128000
   - key: get_together_dolphin
     provider: together
@@ -112,7 +114,7 @@ models:
     model: deepseek-chat
     type: llm
     context_size: 128000
-  - key: get_claude_sonnet
+  - key: get_openrouter_sonnet
     provider: deepseek
     model: anthropic/claude-3.5-sonnet
     type: llm
@@ -124,7 +126,7 @@ models:
     context_size: 32768
   - key: get_ollama_llama3
     provider: ollama
-    model: local-ollama3
+    model: llama3
     type: llm
     context_size: 4096
   - key: get_ollama_mistral
@@ -132,9 +134,9 @@ models:
     model: mistral:7b-instruct-v0.3-q6_K
     type: llm
     context_size: 4096
-  - key: get_local_hermes
+  - key: get_local_llama_cpp
     provider: local
-    model: local-hermes
+    model: local-model
     type: llm
     context_size: 4096
   - key: get_openai_embedder_large
@@ -156,4 +158,4 @@ models:
     provider: local
     model: lmstudio-embedding-model
     type: embedder
-    context_size: 
+    context_size: 8192
