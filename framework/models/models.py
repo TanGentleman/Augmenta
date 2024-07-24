@@ -8,7 +8,6 @@
 from os import getenv
 import logging
 
-
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_together import TogetherEmbeddings
 # from langchain_anthropic import ChatAnthropic
@@ -20,10 +19,38 @@ from constants import LOCAL_MODELS, MODEL_CODES
 # NOTE: Is this usable in any use cases like asynchronously populating convex tables?
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain.callbacks.manager import CallbackManager
+import yaml
 
 # DEPRECATED
 # from langchain_community.embeddings import OllamaEmbeddings
 # from langchain_community.llms.ollama import Ollama
+
+## NEW ##
+def get_model_config_from_yaml(filename: str):
+    import os
+    this_directory = os.path.dirname(os.path.realpath(__file__))
+    file_path = os.path.join(this_directory, filename)
+    with open(file_path, 'r') as f:
+        models_config = yaml.safe_load(f)
+    # Make assertions about the structure of the yaml file
+    if 'models' not in models_config:
+        raise ValueError("models key not found in models.yaml")
+    return models_config
+
+MODEL_CONFIG = get_model_config_from_yaml('models.yaml')
+
+def get_model_dict():
+    model_dict = {}
+    for model in MODEL_CONFIG['models']:
+        model_dict[model['key']] = {
+            'provider': model['provider'],
+            'model_name': model['model'],
+            'context_size': model['context_size'],
+            'model_type': model['type']
+        }
+    return model_dict
+
+MODEL_DICT = get_model_dict()
 
 DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
 TOGETHER_BASE_URL = "https://api.together.xyz"
@@ -36,72 +63,62 @@ logger = logging.getLogger(__name__)
 TOGETHER_BASE_URL = "https://api.together.xyz"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 
-VALID_TOGETHER_MODELS = [
-    "cognitivecomputations/dolphin-2.5-mixtral-8x7b",
-    "Qwen/Qwen2-72B-Instruct",
-    "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
-    "mistralai/Mixtral-8x7B-Instruct-v0.1",
-    "mistralai/Mixtral-8x22B-Instruct-v0.1",
-    "databricks/dbrx-instruct",
-    "Snowflake/snowflake-arctic-instruct",
-    "meta-llama/Llama-3-70b-chat-hf",
-    "mistralai/Mistral-7B-Instruct-v0.1",
-    "deepseek-ai/deepseek-llm-67b-chat",
-    "deepseek-ai/deepseek-coder-33b-instruct",
-]
-VALID_OPENAI_MODELS = ["gpt-4o", "gpt-3.5-turbo"]
-VALID_DEEPSEEK_MODELS = ["deepseek-coder"]
-VALID_LOCAL_MODELS = ["local-model"]
-VALID_OLLAMA_MODELS = [
-    "local-ollama3",
-    "mistral:7b-instruct-v0.3-q6_K",
-    "local-hermes"]
-
-allowed_models = {
+ALL_MODELS = {
     "providers": {
-        "openai": VALID_OPENAI_MODELS,
-        "together": VALID_TOGETHER_MODELS,
-        "deepseek": VALID_DEEPSEEK_MODELS,
-        "local": VALID_LOCAL_MODELS,
-        "ollama": VALID_OLLAMA_MODELS}}
+        "openai": MODEL_CONFIG['valid_openai_models'],
+        "together": MODEL_CONFIG['valid_together_models'],
+        "deepseek": MODEL_CONFIG['valid_deepseek_models'],
+        "local": MODEL_CONFIG['valid_local_models'],
+        "ollama": MODEL_CONFIG['valid_ollama_models']
+    }
+}
+
+VALID_TOGETHER_MODELS = ALL_MODELS["providers"]["together"]
+VALID_OPENAI_MODELS = ALL_MODELS["providers"]["openai"]
+VALID_DEEPSEEK_MODELS = ALL_MODELS["providers"]["deepseek"]
+VALID_LOCAL_MODELS = ALL_MODELS["providers"]["local"]
+VALID_OLLAMA_MODELS = ALL_MODELS["providers"]["ollama"]
 
 DEFAULT_TEMPERATURE = 0
-DEFAULT_MAX_TOKENS = 1000
+DEFAULT_MAX_TOKENS = 2000
 
-def get_together_model(model_name: str, hyperparameters=None) -> ChatOpenAI:
-    assert model_name in VALID_TOGETHER_MODELS
-    api_key = getenv("TOGETHER_API_KEY")
-    assert api_key, "Please set TOGETHER_API_KEY in .env file"
-    
-    # TODO: Rename hyperparameters to model_settings
-    # Other hyperparameters here
+def get_temp_and_tokens(hyperparameters: dict | None = None):
     if hyperparameters:
         temperature = hyperparameters.get("temperature", DEFAULT_TEMPERATURE)
         max_tokens = hyperparameters.get("max_tokens", DEFAULT_MAX_TOKENS)
     else:
         temperature = DEFAULT_TEMPERATURE
         max_tokens = DEFAULT_MAX_TOKENS
+    return temperature, max_tokens
 
-    return ChatOpenAI(
-        base_url=TOGETHER_BASE_URL,
-        api_key=api_key,
-        model=model_name,
-        temperature=temperature,
-        max_tokens=max_tokens,
-        streaming=True,
-        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
-    )
+def get_together_wrapper(model_name: str, hyperparameters=None):
+    assert model_name in VALID_TOGETHER_MODELS, f"Invalid model name: {model_name}"
+    
+    def wrapped_function(hyperparameters=hyperparameters):
+        api_key = getenv("TOGETHER_API_KEY")
+        assert api_key, "Please set TOGETHER_API_KEY in .env file"
+        temperature, max_tokens = get_temp_and_tokens(hyperparameters)
+        
+        return ChatOpenAI(
+            base_url=TOGETHER_BASE_URL,
+            api_key=api_key,
+            model=model_name,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            streaming=True,
+            # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+        )
+    return wrapped_function
+
+def get_together_model(model_name: str, hyperparameters=None) -> ChatOpenAI:
+    wrapped_function = get_together_wrapper(model_name, hyperparameters)
+    return wrapped_function()
 
 def get_openai_model(model_name: str, hyperparameters=None) -> ChatOpenAI:
     assert model_name in VALID_OPENAI_MODELS
     api_key = getenv("OPENAI_API_KEY")
     assert api_key, "Please set OPENAI_API_KEY in .env file"
-    if hyperparameters:
-        temperature = hyperparameters.get("temperature", DEFAULT_TEMPERATURE)
-        max_tokens = hyperparameters.get("max_tokens", DEFAULT_MAX_TOKENS)
-    else:
-        temperature = DEFAULT_TEMPERATURE
-        max_tokens = DEFAULT_MAX_TOKENS
+    temperature, max_tokens = get_temp_and_tokens(hyperparameters)
     return ChatOpenAI(
         model=model_name,
         api_key=api_key,
@@ -136,7 +153,6 @@ def get_together_qwen(hyperparameters=None) -> ChatOpenAI:
         streaming=True,
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
-
 
 def get_together_nous_mix(hyperparameters=None) -> ChatOpenAI:
     api_key = getenv("TOGETHER_API_KEY")
@@ -364,147 +380,34 @@ def get_lmstudio_local_embedder(hyperparameters=None) -> OpenAIEmbeddings:
         api_key="lm-studio"
     )
 
-# This will be defined in a YAML file
-# This should include either provider or base_url
-MODEL_DICT = {
-    "get_openai_gpt4": {
-        # "provider": "openai",
-        "function": get_openai_gpt4,
-        "context_size": 128000,
-        "model_name": "gpt-4o",
-        "model_type": "llm"
-    },
-    "get_openai_gpt3": {
-        "function": get_openai_gpt3,
-        "context_size": 128000,
-        "model_name": "gpt-3.5-turbo",
-        "model_type": "llm"
-    },
-    "get_together_dolphin": {
-        "function": get_together_dolphin,
-        "context_size": 32768,
-        "model_name": "cognitivecomputations/dolphin-2.5-mixtral-8x7b",
-        "model_type": "llm"
-    },
-    "get_together_qwen": {
-        "function": get_together_qwen,
-        "context_size": 4096,
-        "model_name": "Qwen/Qwen2-72B-Instruct",
-        "model_type": "llm"
-    },
-    "get_together_nous_mix": {
-        "function": get_together_nous_mix,
-        "context_size": 32768,
-        "model_name": "NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
-        "model_type": "llm"
-    },
-    "get_together_fn_mix": {
-        "function": get_together_fn_mix,
-        "context_size": 32768,
-        "model_name": "mistralai/Mixtral-8x7B-Instruct-v0.1",
-        "model_type": "llm"
-    },
-    "get_together_bigmix": {
-        "function": get_together_bigmix,
-        "context_size": 65536,
-        "model_name": "mistralai/Mixtral-8x22B-Instruct-v0.1",
-        "model_type": "llm"
-    },
-    "get_together_dbrx": {
-        "function": get_together_dbrx,
-        "context_size": 32768,
-        "model_name": "databricks/dbrx-instruct",
-        "model_type": "llm"
-    },
-    "get_together_arctic": {
-        "function": get_together_arctic,
-        "context_size": 4096,
-        "model_name": "Snowflake/snowflake-arctic-instruct",
-        "model_type": "llm"
-    },
-    "get_together_llama3": {
-        "function": get_together_llama3,
-        "context_size": 8000,
-        "model_name": "meta-llama/Llama-3-70b-chat-hf",
-        "model_type": "llm"
-    },
-    "get_together_deepseek_4k": {
-        "function": get_together_deepseek_4k,
-        "context_size": 4096,
-        "model_name": "deepseek-ai/deepseek-llm-67b-chat",
-        "model_type": "llm"
-    },
-    "get_together_deepseek_32k": {
-        "function": get_together_deepseek_32k,
-        "context_size": 32768,
-        "model_name": "deepseek-ai/deepseek-coder-33b-instruct",
-        "model_type": "llm"
-    },
-    "get_deepseek_coder": {
-        "function": get_deepseek_coder,
-        "context_size": 128000,
-        "model_name": "deepseek-coder",
-        "model_type": "llm"
-    },
-    "get_claude_sonnet": {
-        "function": get_claude_sonnet,
-        "context_size": 200000,
-        "model_name": "anthropic/claude-3.5-sonnet",
-        "model_type": "llm"
-    },
-    # Note: Local model has an undefined context size
-    "get_local_model": {
-        "function": get_local_model,
-        "context_size": 32768,
-        "model_name": "local-model",
-        "model_type": "llm"
-    },
-    "get_ollama_llama3": {
-        "function": get_ollama_llama3,
-        "context_size": 4096,
-        "model_name": "local-ollama3",  # Should this be llama3?
-        "model_type": "llm"
-    },
-    "get_ollama_mistral": {
-        "function": get_ollama_mistral,
-        "context_size": 4096,
-        "model_name": "mistral:7b-instruct-v0.3-q6_K",
-        "model_type": "llm"
-    },
-    "get_local_hermes": {
-        "function": get_local_hermes,
-        "context_size": 4096,
-        "model_name": "local-hermes",
-        "model_type": "llm"
-    },
-    "get_openai_embedder_large": {
-        "function": get_openai_embedder_large,
-        "context_size": 128000,
-        "model_name": "text-embedding-3-large",
-        "model_type": "embedder"
-    },
-    "get_together_embedder_large": {
-        "function": get_together_embedder_large,
-        "context_size": 8192,
-        "model_name": "BAAI/bge-large-en-v1.5",
-        "model_type": "embedder"
-    },
-    "get_ollama_local_embedder": {
-        "function": get_ollama_local_embedder,
-        "context_size": 8192,
-        "model_name": "nomic-embed-text",
-        "model_type": "embedder"
-    },
-    "get_lmstudio_local_embedder": {
-        "function": get_lmstudio_local_embedder,
-        "context_size": 8192,
-        "model_name": "lmstudio-embedding-model",
-        "model_type": "embedder"
-    }
+# This maps the model keys to the functions
+FUNCTION_MAP = {
+    "get_openai_gpt4": get_openai_gpt4,
+    "get_openai_gpt3": get_openai_gpt3,
+    "get_together_dolphin": get_together_dolphin,
+    "get_together_qwen": get_together_qwen,
+    "get_together_nous_mix": get_together_nous_mix,
+    "get_together_fn_mix": get_together_fn_mix,
+    "get_together_bigmix": get_together_bigmix,
+    "get_together_dbrx": get_together_dbrx,
+    "get_together_arctic": get_together_arctic,
+    "get_together_llama3": get_together_llama3,
+    "get_together_new_llama": get_together_wrapper("meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo"),
+    "get_together_llama_400b": get_together_wrapper("meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo"),
+    "get_together_deepseek_4k": get_together_deepseek_4k,
+    "get_together_deepseek_32k": get_together_deepseek_32k,
+    "get_deepseek_coder": get_deepseek_coder,
+    "get_claude_sonnet": get_claude_sonnet,
+    "get_local_model": get_local_model,
+    "get_ollama_llama3": get_ollama_llama3,
+    "get_ollama_mistral": get_ollama_mistral,
+    "get_local_hermes": get_local_hermes,
+    "get_openai_embedder_large": get_openai_embedder_large,
+    "get_together_embedder_large": get_together_embedder_large,
+    "get_ollama_local_embedder": get_ollama_local_embedder,
+    "get_lmstudio_local_embedder": get_lmstudio_local_embedder
 }
-MODEL_KEYS = list(MODEL_DICT.keys())
 MODEL_NAMES = [model["model_name"] for model in MODEL_DICT.values()]
-MODEL_FUNCTIONS = [model["function"] for model in MODEL_DICT.values()]
 
 def model_key_from_name(model_name: str) -> str:
     """Get the model key from the model name"""
@@ -520,25 +423,21 @@ def model_name_from_key(model_key: str) -> str | None:
     return model_name
 
 
-EMBEDDING_CONTEXT_SIZE_DICT = {
-    "get_openai_embedder_large": 128000,
-    "get_together_embedder_large": 8192,
-    "get_ollama_local_embedder": 8192
-}
-
 # Create class LLM_FN that takes a function that is a value in MODEL_DICT
-
-
 class LLM_FN:
     def __init__(self, model_fn=None, hyperparameters=None, model_experimental: str | None = None):
         # If it's not a value in MODEL_DICT, raise an error
         # This means embedding models pass here (for now)
+        if hyperparameters is not None and not isinstance(hyperparameters, dict):
+            raise ValueError("Hyperparameters must be a dictionary")
+        
         if model_experimental is not None:
+            assert model_fn is None, "model_fn must be None if model_experimental is not None"
             if model_experimental in MODEL_CODES:
-                model_fn = MODEL_DICT[MODEL_CODES[model_experimental]]["function"]
+                model_experimental = MODEL_CODES[model_experimental]
         for key, info in MODEL_DICT.items():
             if model_fn is not None:
-                if model_fn == info["function"]:
+                if model_fn == FUNCTION_MAP[key]:
                     self.model_name = str(info["model_name"])
                     self.context_size = int(info["context_size"])
                     self.model_fn = model_fn
@@ -546,24 +445,24 @@ class LLM_FN:
             else:
                 if model_experimental is not None:
                     if key == model_experimental:
-                        self.model_fn = info["function"]
+                        self.model_fn = FUNCTION_MAP[key]
                         self.model_name = str(info["model_name"])
                         self.context_size = int(info["context_size"])
                         break
                     if info["model_name"] == model_experimental:
-                        self.model_fn = info["function"]
+                        self.model_fn = FUNCTION_MAP[key]
                         self.model_name = model_experimental
                         self.context_size = int(info["context_size"])
                         break
         else:
             raise ValueError("Model not found in MODEL_DICT")
         
+        
+        
         self.hyperparameters = hyperparameters
-        assert self.model_fn in MODEL_FUNCTIONS
+        assert self.model_fn in FUNCTION_MAP.values()
         assert self.model_name in MODEL_NAMES
         assert self.context_size > 0
-        assert hyperparameters is None or isinstance(
-            hyperparameters, dict), "Hyperparameters must be a dictionary"
 
     def get_llm(self, hyperparameters=None):
         if hyperparameters is None:
@@ -582,13 +481,6 @@ class LLM:
         if isinstance(llm_fn, LLM):
             raise ValueError("LLM object passed to LLM constructor")
         assert isinstance(llm_fn, LLM_FN), "llm_fn must be an LLM_FN object"
-        found = False
-        for model in MODEL_DICT.values():
-            if model["function"] == llm_fn.model_fn:
-                assert model["model_name"] == llm_fn.model_name, "Model name does not match"
-                found = True
-                break
-        assert found, "Model function not found in MODEL_DICT"
         # TODO: Filter out embedding models
 
         self.model_name = llm_fn.model_name
