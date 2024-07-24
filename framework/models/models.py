@@ -20,6 +20,7 @@ from constants import LOCAL_MODELS, MODEL_CODES
 from langchain.callbacks.streaming_stdout import StreamingStdOutCallbackHandler
 from langchain.callbacks.manager import CallbackManager
 import yaml
+logger = logging.getLogger(__name__)
 
 # DEPRECATED
 # from langchain_community.embeddings import OllamaEmbeddings
@@ -54,11 +55,13 @@ MODEL_DICT = get_model_dict()
 
 DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1"
 TOGETHER_BASE_URL = "https://api.together.xyz"
+OPENAI_BASE_URL = "https://api.openai.com/v1"
 
 OLLAMA_BASE_URL = "http://localhost:11434/v1"
 # This is for LMSTUDIO, but I set llamacpp to same port
 LOCAL_BASE_URL = "http://localhost:1234/v1"
-logger = logging.getLogger(__name__)
+LLAMA_CPP_BASE_URL = LOCAL_BASE_URL # This can be changed to a different port
+
 
 TOGETHER_BASE_URL = "https://api.together.xyz"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
@@ -68,6 +71,7 @@ ALL_MODELS = {
         "openai": MODEL_CONFIG['valid_openai_models'],
         "together": MODEL_CONFIG['valid_together_models'],
         "deepseek": MODEL_CONFIG['valid_deepseek_models'],
+        "openrouter": MODEL_CONFIG['valid_openrouter_models'],
         "local": MODEL_CONFIG['valid_local_models'],
         "ollama": MODEL_CONFIG['valid_ollama_models']
     }
@@ -76,32 +80,85 @@ ALL_MODELS = {
 VALID_TOGETHER_MODELS = ALL_MODELS["providers"]["together"]
 VALID_OPENAI_MODELS = ALL_MODELS["providers"]["openai"]
 VALID_DEEPSEEK_MODELS = ALL_MODELS["providers"]["deepseek"]
+VALID_OPENROUTER_MODELS = ALL_MODELS["providers"]["openrouter"]
 VALID_LOCAL_MODELS = ALL_MODELS["providers"]["local"]
 VALID_OLLAMA_MODELS = ALL_MODELS["providers"]["ollama"]
 
 DEFAULT_TEMPERATURE = 0
 DEFAULT_MAX_TOKENS = 2000
 
-def get_temp_and_tokens(hyperparameters: dict | None = None):
+def get_temp_and_tokens(hyperparameters: dict | None = None) -> tuple[int, int]:
+    # TODO: This will later be converted to unpack_hyperparameters
     if hyperparameters:
         temperature = hyperparameters.get("temperature", DEFAULT_TEMPERATURE)
         max_tokens = hyperparameters.get("max_tokens", DEFAULT_MAX_TOKENS)
     else:
         temperature = DEFAULT_TEMPERATURE
         max_tokens = DEFAULT_MAX_TOKENS
-    return temperature, max_tokens
+    return int(temperature), int(max_tokens)
 
-def get_together_wrapper(model_name: str, hyperparameters=None):
-    assert model_name in VALID_TOGETHER_MODELS, f"Invalid model name: {model_name}"
-    
-    def wrapped_function(hyperparameters=hyperparameters):
+def get_api_key(provider: str):
+    api_key = ""
+    if provider == "openai":
+        api_key = getenv("OPENAI_API_KEY")
+    elif provider == "together":
         api_key = getenv("TOGETHER_API_KEY")
-        assert api_key, "Please set TOGETHER_API_KEY in .env file"
+    elif provider == "deepseek":
+        api_key = getenv("DEEPSEEK_API_KEY")
+    elif provider == "openrouter":
+        api_key = getenv("OPENROUTER_API_KEY")
+    elif provider == "ollama":
+        api_key = "LOCAL-API-KEY"
+    elif provider == "local":
+        api_key = "LOCAL-API-KEY"
+    else:
+        raise ValueError("Invalid provider")
+    if not api_key:
+        raise ValueError(f"Please set {provider.upper()}_API_KEY in .env file")
+    return api_key
+
+def get_base_url(provider: str):
+    base_url = ""
+    if provider == "together":
+        base_url = TOGETHER_BASE_URL
+    elif provider == "openai":
+        base_url = OPENAI_BASE_URL
+    elif provider == "deepseek":
+        base_url = DEEPSEEK_BASE_URL
+    elif provider == "openrouter":
+        base_url = OPENROUTER_BASE_URL
+    elif provider == "local":
+        base_url = LOCAL_BASE_URL
+    elif provider == "ollama":
+        base_url = OLLAMA_BASE_URL
+    else:
+        raise ValueError("Invalid provider")
+    assert base_url, "Base URL not set"
+    return base_url
+
+def validate_model_name(provider: str, model_name: str):
+    if provider == "openai":
+        assert model_name in VALID_OPENAI_MODELS, f"Invalid model name: {model_name}"
+    elif provider == "together":
+        assert model_name in VALID_TOGETHER_MODELS, f"Invalid model name: {model_name}"
+    elif provider == "deepseek":
+        assert model_name in VALID_DEEPSEEK_MODELS, f"Invalid model name: {model_name}"
+    elif provider == "openrouter":
+        assert model_name in VALID_OPENROUTER_MODELS, f"Invalid model name: {model_name}"
+    elif provider == "local":
+        assert model_name in VALID_LOCAL_MODELS, f"Invalid model name: {model_name}"
+    elif provider == "ollama":
+        assert model_name in VALID_OLLAMA_MODELS, f"Invalid model name: {model_name}"
+    else:
+        raise ValueError("Invalid provider")
+
+def get_model_wrapper(provider: str, model_name: str, hyperparameters=None):
+    validate_model_name(provider, model_name)
+    def wrapped_function(hyperparameters=hyperparameters):
         temperature, max_tokens = get_temp_and_tokens(hyperparameters)
-        
         return ChatOpenAI(
-            base_url=TOGETHER_BASE_URL,
-            api_key=api_key,
+            base_url=get_base_url(provider),
+            api_key=get_api_key(provider),
             model=model_name,
             temperature=temperature,
             max_tokens=max_tokens,
@@ -111,30 +168,42 @@ def get_together_wrapper(model_name: str, hyperparameters=None):
     return wrapped_function
 
 def get_together_model(model_name: str, hyperparameters=None) -> ChatOpenAI:
-    wrapped_function = get_together_wrapper(model_name, hyperparameters)
+    provider = "together"
+    wrapped_function = get_model_wrapper(provider, model_name, hyperparameters)
     return wrapped_function()
 
 def get_openai_model(model_name: str, hyperparameters=None) -> ChatOpenAI:
-    assert model_name in VALID_OPENAI_MODELS
-    api_key = getenv("OPENAI_API_KEY")
-    assert api_key, "Please set OPENAI_API_KEY in .env file"
-    temperature, max_tokens = get_temp_and_tokens(hyperparameters)
-    return ChatOpenAI(
-        model=model_name,
-        api_key=api_key,
-        temperature=temperature,
-        max_tokens=max_tokens,
-        streaming=True,
-        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
-    )
-        
+    provider = "openai"
+    wrapped_function = get_model_wrapper(provider, model_name, hyperparameters)
+    return wrapped_function()
+
+def get_deepseek_model(model_name: str, hyperparameters=None) -> ChatOpenAI:
+    provider = "deepseek"
+    wrapped_function = get_model_wrapper(provider, model_name, hyperparameters)
+    return wrapped_function()
+
+def get_openrouter_model(model_name: str, hyperparameters=None) -> ChatOpenAI:
+    provider = "openrouter"
+    wrapped_function = get_model_wrapper(provider, model_name, hyperparameters)
+    return wrapped_function()
+
+def get_local_model(model_name: str, hyperparameters=None) -> ChatOpenAI:
+    # TODO: Add port as a parameter
+    provider = "local"
+    wrapped_function = get_model_wrapper(provider, model_name, hyperparameters)
+    return wrapped_function()
+
+def get_ollama_model(model_name: str, hyperparameters=None) -> ChatOpenAI:
+    provider = "ollama"
+    wrapped_function = get_model_wrapper(provider, model_name, hyperparameters)
+    return wrapped_function()
 
 def get_openai_gpt4(hyperparameters=None) -> ChatOpenAI:
     model="gpt-4o"
     return get_openai_model(model, hyperparameters)
 
-def get_openai_gpt3(hyperparameters=None) -> ChatOpenAI:
-    model="gpt-3.5-turbo"
+def get_openai_gpt4_mini(hyperparameters=None) -> ChatOpenAI:
+    model="gpt-4o-mini"
     return get_openai_model(model, hyperparameters)
 
 def get_together_dolphin(hyperparameters=None) -> ChatOpenAI:
@@ -142,140 +211,46 @@ def get_together_dolphin(hyperparameters=None) -> ChatOpenAI:
     return get_together_model(model, hyperparameters)
 
 def get_together_qwen(hyperparameters=None) -> ChatOpenAI:
-    api_key = getenv("TOGETHER_API_KEY")
-    assert api_key, "Please set TOGETHER_API_KEY in .env file"
-    return ChatOpenAI(
-        base_url=TOGETHER_BASE_URL,
-        api_key=api_key,
-        model="Qwen/Qwen2-72B-Instruct",
-        temperature=0,
-        max_tokens=2000,
-        streaming=True,
-        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
-    )
+    model="Qwen/Qwen2-72B-Instruct"
+    return get_together_model(model, hyperparameters)
 
 def get_together_nous_mix(hyperparameters=None) -> ChatOpenAI:
-    api_key = getenv("TOGETHER_API_KEY")
-    assert api_key, "Please set TOGETHER_API_KEY in .env file"
-    return ChatOpenAI(
-        base_url=TOGETHER_BASE_URL,
-        api_key=api_key,
-        model="NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO",
-        temperature=0,
-        max_tokens=1000,
-        streaming=True,
-        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
-    )
-
+    model="NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO"
+    return get_together_model(model, hyperparameters)
 
 def get_together_bigmix(hyperparameters=None) -> ChatOpenAI:
-    api_key = getenv("TOGETHER_API_KEY")
-    assert api_key, "Please set TOGETHER_API_KEY in .env file"
-    return ChatOpenAI(
-        base_url=TOGETHER_BASE_URL,
-        api_key=api_key,
-        model="mistralai/Mixtral-8x22B-Instruct-v0.1",
-        temperature=0,
-        max_tokens=4000,
-        streaming=True,
-        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
-    )
+    model="mistralai/Mixtral-8x22B-Instruct-v0.1"
+    return get_together_model(model, hyperparameters)
 
 
 def get_together_dbrx(hyperparameters=None) -> ChatOpenAI:
-    api_key = getenv("TOGETHER_API_KEY")
-    assert api_key, "Please set TOGETHER_API_KEY in .env file"
-    return ChatOpenAI(
-        base_url=TOGETHER_BASE_URL,
-        api_key=api_key,
-        model="databricks/dbrx-instruct",
-        temperature=0,
-        max_tokens=1000,
-        streaming=True,
-        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
-    )
-
+    model="databricks/dbrx-instruct"
+    return get_together_model(model, hyperparameters)
 
 def get_together_arctic(hyperparameters=None) -> ChatOpenAI:
-    api_key = getenv("TOGETHER_API_KEY")
-    assert api_key, "Please set TOGETHER_API_KEY in .env file"
-    return ChatOpenAI(
-        base_url=TOGETHER_BASE_URL,
-        api_key=api_key,
-        model="Snowflake/snowflake-arctic-instruct",
-        temperature=0,
-        max_tokens=1000,
-        streaming=True,
-        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
-    )
+    model="Snowflake/snowflake-arctic-instruct"
+    return get_together_model(model, hyperparameters)
 
 
 def get_together_llama3(hyperparameters=None) -> ChatOpenAI:
-    api_key = getenv("TOGETHER_API_KEY")
-    assert api_key, "Please set TOGETHER_API_KEY in .env file"
-    return ChatOpenAI(
-        base_url=TOGETHER_BASE_URL,
-        api_key=api_key,
-        model="meta-llama/Llama-3-70b-chat-hf",
-        temperature=0,
-        max_tokens=2000,
-        streaming=True,
-        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
-    )
-
+    model="meta-llama/Llama-3-70b-chat-hf"
+    return get_together_model(model, hyperparameters)
 
 def get_together_fn_mix(hyperparameters=None) -> ChatOpenAI:
-    api_key = getenv("TOGETHER_API_KEY")
-    assert api_key, "Please set TOGETHER_API_KEY in .env file"
-    return ChatOpenAI(
-        base_url=TOGETHER_BASE_URL,
-        api_key=api_key,
-        model="mistralai/Mixtral-8x7B-Instruct-v0.1",
-        temperature=0,
-        max_tokens=1000,
-        streaming=True,
-        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
-    )
+    model="NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO"
+    return get_together_model(model, hyperparameters)
 
 def get_together_deepseek_4k(hyperparameters=None) -> ChatOpenAI:
-    api_key = getenv("TOGETHER_API_KEY")
-    assert api_key, "Please set TOGETHER_API_KEY in .env file"
-    return ChatOpenAI(
-        base_url=TOGETHER_BASE_URL,
-        api_key=api_key,
-        model="deepseek-ai/deepseek-llm-67b-chat",
-        temperature=0,
-        max_tokens=800,
-        streaming=True,
-        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
-    )
-
+    model="deepseek-ai/deepseek-llm-67b-chat"
+    return get_together_model(model, hyperparameters)
 
 def get_together_deepseek_32k(hyperparameters=None) -> ChatOpenAI:
-    api_key = getenv("TOGETHER_API_KEY")
-    assert api_key, "Please set TOGETHER_API_KEY in .env file"
-    return ChatOpenAI(
-        base_url=TOGETHER_BASE_URL,
-        api_key=api_key,
-        model="deepseek-ai/deepseek-coder-33b-instruct",
-        temperature=0,
-        max_tokens=2000,
-        streaming=True,
-        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
-    )
+    model="deepseek-ai/deepseek-llm-405b-chat"
+    return get_together_model(model, hyperparameters)
 
-def get_claude_sonnet(hyperparameters=None) -> ChatOpenAI:
-    api_key = getenv("OPENROUTER_API_KEY")
-    assert api_key, "Please set OPENROUTER_API_KEY in .env file"
-    return ChatOpenAI(
-        base_url=OPENROUTER_BASE_URL,
-        api_key=api_key,
-        model="anthropic/claude-3.5-sonnet",
-        max_tokens=1000,
-        streaming=True,
-        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
-    )
-
+def get_openrouter_sonnet(hyperparameters=None) -> ChatOpenAI:
+    model="anthropic/claude-3.5-sonnet"
+    return get_openrouter_model(model, hyperparameters)
 
 def get_openai_embedder_large(hyperparameters=None) -> OpenAIEmbeddings:
     api_key = getenv("OPENAI_API_KEY")
@@ -285,16 +260,6 @@ def get_openai_embedder_large(hyperparameters=None) -> OpenAIEmbeddings:
         api_key=api_key
     )
 
-# def get_together_embedder_large(hyperparameters=None) -> OpenAIEmbeddings:
-#     api_key = getenv("TOGETHER_API_KEY")
-#     assert api_key, "Please set TOGETHER_API_KEY in .env file"
-#     return OpenAIEmbeddings(
-#         base_url=TOGETHER_BASE_URL,
-#         api_key=api_key,
-#         model="BAAI/bge-large-en-v1.5",
-#     )
-
-
 def get_together_embedder_large(hyperparameters=None) -> TogetherEmbeddings:
     api_key = getenv("TOGETHER_API_KEY")
     assert api_key, "Please set TOGETHER_API_KEY in .env file"
@@ -303,67 +268,37 @@ def get_together_embedder_large(hyperparameters=None) -> TogetherEmbeddings:
         model="BAAI/bge-large-en-v1.5",
     )
 
-
 def get_deepseek_coder(hyperparameters=None) -> ChatOpenAI:
-    api_key = getenv("DEEPSEEK_API_KEY")
-    assert api_key, "Please set DEEPSEEK_API_KEY in .env file"
-    return ChatOpenAI(
-        base_url=DEEPSEEK_BASE_URL,
-        api_key=api_key,
-        model="deepseek-coder",
-        max_tokens=3000,
-        streaming=True,
-        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
-    )
+    model="deepseek-coder"
+    return get_deepseek_model(model, hyperparameters)
 
+def get_deepseek_chat(hyperparameters=None) -> ChatOpenAI:
+    model="deepseek-chat"
+    return get_deepseek_model(model, hyperparameters)
 
 def get_local_model(hyperparameters=None) -> ChatOpenAI:
+    model="local-model"
+    return get_local_model(model, hyperparameters)
+
+def get_ollama_llama3(hyperparameters=None) -> ChatOpenAI:
+    model="llama3"
+    return get_ollama_model(model, hyperparameters)
+
+def get_ollama_mistral(hyperparameters=None) -> ChatOpenAI:
+    model="mistral:7b-instruct-v0.3-q6_K"
+    return get_ollama_model(model, hyperparameters)
+
+def get_local_llama_cpp(hyperparameters=None) -> ChatOpenAI:
+    # This will be deprecated when port parameter is implemented
     return ChatOpenAI(
-        base_url=LOCAL_BASE_URL,
-        api_key='lm-studio',
+        base_url=LLAMA_CPP_BASE_URL,
+        api_key='LOCAL-API-KEY',
         model="local-model",
         temperature=0,
         max_tokens=1000,
         streaming=True,
         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
-
-
-def get_ollama_llama3(hyperparameters=None) -> ChatOpenAI:
-    return ChatOpenAI(
-        base_url=OLLAMA_BASE_URL,
-        api_key='LOCAL-API-KEY',
-        model="llama3",
-        temperature=0,
-        max_tokens=1000,
-        streaming=True,
-        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
-    )
-
-
-def get_ollama_mistral(hyperparameters=None) -> ChatOpenAI:
-    return ChatOpenAI(
-        base_url=OLLAMA_BASE_URL,
-        api_key='LOCAL-API-KEY',
-        model="mistral:7b-instruct-v0.3-q6_K",
-        temperature=0,
-        max_tokens=1000,
-        streaming=True,
-        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
-    )
-
-
-def get_local_hermes(hyperparameters=None) -> ChatOpenAI:
-    return ChatOpenAI(
-        base_url="http://localhost:8000/v1",
-        api_key='LOCAL-API-KEY',
-        model="local-hermes",
-        temperature=0,
-        max_tokens=1000,
-        streaming=True,
-        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
-    )
-
 
 def get_ollama_local_embedder(hyperparameters=None) -> OpenAIEmbeddings:
     return OpenAIEmbeddings(
@@ -377,13 +312,13 @@ def get_lmstudio_local_embedder(hyperparameters=None) -> OpenAIEmbeddings:
     return OpenAIEmbeddings(
         base_url="http://localhost:1234/v1",
         model="lmstudio-embedding-model",
-        api_key="lm-studio"
+        api_key="LOCAL-API-KEY"
     )
 
 # This maps the model keys to the functions
 FUNCTION_MAP = {
     "get_openai_gpt4": get_openai_gpt4,
-    "get_openai_gpt3": get_openai_gpt3,
+    "get_openai_gpt4_mini": get_openai_gpt4_mini,
     "get_together_dolphin": get_together_dolphin,
     "get_together_qwen": get_together_qwen,
     "get_together_nous_mix": get_together_nous_mix,
@@ -392,16 +327,17 @@ FUNCTION_MAP = {
     "get_together_dbrx": get_together_dbrx,
     "get_together_arctic": get_together_arctic,
     "get_together_llama3": get_together_llama3,
-    "get_together_new_llama": get_together_wrapper("meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo"),
-    "get_together_llama_400b": get_together_wrapper("meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo"),
+    "get_together_new_llama": get_model_wrapper("together", "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo"),
+    "get_together_llama_400b": get_model_wrapper("together", "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo"),
     "get_together_deepseek_4k": get_together_deepseek_4k,
     "get_together_deepseek_32k": get_together_deepseek_32k,
     "get_deepseek_coder": get_deepseek_coder,
-    "get_claude_sonnet": get_claude_sonnet,
+    "get_deepseek_chat": get_deepseek_chat,
+    "get_openrouter_sonnet": get_openrouter_sonnet,
     "get_local_model": get_local_model,
     "get_ollama_llama3": get_ollama_llama3,
     "get_ollama_mistral": get_ollama_mistral,
-    "get_local_hermes": get_local_hermes,
+    "get_local_llama_cpp": get_local_llama_cpp,
     "get_openai_embedder_large": get_openai_embedder_large,
     "get_together_embedder_large": get_together_embedder_large,
     "get_ollama_local_embedder": get_ollama_local_embedder,
@@ -457,8 +393,6 @@ class LLM_FN:
         else:
             raise ValueError("Model not found in MODEL_DICT")
         
-        
-        
         self.hyperparameters = hyperparameters
         assert self.model_fn in FUNCTION_MAP.values()
         assert self.model_name in MODEL_NAMES
@@ -506,11 +440,6 @@ class LLM:
             logger.error("Model name not found in model object")
             return False
 
-        # override-llama3 name
-        if model_name == "llama3":
-            logger.info("Model name override: llama3 -> local-ollama3")
-            model_name = "local-ollama3"
-
         if model_name != self.model_name:
             logger.error(
                 f"Model name from API: {model_name} does not match expected model name: {self.model_name}")
@@ -543,6 +472,7 @@ class LLM:
     def __repr__(self):
         return f"LLM(model_name={self.model_name}, context_size={self.context_size})"
 
+### DEPRECATED ###
 
 # def get_claude_opus(hyperparameters=None) -> ChatAnthropic:
 #     api_key = getenv("ANTHROPIC_API_KEY")
@@ -554,4 +484,13 @@ class LLM:
 #         max_tokens_to_sample=4000,
 #         streaming=True,
 #         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+#     )
+
+# def get_together_embedder_large(hyperparameters=None) -> OpenAIEmbeddings:
+#     api_key = getenv("TOGETHER_API_KEY")
+#     assert api_key, "Please set TOGETHER_API_KEY in .env file"
+#     return OpenAIEmbeddings(
+#         base_url=TOGETHER_BASE_URL,
+#         api_key=api_key,
+#         model="BAAI/bge-large-en-v1.5",
 #     )
