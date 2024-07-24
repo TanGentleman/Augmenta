@@ -26,6 +26,8 @@ VALID_LLM = Literal[
     "get_together_dbrx",
     "get_together_arctic",
     "get_together_llama3",
+    "get_together_new_llama",
+    "get_together_llama_400b",
     "get_together_deepseek_4k",
     "get_together_deepseek_32k",
     "get_claude_opus",
@@ -85,7 +87,7 @@ class RagSchema(BaseModel):
     method: Literal["faiss", "chroma"]
     chunk_size: int = Field(ge=0)
     chunk_overlap: int = Field(ge=0)
-    k_excerpts: int = Field(ge=0, le=15)
+    k_excerpts: int = Field(ge=0, le=30)
     rag_llm: VALID_LLM
     inputs: list[str]
     multivector_enabled: bool
@@ -112,13 +114,8 @@ def get_llm_fn(model_name: str,
     """
     assert model_type in [
         "llm", "embedder"], "Model type must be llm or embedder"
-    model_function = MODEL_DICT.get(model_name)
-    if model_function is None:
-        raise ValueError(f"Model {model_name} not found")
-    if model_function["model_type"] != model_type:
-        raise ValueError(f"Model {model_name} must be type {model_type}")
 
-    llm_fn = LLM_FN(model_function["function"])
+    llm_fn = LLM_FN(model_experimental=model_name)
     if LOCAL_MODEL_ONLY:
         if llm_fn.model_name not in LOCAL_MODELS:
             logger.warning(f"Local model must be in {LOCAL_MODELS}")

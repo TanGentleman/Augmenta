@@ -1,0 +1,159 @@
+# Supported providers: openai, together, deepseek, local, ollama
+# Supported types: llm, embedder
+valid_together_models:
+  - cognitivecomputations/dolphin-2.5-mixtral-8x7b
+  - Qwen/Qwen2-72B-Instruct
+  - NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO
+  - mistralai/Mixtral-8x7B-Instruct-v0.1
+  - mistralai/Mixtral-8x22B-Instruct-v0.1
+  - databricks/dbrx-instruct
+  - Snowflake/snowflake-arctic-instruct
+  - meta-llama/Llama-3-70b-chat-hf
+  - meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo
+  - meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo
+  - mistralai/Mistral-7B-Instruct-v0.1
+  - deepseek-ai/deepseek-llm-67b-chat
+  - deepseek-ai/deepseek-coder-33b-instruct
+
+valid_openai_models:
+  - gpt-4o
+  - gpt-3.5-turbo
+
+valid_deepseek_models:
+  - deepseek-coder
+  - deepseek-chat
+
+valid_local_models:
+  - local-model
+
+valid_ollama_models:
+  - local-ollama3
+  - mistral:7b-instruct-v0.3-q6_K
+  - local-hermes
+
+models:
+  - key: get_openai_gpt4
+    provider: openai
+    type: llm
+    model: gpt-4o
+    context_size: 128000
+  - key: get_openai_gpt3
+    provider: openai
+    type: llm
+    model: gpt-3.5-turbo
+    context_size: 128000
+  - key: get_together_dolphin
+    provider: together
+    model: cognitivecomputations/dolphin-2.5-mixtral-8x7b
+    type: llm
+    context_size: 32768
+  - key: get_together_qwen
+    provider: together
+    model: Qwen/Qwen2-72B-Instruct
+    type: llm
+    context_size: 4096
+  - key: get_together_nous_mix
+    provider: together
+    model: NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO
+    type: llm
+    context_size: 32768
+  - key: get_together_fn_mix
+    provider: together
+    model: mistralai/Mixtral-8x7B-Instruct-v0.1
+    type: llm
+    context_size: 32768
+  - key: get_together_bigmix
+    provider: together
+    model: mistralai/Mixtral-8x22B-Instruct-v0.1
+    type: llm
+    context_size: 65536
+  - key: get_together_dbrx
+    provider: together
+    model: databricks/dbrx-instruct
+    type: llm
+    context_size: 32768
+  - key: get_together_arctic
+    provider: together
+    model: Snowflake/snowflake-arctic-instruct
+    type: llm
+    context_size: 4096
+  - key: get_together_llama3
+    provider: together
+    model: meta-llama/Llama-3-70b-chat-hf
+    type: llm
+    context_size: 8192
+  - key: get_together_new_llama
+    provider: together
+    model: meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo
+    type: llm
+    context_size: 8192
+  - key: get_together_llama_400b
+    provider: together
+    model: meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo
+    type: llm
+    context_size: 4096
+  - key: get_together_deepseek_4k
+    provider: together
+    model: deepseek-ai/deepseek-llm-67b-chat
+    type: llm
+    context_size: 4096
+  - key: get_together_deepseek_32k
+    provider: together
+    model: deepseek-ai/deepseek-coder-33b-instruct
+    type: llm
+    context_size: 32768
+  - key: get_deepseek_coder
+    provider: deepseek
+    model: deepseek-coder
+    type: llm
+    context_size: 128000
+  - key: get_deepseek_chat
+    provider: deepseek
+    model: deepseek-chat
+    type: llm
+    context_size: 128000
+  - key: get_claude_sonnet
+    provider: deepseek
+    model: anthropic/claude-3.5-sonnet
+    type: llm
+    context_size: 200000
+  - key: get_local_model
+    provider: local
+    model: local-model
+    type: llm
+    context_size: 32768
+  - key: get_ollama_llama3
+    provider: ollama
+    model: local-ollama3
+    type: llm
+    context_size: 4096
+  - key: get_ollama_mistral
+    provider: ollama
+    model: mistral:7b-instruct-v0.3-q6_K
+    type: llm
+    context_size: 4096
+  - key: get_local_hermes
+    provider: local
+    model: local-hermes
+    type: llm
+    context_size: 4096
+  - key: get_openai_embedder_large
+    provider: openai
+    model: text-embedding-3-large
+    type: embedder
+    context_size: 128000
+  - key: get_together_embedder_large
+    provider: together
+    model: BAAI/bge-large-en-v1.5
+    type: embedder
+    context_size: 8192
+  - key: get_ollama_local_embedder
+    provider: ollama
+    model: nomic-embed-text
+    type: embedder
+    context_size: 8192
+  - key: get_lmstudio_local_embedder
+    provider: local
+    model: lmstudio-embedding-model
+    type: embedder
+    context_size: 
