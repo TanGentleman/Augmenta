@@ -1,4 +1,4 @@
-# Supported providers: openai, together, deepseek, local, ollama
+# Supported providers: openai, together, deepseek, openrouter, local, ollama
 # Supported types: llm, embedder
 valid_together_models:
   - cognitivecomputations/dolphin-2.5-mixtral-8x7b
@@ -32,6 +32,9 @@ valid_local_models:
 valid_ollama_models:
   - llama3
   - mistral:7b-instruct-v0.3-q6_K
+
+valid_litellm_models:
+  - openrouter/google/gemini-flash-1.5
 
 models:
   - key: get_openai_gpt4
@@ -139,6 +142,13 @@ models:
     model: local-model
     type: llm
     context_size: 4096
+  - key: get_gemini_flash
+    provider: litellm
+    model: openrouter/google/gemini-flash-1.5
+    type: llm
+    context_size: 1000000
+
+
   - key: get_openai_embedder_large
     provider: openai
     model: text-embedding-3-large

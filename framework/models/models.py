@@ -5,7 +5,7 @@
 
 # TODO: Implement a YAML file to store model names and their corresponding values
 
-from os import getenv
+from os import getenv, path
 import logging
 
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
@@ -28,9 +28,8 @@ logger = logging.getLogger(__name__)
 
 ## NEW ##
 def get_model_config_from_yaml(filename: str):
-    import os
-    this_directory = os.path.dirname(os.path.realpath(__file__))
-    file_path = os.path.join(this_directory, filename)
+    models_dir = path.dirname(path.realpath(__file__))
+    file_path = path.join(models_dir, filename)
     with open(file_path, 'r') as f:
         models_config = yaml.safe_load(f)
     # Make assertions about the structure of the yaml file
@@ -65,6 +64,7 @@ LLAMA_CPP_BASE_URL = LOCAL_BASE_URL # This can be changed to a different port
 
 TOGETHER_BASE_URL = "https://api.together.xyz"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+LITELLM_BASE_URL = "http://localhost:4000/v1"
 
 ALL_MODELS = {
     "providers": {
@@ -73,7 +73,8 @@ ALL_MODELS = {
         "deepseek": MODEL_CONFIG['valid_deepseek_models'],
         "openrouter": MODEL_CONFIG['valid_openrouter_models'],
         "local": MODEL_CONFIG['valid_local_models'],
-        "ollama": MODEL_CONFIG['valid_ollama_models']
+        "ollama": MODEL_CONFIG['valid_ollama_models'],
+        "litellm": MODEL_CONFIG['valid_litellm_models']
     }
 }
 
@@ -83,7 +84,7 @@ VALID_DEEPSEEK_MODELS = ALL_MODELS["providers"]["deepseek"]
 VALID_OPENROUTER_MODELS = ALL_MODELS["providers"]["openrouter"]
 VALID_LOCAL_MODELS = ALL_MODELS["providers"]["local"]
 VALID_OLLAMA_MODELS = ALL_MODELS["providers"]["ollama"]
-
+VALID_LITELLM_MODELS = ALL_MODELS["providers"]["litellm"]
 DEFAULT_TEMPERATURE = 0
 DEFAULT_MAX_TOKENS = 2000
 
@@ -111,6 +112,8 @@ def get_api_key(provider: str):
         api_key = "LOCAL-API-KEY"
     elif provider == "local":
         api_key = "LOCAL-API-KEY"
+    elif provider == "litellm":
+        api_key = getenv("LLM_API_KEY")
     else:
         raise ValueError("Invalid provider")
     if not api_key:
@@ -131,6 +134,8 @@ def get_base_url(provider: str):
         base_url = LOCAL_BASE_URL
     elif provider == "ollama":
         base_url = OLLAMA_BASE_URL
+    elif provider == "litellm":
+        base_url = LITELLM_BASE_URL
     else:
         raise ValueError("Invalid provider")
     assert base_url, "Base URL not set"
@@ -149,6 +154,8 @@ def validate_model_name(provider: str, model_name: str):
         assert model_name in VALID_LOCAL_MODELS, f"Invalid model name: {model_name}"
     elif provider == "ollama":
         assert model_name in VALID_OLLAMA_MODELS, f"Invalid model name: {model_name}"
+    elif provider == "litellm":
+        assert model_name in VALID_LITELLM_MODELS, f"Invalid model name: {model_name}"
     else:
         raise ValueError("Invalid provider")
 
@@ -195,6 +202,11 @@ def get_local_model(model_name: str, hyperparameters=None) -> ChatOpenAI:
 
 def get_ollama_model(model_name: str, hyperparameters=None) -> ChatOpenAI:
     provider = "ollama"
+    wrapped_function = get_model_wrapper(provider, model_name, hyperparameters)
+    return wrapped_function()
+
+def get_litellm_model(model_name: str, hyperparameters=None) -> ChatOpenAI:
+    provider = "litellm"
     wrapped_function = get_model_wrapper(provider, model_name, hyperparameters)
     return wrapped_function()
 
@@ -317,6 +329,7 @@ def get_lmstudio_local_embedder(hyperparameters=None) -> OpenAIEmbeddings:
 
 # This maps the model keys to the functions
 FUNCTION_MAP = {
+    "get_gemini_flash": get_model_wrapper("litellm", "openrouter/google/gemini-flash-1.5"),
     "get_openai_gpt4": get_openai_gpt4,
     "get_openai_gpt4_mini": get_openai_gpt4_mini,
     "get_together_dolphin": get_together_dolphin,

@@ -12,13 +12,13 @@ from constants import FLASHCARD_SIMPLE_SYSTEM_MESSAGE
 from pyperclip import copy, paste
 from pathlib import Path
 
-
-MODEL = "llama"
+MODEL = "flash"
 ENABLE_RAG = False
 USE_SYSTEM = False
 FLASHCARD_FILEPATH = FLASH_DIR / "flashcards.json"
 
-FINAL_PROMPT_TEMPLATE = "{goal}. Include keys {required} and ONLY output valid JSON, no preamble.\n\n```json"
+# FINAL_PROMPT_TEMPLATE = "{goal}. Include keys {required} and ONLY output valid JSON, no preamble.\n\n```json"
+FINAL_PROMPT_TEMPLATE = "Goal: {goal}. Include keys {required} and ONLY output valid JSON, no preamble."
 
 # DEFAULT_GOAL = "Create Q/A pairs that comprehensively cover the main ideas of the paper's excerpts. The answers should be supported by the text."
 DEFAULT_GOAL = "Create witty facts about penguins"
@@ -152,15 +152,17 @@ def run_rag_chain(inputs: tuple[str, list[str]]) -> None:
     print("Exiting!")
     raise SystemExit
 
+
+
 def run_flashrag(set_goal = True) -> None:
     """
     Run the flashrag program
     """
     config = get_config()
     chatbot = Chatbot(config)
-    inputs = (goal, required_keys)
     print("First, let's construct a prompt fitting for this task.")
     goal, required_keys = get_goal_and_keys()
+    inputs = (goal, required_keys)
     prompt = convert_inputs_to_prompt(inputs)
     messages = chatbot.chat(prompt)
     if not messages:
