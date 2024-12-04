@@ -17,3 +17,6 @@ python-dotenv
 pyperclip
 
 typeguard
+
+# Optional
+# spotipy

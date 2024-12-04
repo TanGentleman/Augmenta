@@ -147,6 +147,11 @@ models:
     model: openrouter/google/gemini-flash-1.5
     type: llm
     context_size: 1000000
+  - key: get_alt_gemini_flash
+    provider: openrouter
+    model: google/gemini-flash-1.5
+    type: llm
+    context_size: 1000000
 
 
   - key: get_openai_embedder_large

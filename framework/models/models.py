@@ -159,8 +159,9 @@ def validate_model_name(provider: str, model_name: str):
     else:
         raise ValueError("Invalid provider")
 
-def get_model_wrapper(provider: str, model_name: str, hyperparameters=None):
-    validate_model_name(provider, model_name)
+def get_model_wrapper(provider: str, model_name: str, hyperparameters=None, validate: bool = True):
+    if validate:
+        validate_model_name(provider, model_name)
     def wrapped_function(hyperparameters=hyperparameters):
         temperature, max_tokens = get_temp_and_tokens(hyperparameters)
         return ChatOpenAI(
@@ -330,6 +331,7 @@ def get_lmstudio_local_embedder(hyperparameters=None) -> OpenAIEmbeddings:
 # This maps the model keys to the functions
 FUNCTION_MAP = {
     "get_gemini_flash": get_model_wrapper("litellm", "openrouter/google/gemini-flash-1.5"),
+    "get_alt_gemini_flash": get_model_wrapper("openrouter", "google/gemini-flash-1.5", validate=False),
     "get_openai_gpt4": get_openai_gpt4,
     "get_openai_gpt4_mini": get_openai_gpt4_mini,
     "get_together_dolphin": get_together_dolphin,
