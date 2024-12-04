@@ -1,4 +1,4 @@
-# Current task:
+# task 1:
 Implement workflow:
 1. Add documents (.pdf or .txt files) to documents folder in repo
 2. Set settings.json and adjust values for:
@@ -23,7 +23,22 @@ Implement workflow:
     - This will vector search the summaries, but return references to the parent docs
     - Excerpts saved to output.md
 9. Run chat.py with -rag just like with simple retriever
+# Status: Complete
+
+# Current task: Hit MVP on Flashcard demo
+
+MVP:
+- [X] Create a basic flashcard UI component
+- [X] Given a dictionary or file flashcards.json: Display them as flashcards
+- [ ] A flashapp.py that runs a flashcard app with features:
+  - [X] UX allows for going through the flashcards
+  - [X] An input to jump to a flashcard index
+  - [ ] *A way to mark a flashcard as known (manage state?)
+
+* = More advanced, but I'd want 3 types of flashcard attributes: Public, Hidden, Private
 
 # TODO
 - Use Unstructured for pdf partioning, cleaning, and chunking
-- Implement gradio interface for simple chat interface
+- Implement FastAPI server
+- Implement Web UI
+- Implement a way to mark flashcards as known

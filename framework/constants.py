@@ -39,13 +39,15 @@ MODEL_CODES = {
     "code": "get_deepseek_coder",
     "dbrx": "get_together_dbrx",
     "arctic": "get_together_arctic",
-    "llama": "get_together_llama3",
+    # "llama": "get_together_llama3",
+    "llama": "get_together_new_llama",
     "llama400": "get_together_llama_400b",
     "deepseek": "get_together_deepseek_4k",
     "qwen": "get_together_qwen",
     "sonnet": "get_openrouter_sonnet",
     "local": "get_local_model",
     "ollama": "get_ollama_llama3",
+    "flash": "get_gemini_flash",
 }
 
 SYSTEM_MESSAGE_CODES = {

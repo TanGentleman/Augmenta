@@ -30,8 +30,13 @@ try:
 except ImportError:
     pass
 
-
-TERMINAL_WIDTH = get_terminal_size().columns
+try:
+    from shutil import get_terminal_size
+    TERMINAL_WIDTH = get_terminal_size().columns
+except (ImportError, OSError):
+    # Default width if we can't get terminal size
+    # NOTE: This will catch Jupyter notebooks
+    TERMINAL_WIDTH = 80
 # NOTE: The get_terminal_size function can be called at runtime if the
 # terminal width changes
 
@@ -656,6 +661,7 @@ class Chatbot:
                 'Backup model:',
                 self.config.chat_settings.backup_model.model_name)
         print('Stream:', self.config.chat_settings.stream)
+        print(f'Chat exchanges in memory:{len(self.messages)//2}')
 
         optional_settings = self.config.optional.model_dump()
         if any(optional_settings.values()):

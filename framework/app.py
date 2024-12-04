@@ -1,16 +1,17 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import StreamingResponse, FileResponse
 import time
-import spotify
+from spotify import core as spotify
 import os
 from models.models import get_ollama_mistral, LLM_FN, LLM, get_together_llama3
 # from mutagen.mp4 import MP4
-from langchain.schema import SystemMessage, AIMessage, HumanMessage
+from langchain_core.messages import SystemMessage, AIMessage, HumanMessage
 from utils import ROOT
 #
 app = FastAPI()
 
 MUSIC_FILEPATH = ROOT.parent / "music"
+
 
 def stream_llm_response(query, llm, is_Ollama=False):
     messages = [
@@ -98,6 +99,8 @@ def test_spotify_function() -> dict[str, str]:
     return spotify.guess_album_name_from_song_name("My heart will go on")
 
 # Create a route that calls the Python function
+
+
 @app.get("/v1/test")
 async def test_endpoint():
     response = test_spotify_function()

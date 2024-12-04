@@ -5,9 +5,6 @@ from typing import Literal, Union
 from pydantic import BaseModel, Field
 
 from models.models import LLM_FN, MODEL_DICT
-from os import path, mkdir
-from json import load as json_load, dump as json_dump
-
 import logging
 
 import utils
@@ -17,7 +14,7 @@ ACTIVE_JSON_FILE = "active.json"
 
 VALID_LLM = Literal[
     "get_openai_gpt4",
-    "get_openai_gpt3",
+    "get_openai_gpt4_mini",
     "get_together_dolphin",
     "get_together_qwen",
     "get_together_nous_mix",
@@ -31,12 +28,13 @@ VALID_LLM = Literal[
     "get_together_deepseek_4k",
     "get_together_deepseek_32k",
     "get_claude_opus",
-    "get_claude_sonnet",
+    "get_openrouter_sonnet",
     "get_deepseek_coder",
+    "get_deepseek_chat",
     "get_local_model",
     "get_ollama_llama3",
     "get_ollama_mistral",
-    "get_local_hermes"
+    "get_local_llama_cpp"
 ]
 
 VALID_EMBEDDER = Literal["get_openai_embedder_large",
@@ -754,15 +752,17 @@ class Config:
         if not self.rag_settings.rag_mode:
             # Handling case where this file does not exist
             full_filepath = utils.CONFIG_DIR / filename
-            if path.exists(full_filepath):
+            if full_filepath.exists():
                 base_config_filename = filename
             else:
+                print(f"WARNING: Config filepath invalid. Using {DEFAULT_CONFIG_FILENAME}")
                 base_config_filename = DEFAULT_CONFIG_FILENAME
                 
             # Inject the settings for RAG from settings.json
             config_settings = utils.read_settings(base_config_filename)
             data["RAG"] = config_settings["RAG"]
             data["RAG"]["rag_mode"] = self.rag_settings.rag_mode
+            # NOTE: If rag_mode is False, the RAG settings added to active.json are taken from the base config file
 
         utils.save_config_as_json(data, filename)
 

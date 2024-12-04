@@ -1,4 +1,4 @@
-from models.models import get_openai_gpt4, get_together_dolphin, get_together_nous_mix, get_together_arctic, get_together_fn_mix, get_claude_sonnet
+from models.models import get_openai_gpt4, get_together_dolphin, get_together_nous_mix, get_together_arctic, get_together_fn_mix, get_openrouter_sonnet
 from models.models import get_local_model, get_together_bigmix, get_together_qwen, get_together_llama3, get_together_dbrx, get_openai_gpt4
 from models.models import LLM, LLM_FN
 from chains import SimpleChain, get_eval_chain
@@ -8,7 +8,7 @@ from classes import Config
 from chat import Chatbot
 import base64
 # from models.models import get_claude_opus, get_ollama_mistral, get_openai_gpt4, get_together_llama3, get_local_model, get_ollama_llama3, LLM_FN, LLM
-from langchain.schema import SystemMessage, AIMessage, HumanMessage
+from langchain_core.messages import SystemMessage, AIMessage, HumanMessage
 Test_Anthropic = False
 Test_OpenAI = True
 Test_Together = False
@@ -49,7 +49,7 @@ class TestChatbot(unittest.TestCase):
         self.assertIsInstance(response, AIMessage)
 
     def test_chatbot_nonpersistent(self):
-        messages = self.chatbot.chat(".read", persistence_enabled=False)
+        messages = self.chatbot.chat(".read", persist=False)
         self.assertIsInstance(messages, list)
         response = messages[-1]
         self.assertIsInstance(response, AIMessage)
