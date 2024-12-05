@@ -14,8 +14,10 @@ logger = logging.getLogger(__name__)
 ACTIVE_JSON_FILE = "active.json"
 
 VALID_LLM = Literal[
+    "get_gemini_flash",
+    "gemini",
     "get_openai_gpt4",
-    "get_openai_gpt4_mini",
+    "get_openai_gpt4_mini", 
     "get_together_dolphin",
     "get_together_qwen",
     "get_together_nous_mix",
@@ -28,10 +30,9 @@ VALID_LLM = Literal[
     "get_together_llama_400b",
     "get_together_deepseek_4k",
     "get_together_deepseek_32k",
-    "get_claude_opus",
-    "get_openrouter_sonnet",
     "get_deepseek_coder",
     "get_deepseek_chat",
+    "get_openrouter_sonnet",
     "get_local_model",
     "get_ollama_llama3",
     "get_ollama_mistral",
@@ -308,8 +309,7 @@ class RagSettings:
         else:
             # No doc ids found
             self.multivector_enabled = False
-            logger.warning(
-                "Multivector forcibly disabled. Could this be problematic?")
+            logger.warning("Multivector disabled.")
             # if self.multivector_enabled:
             #     logger.error("Multivector should not be enabled with no doc ids! Aborting.")
             #     raise ValueError("Error in manifest.json")

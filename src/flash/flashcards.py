@@ -132,7 +132,7 @@ class Flashcard:
             if key_name:
                 if include_answer or key_name.lower() != 'answer':
                     if key_name == 'answer':
-                        logger.info(
+                        logger.debug(
                             f"Exposed Answer: {self.card_data.get(key_name, 'N/A')}")
                     value = self.card_data.get(key_name, 'N/A')
                     flashcard_text.append(f"{key_name}: {value}", style=style)
