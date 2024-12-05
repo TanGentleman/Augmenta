@@ -12,11 +12,11 @@ CLIENT_SECRET = environ.get("SPOTIFY_CLIENT_SECRET")
 if not CLIENT_ID or not CLIENT_SECRET:
     raise Exception("No Spotify client ID or secret found")
 
-redirect_uri = 'https://localhost:3000'
+redirect_uri = 'http://localhost:3000'
 scope = 'user-library-modify user-library-read user-read-email user-read-private'
-state = "W0ZZFN8FRxMphLux"
+state = "W0ZZFN8FRxMphLux" # Random string
 code = "retracted_code"
-# Generate a random string for the state parameter
+
 URL = "Custom_url"
 # TODO: Write code for getting custom link
 # Prerequisite step:
