@@ -16,9 +16,9 @@ Need structured data from 1000+ documents? No problem. Enforcing certain fields 
 Get started with Augmenta in <3 minutes:
 
 1. Clone the repository: `git clone https://github.com/TanGentleman/Augmenta.git`
-2. Install dependencies: `pip install -r requirements.txt`
+2. Install dependencies: `pip install -e .`
 3. Create a `.env` file with your API keys
-4. Run Augmenta: `python3 chat.py`
+4. Run Augmenta: `cd src && python3 -m augmenta.chat`
 
 That's it! You're now ready to start exploring Augmenta's features and capabilities.
 
@@ -45,7 +45,7 @@ source .venv/bin/activate
 ```
 4. Install the dependencies:
 ```bash
-pip install -r requirements.txt
+pip install -e .
 ```
 
 ### Usage
