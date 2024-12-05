@@ -1,9 +1,10 @@
-
-# from rag import input_to_docs, get_chroma_vectorstore_from_docs, get_faiss_vectorstore_from_docs, load_existing_faiss_vectorstore, load_existing_chroma_vectorstore, split_documents
-
+from json import dump as json_dump
+from uuid import uuid4
+from os import get_terminal_size
+from textwrap import fill
+from dotenv import load_dotenv
 
 from langchain_core.output_parsers import JsonOutputParser
-
 from langchain_core.messages import SystemMessage, AIMessage, HumanMessage, BaseMessage
 from langchain_community.vectorstores.chroma import Chroma
 from langchain_community.vectorstores.faiss import FAISS
@@ -19,14 +20,16 @@ from .config.config import DEFAULT_CONFIG_FILENAME, MAX_CHARACTERS_IN_PARENT_DOC
 from .classes import Config
 from .models.models import LLM_FN, LLM
 from .chains import get_summary_chain, get_rag_chain, get_eval_chain
-from json import dump as json_dump
-from uuid import uuid4
-from os import get_terminal_size
-from textwrap import fill
-from dotenv import load_dotenv
+
+try:
+    from flash.flashcards import construct_flashcards, display_flashcards, FLASHCARD_FILEPATH
+except ImportError:
+    print("flash module not found")
+    pass
+
 load_dotenv()
 
-from flash.flashcards import construct_flashcards, display_flashcards, FLASHCARD_FILEPATH
+
 
 
 try:
