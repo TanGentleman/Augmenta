@@ -1,16 +1,15 @@
 import json
 
 from typeguard import typechecked
-from classes import Config
-from chains import get_rag_chain
-from models.models import LLM
-from chat import Chatbot
+from augmenta.classes import Config
+from augmenta.chains import get_rag_chain
+from augmenta.models.models import LLM
+from augmenta.chat import Chatbot
 from pydantic import BaseModel
 from langchain_core.output_parsers import JsonOutputParser
-from .flashcards import load_flashcards_from_json, display_flashcards, FLASH_DIR
-from constants import FLASHCARD_SIMPLE_SYSTEM_MESSAGE
-from pyperclip import copy, paste
-from pathlib import Path
+from langchain_core.messages import AIMessage
+from flash.flashcards import load_flashcards_from_json, construct_flashcards, display_flashcards, FLASH_DIR
+from augmenta.constants import FLASHCARD_SIMPLE_SYSTEM_MESSAGE
 
 MODEL = "flash"
 ENABLE_RAG = False
@@ -152,6 +151,69 @@ def run_rag_chain(inputs: tuple[str, list[str]]) -> None:
     print("Exiting!")
     raise SystemExit
 
+# ... existing code ...
+
+def handle_flashcards(response: AIMessage) -> bool:
+    """
+    Handles the creation and display of flashcards from an AI response.
+    
+    Args:
+        response (AIMessage): The AI response to parse for flashcards
+        
+    Returns:
+        bool: True if flashcards were successfully handled, False otherwise
+    """
+    try:
+        response_object = parse_flashcard_response(response.content)
+        if not response_object:
+            return False
+            
+        flashcards, keys, styles = construct_flashcards(response_object)
+        display_and_save_flashcards(flashcards, response_object)
+        return True
+        
+    except Exception as e:
+        print(f"Failed to handle flashcards: {e}")
+        return False
+
+def parse_flashcard_response(content: str) -> list[dict] | None:
+    """
+    Parses the response content into a valid flashcard format.
+    
+    Args:
+        content (str): The response content to parse
+        
+    Returns:
+        list[dict] | None: The parsed flashcard data if valid, None otherwise
+    """
+    try:
+        response_object = JsonOutputParser().parse(content)
+        if not isinstance(response_object, list) or not isinstance(response_object[0], dict):
+            print("Invalid flashcard format")
+            return None
+        return response_object
+    except Exception:
+        print("Could not parse response as JSON")
+        return None
+
+def display_and_save_flashcards(flashcards: list, response_object: list[dict]) -> None:
+    """
+    Displays the flashcards and saves them to file.
+    
+    Args:
+        flashcards (list): The flashcards to display
+        response_object (list[dict]): The raw flashcard data to save
+    """
+    display_flashcards(
+        flashcards,
+        panel_name="Flashcard",
+        delay=0,
+        include_answer=True
+    )
+    
+    with open(FLASHCARD_FILEPATH, 'w') as file:
+        json.dump(response_object, file, indent=4)
+    print("Flashcards saved successfully")
 
 
 def run_flashrag(set_goal = True) -> None:
@@ -164,7 +226,7 @@ def run_flashrag(set_goal = True) -> None:
     goal, required_keys = get_goal_and_keys()
     inputs = (goal, required_keys)
     prompt = convert_inputs_to_prompt(inputs)
-    messages = chatbot.chat(prompt)
+    messages = chatbot.chat(prompt, persist=False)
     if not messages:
         exit()
     response = messages[0]

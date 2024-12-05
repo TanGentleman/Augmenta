@@ -1,8 +1,8 @@
 from typing import Any, Callable
 from langchain_core.runnables import RunnablePassthrough
 from langchain_core.output_parsers import StrOutputParser, JsonOutputParser
-from constants import get_music_template, get_rag_template, get_summary_template, get_eval_template
-from utils import format_docs
+from .constants import get_music_template, get_rag_template, get_summary_template, get_eval_template
+from .utils import format_docs
 
 
 class SimpleChain:

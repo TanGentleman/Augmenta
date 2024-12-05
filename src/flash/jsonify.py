@@ -5,6 +5,70 @@ FLASH_DATA_FOLDER = ROOT / "data"
 INPUTS_FOLDER = FLASH_DATA_FOLDER / "inputs"
 OUTPUTS_FOLDER = FLASH_DATA_FOLDER / "outputs"
 
+from langchain.output_parsers import JsonOutputParser
+
+def is_valid_flashcard_list(obj: any) -> bool:
+    """
+    Validates that an object is a list of dictionaries suitable for flashcards.
+
+    Args:
+        obj (any): The object to validate.
+
+    Returns:
+        bool: True if the object is a valid list of dictionaries.
+    """
+    return isinstance(obj, list) and len(obj) > 0 and isinstance(obj[0], dict)
+
+def validate_flashcard(card: dict) -> bool:
+    """
+    Validates that a dictionary has the required fields to be a flashcard.
+
+    Args:
+        card (dict): The dictionary to validate.
+
+    Returns:
+        bool: True if valid, False otherwise.
+    """
+    # required_fields = ['front', 'back']
+    # return all(field in card for field in required_fields)
+    # Check that the card has at least one field
+    if not card:
+        return False
+    return True
+
+def parse_flashcards(json_string: str) -> list[dict]:
+    """
+    Parses a JSON string into a validated list of flashcard dictionaries using JsonOutputParser.
+
+    Args:
+        json_string (str): The JSON string to parse.
+
+    Returns:
+        list[dict]: A list of validated flashcard dictionaries.
+        
+    Raises:
+        ValueError: If parsing fails or flashcards are invalid.
+    """
+    try:
+        # Use JsonOutputParser to parse the string
+        parser = JsonOutputParser()
+        flashcards = parser.parse(json_string)
+        
+        # Validate the overall structure
+        if not is_valid_flashcard_list(flashcards):
+            raise ValueError("Parsed JSON is not a valid list of dictionaries")
+            
+        # Validate each flashcard
+        invalid_cards = [i for i, card in enumerate(flashcards) if not validate_flashcard(card)]
+        if invalid_cards:
+            raise ValueError(f"Invalid flashcards at indices: {invalid_cards}")
+            
+        return flashcards
+        
+    except Exception as e:
+        raise ValueError(f"Failed to parse flashcards: {str(e)}")
+
+
 
 def fix_filename(filename: str | Path) -> str:
     """

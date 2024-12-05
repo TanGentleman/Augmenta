@@ -1,5 +1,5 @@
 from typing import Literal
-from constants import CHROMA_FOLDER, FAISS_FOLDER, VECTOR_DB_SUFFIX
+
 from json import JSONDecodeError, load as json_load
 from json import dump as json_dump
 from re import sub as regex_sub
@@ -7,16 +7,20 @@ from uuid import uuid4
 from langchain_core.documents import Document
 from datetime import datetime
 
+from .constants import CHROMA_FOLDER, FAISS_FOLDER, VECTOR_DB_SUFFIX
+
 # Get the root path of the repository
 from pathlib import Path
-ROOT = Path(__file__).resolve().parent
+ROOT = Path(__file__).resolve().parent.parent
+AUGMENTA_DIR = ROOT / "augmenta"
+CONFIG_DIR = AUGMENTA_DIR / "config"
 DOCUMENTS_DIR = ROOT / "documents"
 DATA_DIR = ROOT / "data"
 LLM_OUTPUTS_PATH = DATA_DIR / "llm-outputs"
 LLM_RESPONSE_PATH = LLM_OUTPUTS_PATH / "markdown"
 TEXT_FILE_DIR = DATA_DIR / "txt"
-CONFIG_DIR = ROOT / "config"
 DB_DIR = DATA_DIR / "databases"
+
 CHROMA_FOLDER_PATH = DB_DIR / CHROMA_FOLDER
 FAISS_FOLDER_PATH = DB_DIR / FAISS_FOLDER
 
@@ -447,7 +451,6 @@ def ensure_valid_framework(root: Path = ROOT):
             TEXT_FILE_DIR.mkdir()
 
     # manifest.json
-    filepath = MANIFEST_FILEPATH
     if not MANIFEST_FILEPATH.exists():
         with open(MANIFEST_FILEPATH, "w") as f:
             # Make databases key

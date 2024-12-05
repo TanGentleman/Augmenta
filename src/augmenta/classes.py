@@ -1,13 +1,14 @@
-from config.config import DEFAULT_CONFIG_FILENAME, LOCAL_MODEL_ONLY, OVERRIDE_FILENAME_KEY
-from constants import LOCAL_MODELS, MODEL_CODES, MODEL_TO_SYSTEM_MSG, SYSTEM_MESSAGE_CODES
+
 # use pydantic to enforce Config schema
 from typing import Literal, Union
 from pydantic import BaseModel, Field
 
-from models.models import LLM_FN, MODEL_DICT
+from .models.models import LLM_FN, MODEL_DICT
+from .config.config import DEFAULT_CONFIG_FILENAME, LOCAL_MODEL_ONLY, OVERRIDE_FILENAME_KEY
+from .constants import LOCAL_MODELS, MODEL_CODES, MODEL_TO_SYSTEM_MSG, SYSTEM_MESSAGE_CODES
 import logging
 
-import utils
+from . import utils
 logger = logging.getLogger(__name__)
 
 ACTIVE_JSON_FILE = "active.json"

@@ -1,13 +1,9 @@
 
 # from rag import input_to_docs, get_chroma_vectorstore_from_docs, get_faiss_vectorstore_from_docs, load_existing_faiss_vectorstore, load_existing_chroma_vectorstore, split_documents
-import rag
-import utils
-from constants import MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SYSTEM_MESSAGE_CODES
-from config.config import DEFAULT_CONFIG_FILENAME, MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, OVERRIDE_FILENAME_KEY, SAVE_ONESHOT_RESPONSE, FILTER_TOPIC
-from classes import Config
-from models.models import LLM_FN, LLM
+
+
 from langchain_core.output_parsers import JsonOutputParser
-from flash.flashcards import construct_flashcards, display_flashcards, FLASHCARD_FILEPATH
+
 from langchain_core.messages import SystemMessage, AIMessage, HumanMessage, BaseMessage
 from langchain_community.vectorstores.chroma import Chroma
 from langchain_community.vectorstores.faiss import FAISS
@@ -16,14 +12,22 @@ from langchain.retrievers.multi_vector import MultiVectorRetriever
 from langchain_core.documents import Document
 from langchain.storage import InMemoryByteStore
 
-from chains import get_summary_chain, get_rag_chain, get_eval_chain
-import pyperclip
+from . import rag
+from . import utils
+from .constants import MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SYSTEM_MESSAGE_CODES
+from .config.config import DEFAULT_CONFIG_FILENAME, MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, OVERRIDE_FILENAME_KEY, SAVE_ONESHOT_RESPONSE, FILTER_TOPIC
+from .classes import Config
+from .models.models import LLM_FN, LLM
+from .chains import get_summary_chain, get_rag_chain, get_eval_chain
 from json import dump as json_dump
 from uuid import uuid4
 from os import get_terminal_size
 from textwrap import fill
 from dotenv import load_dotenv
 load_dotenv()
+
+from flash.flashcards import construct_flashcards, display_flashcards, FLASHCARD_FILEPATH
+
 
 try:
     import gnureadline
@@ -60,6 +64,7 @@ REFORMATTING_PROMPTS = [".paste", ".read"]
 COMMAND_LIST = [
     "q", ".q", "quit", 
     ".d", ".del", 
+    ".h", ".help",
     ".swap", ".switch", 
     ".r", ".refresh",
     ".s", ".save", 
@@ -74,6 +79,26 @@ COMMAND_LIST = [
     ".pick",
     ".flush"
 ]
+
+COMMAND_HELP_MESSAGE = """Commands:
+    - quit, q, .q: Exits the chat loop.
+    - .d, .del: Deletes the last exchange.
+    - .h, .help: Displays help.
+    - .swap, .switch: Switches the chat model.
+    - .r, .refresh: Refreshes the configuration.
+    - .s, .save: Saves the last response.
+    - .sa, .saveall: Saves all exchanges.
+    - .i, .info: Displays information.
+    - .r, .refresh: Toggles RAG mode (on/off).
+    - .rag: Switches to RAG mode.
+    - .reg: Switches to chat mode.
+    - .sys: Sets a system message.
+    - .names: Displays collection names.
+    - .copy: Copies the last response to clipboard.
+    - .pick: Select chat exchanges to remove.
+    - .eval: Evaluates the vectorstore.
+    - .a: Amnesia mode.
+"""
 
 
 class Chatbot:
@@ -673,6 +698,12 @@ class Chatbot:
             print('Prompt prefix:', self.config.optional.prompt_prefix)
             print('Prompt suffix:', self.config.optional.prompt_suffix)
 
+    def print_help(self) -> None:
+        """
+        Prints the help message.
+        """
+        print(COMMAND_HELP_MESSAGE)
+
     def handle_command(self, prompt) -> None:
         """
         Handles commands in the chat loop.
@@ -683,6 +714,7 @@ class Chatbot:
         Commands:
         - quit, q, .q: Exits the chat loop.
         - .d, .del: Deletes the last exchange.
+        - .h, .help: Displays help.
         - .swap, .switch: Switches the chat model.
         - .r, .refresh: Refreshes the configuration.
         - .s, .save: Saves the last response.
@@ -704,6 +736,10 @@ class Chatbot:
         # Delete last exchange
         if prompt in [".d", ".del"]:
             self._pop_last_exchange()
+            return
+        # Display help
+        elif prompt in [".h", ".help"]:
+            self.print_help()
             return
         # Quit chat
         elif prompt in ["q", ".q", "quit"]:
@@ -1047,7 +1083,7 @@ class Chatbot:
         if self.config.optional.amnesia:
             ### Amnesia mode ###
             print('Amnesia mode enabled')
-            if self.config.optional.display_flashcards:
+            if self.config.optional.display_flashcards and construct_flashcards:
                 print('Displaying flashcards')
                 # TODO: Implement flashcards
                 try:
@@ -1073,7 +1109,7 @@ class Chatbot:
             self._pop_last_exchange()
         return response
 
-    def get_rag_response(self, prompt: str):
+    def get_rag_response(self, prompt: str) -> None | AIMessage:
         assert self.config.rag_settings.rag_mode, "RAG mode not enabled"
         assert self.rag_model is not None, "RAG LLM not initialized"
         assert self.rag_chain is not None, "RAG chain not initialized"

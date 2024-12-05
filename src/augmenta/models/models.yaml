@@ -25,6 +25,7 @@ valid_deepseek_models:
 
 valid_openrouter_models:
   - anthropic/claude-3.5-sonnet
+  - google/gemini-flash-1.5
 
 valid_local_models:
   - local-model
@@ -147,7 +148,7 @@ models:
     model: openrouter/google/gemini-flash-1.5
     type: llm
     context_size: 1000000
-  - key: get_alt_gemini_flash
+  - key: gemini
     provider: openrouter
     model: google/gemini-flash-1.5
     type: llm

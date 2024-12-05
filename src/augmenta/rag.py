@@ -8,8 +8,8 @@ from langchain_community.vectorstores import Chroma, FAISS
 from chromadb.config import Settings
 from langchain_community.document_loaders import PyPDFLoader, ArxivLoader
 
-from config.config import EXPERIMENTAL_UNSTRUCTURED, METADATA_MAP
-from utils import CHROMA_FOLDER_PATH, DOCUMENTS_DIR, FAISS_FOLDER_PATH, clean_docs, database_exists
+from .config.config import EXPERIMENTAL_UNSTRUCTURED, METADATA_MAP
+from .utils import CHROMA_FOLDER_PATH, DOCUMENTS_DIR, FAISS_FOLDER_PATH, clean_docs, database_exists
 
 
 def loader_from_arxiv_url(url: str) -> ArxivLoader:

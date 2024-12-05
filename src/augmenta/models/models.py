@@ -13,7 +13,7 @@ from langchain_together import TogetherEmbeddings
 # from langchain_anthropic import ChatAnthropic
 from langchain.schema import BaseMessage
 
-from constants import LOCAL_MODELS, MODEL_CODES
+from ..constants import LOCAL_MODELS, MODEL_CODES
 
 # FOR DEBUG OR PIPING OUTPUT
 # NOTE: Is this usable in any use cases like asynchronously populating convex tables?
@@ -160,6 +160,11 @@ def validate_model_name(provider: str, model_name: str):
         raise ValueError("Invalid provider")
 
 def get_model_wrapper(provider: str, model_name: str, hyperparameters=None, validate: bool = True):
+    ENFORCE_STREAMING_CALLBACK = False
+    if ENFORCE_STREAMING_CALLBACK:
+        callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
+    else:
+        callback_manager = None
     if validate:
         validate_model_name(provider, model_name)
     def wrapped_function(hyperparameters=hyperparameters):
@@ -171,7 +176,7 @@ def get_model_wrapper(provider: str, model_name: str, hyperparameters=None, vali
             temperature=temperature,
             max_tokens=max_tokens,
             streaming=True,
-            # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
+            callback_manager=callback_manager
         )
     return wrapped_function
 
@@ -331,7 +336,7 @@ def get_lmstudio_local_embedder(hyperparameters=None) -> OpenAIEmbeddings:
 # This maps the model keys to the functions
 FUNCTION_MAP = {
     "get_gemini_flash": get_model_wrapper("litellm", "openrouter/google/gemini-flash-1.5"),
-    "get_alt_gemini_flash": get_model_wrapper("openrouter", "google/gemini-flash-1.5", validate=False),
+    "gemini": get_model_wrapper("openrouter", "google/gemini-flash-1.5"),
     "get_openai_gpt4": get_openai_gpt4,
     "get_openai_gpt4_mini": get_openai_gpt4_mini,
     "get_together_dolphin": get_together_dolphin,
@@ -358,7 +363,6 @@ FUNCTION_MAP = {
     "get_ollama_local_embedder": get_ollama_local_embedder,
     "get_lmstudio_local_embedder": get_lmstudio_local_embedder
 }
-MODEL_NAMES = [model["model_name"] for model in MODEL_DICT.values()]
 
 def model_key_from_name(model_name: str) -> str:
     """Get the model key from the model name"""
@@ -410,6 +414,7 @@ class LLM_FN:
         
         self.hyperparameters = hyperparameters
         assert self.model_fn in FUNCTION_MAP.values()
+        MODEL_NAMES = [model["model_name"] for model in MODEL_DICT.values()]
         assert self.model_name in MODEL_NAMES
         assert self.context_size > 0
 

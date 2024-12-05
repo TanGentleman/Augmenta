@@ -17,7 +17,7 @@ from time import sleep
 
 from pathlib import Path
 
-from utils import MANIFEST_FILEPATH
+from augmenta.utils import MANIFEST_FILEPATH
 FLASH_DIR = Path(__file__).resolve().parent
 FLASHCARD_FILEPATH = FLASH_DIR / "flashcards.json"
 
