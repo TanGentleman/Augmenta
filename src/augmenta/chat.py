@@ -1,3 +1,4 @@
+import logging
 from json import dump as json_dump
 from uuid import uuid4
 from os import get_terminal_size
@@ -22,14 +23,18 @@ from .models.models import LLM_FN, LLM
 from .chains import get_summary_chain, get_rag_chain, get_eval_chain
 
 try:
-    from flash.flashcards import construct_flashcards, display_flashcards, FLASHCARD_FILEPATH
+    from paths import FLASHCARD_FILEPATH
+    from flash.manager import Flashcards
 except ImportError:
     print("flash module not found")
     pass
 
 load_dotenv()
-
-
+# Set up logging
+logging.basicConfig(
+    level=logging.ERROR,
+    format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 
 try:
@@ -98,6 +103,8 @@ COMMAND_HELP_MESSAGE = """Commands:
     - .sys: Sets a system message.
     - .names: Displays collection names.
     - .copy: Copies the last response to clipboard.
+    - .paste: Pastes the last response from clipboard.
+    - .read: Reads from sample.txt in TEXT_FILE_DIR.
     - .pick: Select chat exchanges to remove.
     - .eval: Evaluates the vectorstore.
     - .a: Amnesia mode.
@@ -1083,32 +1090,37 @@ class Chatbot:
         assert isinstance(response, AIMessage), "Response not AIMessage"
         self.messages.append(response)
         self.response_count += 1
+
+        if self.config.optional.display_flashcards and Flashcards:
+            def is_response_object_valid(x):
+                if isinstance(x, list):
+                    return isinstance(x[0], dict)
+                else:
+                    return False
+            # TODO: Implement flashcards
+            try:
+                manager = Flashcards(front_panel_name="Flashcard")
+                response_object = JsonOutputParser().parse(response.content)
+                if isinstance(response_object, dict):
+                    print("WARNING: Got dict instead of list of dicts")
+                    response_object = [response_object]
+                assert is_response_object_valid(response_object), "Response object not valid"
+                print("Got valid JSON for flashcards.")
+                manager.construct_flashcards(
+                    response_object)
+                manager.display_flashcards(
+                    delay=0.1,
+                    include_answer=True
+                )
+                manager.save_to_json(FLASHCARD_FILEPATH)
+            except BaseException:
+                print("Did not get valid JSON for flashcards.")
+        else:
+            print('Flashcards disabled')
         if self.config.optional.amnesia:
             ### Amnesia mode ###
             print('Amnesia mode enabled')
-            if self.config.optional.display_flashcards and construct_flashcards:
-                print('Displaying flashcards')
-                # TODO: Implement flashcards
-                try:
-                    def is_output_valid(x): return isinstance(
-                        x, list) and isinstance(x[0], dict)
-                    response_object = JsonOutputParser().parse(response.content)
-                    assert is_output_valid(response_object)
-                    print("Got valid JSON for flashcards.")
-                    flashcards, keys, styles = construct_flashcards(
-                        response_object)
-                    display_flashcards(
-                        flashcards,
-                        panel_name="Flashcard",
-                        delay=0,
-                        include_answer=True
-                    )
-                    with open(FLASHCARD_FILEPATH, 'w') as file:
-                        json_dump(response_object, file, indent=4)
-                except BaseException:
-                    print("Did not get valid JSON for flashcards.")
-            else:
-                print('Flashcards disabled')
+            
             self._pop_last_exchange()
         return response
 
@@ -1250,7 +1262,7 @@ class Chatbot:
             return
         self.messages.pop()
         self.messages.pop()
-        print('Deleted last exchange')
+        print('Last chat exchange removed.')
         self.response_count -= 1
 
     def _add_message(self, message: SystemMessage | AIMessage | HumanMessage):
@@ -1377,7 +1389,6 @@ def main_cli():
     persist = not args.not_persistent
 
     try:
-        utils.ensure_valid_framework()
         chatbot = Chatbot(config)
         chatbot.chat(prompt, persist=persist)
     except KeyboardInterrupt:

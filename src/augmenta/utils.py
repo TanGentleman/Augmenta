@@ -9,24 +9,20 @@ from datetime import datetime
 
 from .constants import CHROMA_FOLDER, FAISS_FOLDER, VECTOR_DB_SUFFIX
 
-# Get the root path of the repository
 from pathlib import Path
-ROOT = Path(__file__).resolve().parent.parent
-AUGMENTA_DIR = ROOT / "augmenta"
-CONFIG_DIR = AUGMENTA_DIR / "config"
-DOCUMENTS_DIR = ROOT / "documents"
-DATA_DIR = ROOT / "data"
-LLM_OUTPUTS_PATH = DATA_DIR / "llm-outputs"
-LLM_RESPONSE_PATH = LLM_OUTPUTS_PATH / "markdown"
-TEXT_FILE_DIR = DATA_DIR / "txt"
-DB_DIR = DATA_DIR / "databases"
+# Get the root path of the repository
+from paths import (
+    CONFIG_DIR,
+    CHROMA_FOLDER_PATH,
+    FAISS_FOLDER_PATH,
+    DOCUMENTS_DIR,
+    DATA_DIR,
+    LLM_OUTPUTS_PATH,
+    LLM_RESPONSE_PATH,
+    TEXT_FILE_DIR,
+    MANIFEST_FILEPATH,
+)
 
-CHROMA_FOLDER_PATH = DB_DIR / CHROMA_FOLDER
-FAISS_FOLDER_PATH = DB_DIR / FAISS_FOLDER
-
-MANIFEST_FILEPATH = DATA_DIR / "manifest.json"
-
-INITIAL_MANIFEST_CONTENTS = '{"databases": []}'
 
 def copy_string_to_clipboard(string: str) -> str | None:
     """
@@ -74,6 +70,12 @@ def save_string_as_markdown_file(
     with open(filepath, "w", encoding="utf-8") as file:
         file.write(response_string)
 
+def save_string_as_text_file(
+        response_string: str,
+        filename="sample.txt"):
+    filepath = TEXT_FILE_DIR / filename
+    with open(filepath, "w", encoding="utf-8") as file:
+        file.write(response_string)
 
 def read_text_file(filename: str = "sample.txt") -> str:
     """
@@ -420,38 +422,3 @@ def fix_filename(filename: str | Path) -> str:
         print("Warning: Converting path to just the filename")
         return str(filename.name)
     return filename
-
-def ensure_valid_framework(root: Path = ROOT): 
-    """
-    Validate the folders needed
-    """
-    assert root.exists(), "Root path does not exist"
-    # Set validate ROOT path
-
-    # Documents folder
-    if not DOCUMENTS_DIR.exists():
-        DOCUMENTS_DIR.mkdir()
-
-    # Data folder
-    if not DATA_DIR.exists():
-        DATA_DIR.mkdir()
-        LLM_OUTPUTS_PATH.mkdir()
-        LLM_RESPONSE_PATH.mkdir()
-        TEXT_FILE_DIR.mkdir()
-    # Outputs folder
-    elif not LLM_OUTPUTS_PATH.exists():
-        LLM_OUTPUTS_PATH.mkdir()
-        LLM_RESPONSE_PATH.mkdir()
-    # Markdown folder! I will rename it soon.
-    elif not LLM_RESPONSE_PATH.exists():
-        LLM_RESPONSE_PATH.mkdir()
-    else:
-        # Text file folder
-        if not TEXT_FILE_DIR.exists():
-            TEXT_FILE_DIR.mkdir()
-
-    # manifest.json
-    if not MANIFEST_FILEPATH.exists():
-        with open(MANIFEST_FILEPATH, "w") as f:
-            # Make databases key
-            f.write(INITIAL_MANIFEST_CONTENTS)

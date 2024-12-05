@@ -9,7 +9,7 @@ from chromadb.config import Settings
 from langchain_community.document_loaders import PyPDFLoader, ArxivLoader
 
 from .config.config import EXPERIMENTAL_UNSTRUCTURED, METADATA_MAP
-from .utils import CHROMA_FOLDER_PATH, DOCUMENTS_DIR, FAISS_FOLDER_PATH, clean_docs, database_exists
+from .utils import CHROMA_FOLDER_PATH, DOCUMENTS_DIR, FAISS_FOLDER_PATH, clean_docs, database_exists, save_string_as_text_file
 
 
 def loader_from_arxiv_url(url: str) -> ArxivLoader:
@@ -135,6 +135,24 @@ def split_documents(
         if char_count > 20000:  # This number is arbitrary
             print("Warning: Document is really long, consider splitting it further.")
     return chunked_docs
+
+def documents_to_string(docs: list[Document]) -> str:
+    """
+    Convert a list of Documents into a single string containing all their content.
+
+    Args:
+        docs (list[Document]): List of Document objects to combine
+
+    Returns:
+        str: Combined string of all document contents
+    """
+    return "\n\n".join(doc.page_content for doc in docs)
+
+def convert_pdf_to_text_file(filename: str) -> str:
+    docs = documents_from_local_pdf(filename)
+    docs_str = documents_to_string(docs)
+    save_string_as_text_file(docs_str, filename + ".txt")
+    return docs_str
 
 
 def get_chroma_vectorstore(
