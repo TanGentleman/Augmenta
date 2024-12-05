@@ -2,6 +2,7 @@
 .env
 .venv/
 .venv310/
+.venv311/
 .venv312/
 __pycache__/
 
@@ -9,10 +10,11 @@ __pycache__/
 *.md
 *.txt
 *.json
-*.png
+# *.png
 
-framework/data/databases/
+src/data/databases/
 deprecated/
 images/
 notebooks/
 .cache
+junk-to-sort/
