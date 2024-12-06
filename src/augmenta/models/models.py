@@ -40,8 +40,8 @@ def get_model_dict():
         model_dict[model['key']] = {
             'provider': model['provider'],
             'model_name': model['model'],
-            'context_size': model['context_size'],
-            'model_type': model['type']
+            'context_size': model.get('context_size', 4096),
+            'model_type': model.get('model_type', 'llm')
         }
     return model_dict
 
@@ -211,60 +211,6 @@ def get_litellm_model(model_name: str, hyperparameters=None) -> ChatOpenAI:
     wrapped_function = get_model_wrapper(provider, model_name, hyperparameters)
     return wrapped_function()
 
-def get_openai_gpt4(hyperparameters=None) -> ChatOpenAI:
-    model="gpt-4o"
-    return get_openai_model(model, hyperparameters)
-
-def get_openai_gpt4_mini(hyperparameters=None) -> ChatOpenAI:
-    model="gpt-4o-mini"
-    return get_openai_model(model, hyperparameters)
-
-def get_together_dolphin(hyperparameters=None) -> ChatOpenAI:
-    model="cognitivecomputations/dolphin-2.5-mixtral-8x7b"
-    return get_together_model(model, hyperparameters)
-
-def get_together_qwen(hyperparameters=None) -> ChatOpenAI:
-    model="Qwen/Qwen2-72B-Instruct"
-    return get_together_model(model, hyperparameters)
-
-def get_together_nous_mix(hyperparameters=None) -> ChatOpenAI:
-    model="NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO"
-    return get_together_model(model, hyperparameters)
-
-def get_together_bigmix(hyperparameters=None) -> ChatOpenAI:
-    model="mistralai/Mixtral-8x22B-Instruct-v0.1"
-    return get_together_model(model, hyperparameters)
-
-
-def get_together_dbrx(hyperparameters=None) -> ChatOpenAI:
-    model="databricks/dbrx-instruct"
-    return get_together_model(model, hyperparameters)
-
-def get_together_arctic(hyperparameters=None) -> ChatOpenAI:
-    model="Snowflake/snowflake-arctic-instruct"
-    return get_together_model(model, hyperparameters)
-
-
-def get_together_llama3(hyperparameters=None) -> ChatOpenAI:
-    model="meta-llama/Llama-3-70b-chat-hf"
-    return get_together_model(model, hyperparameters)
-
-def get_together_fn_mix(hyperparameters=None) -> ChatOpenAI:
-    model="NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO"
-    return get_together_model(model, hyperparameters)
-
-def get_together_deepseek_4k(hyperparameters=None) -> ChatOpenAI:
-    model="deepseek-ai/deepseek-llm-67b-chat"
-    return get_together_model(model, hyperparameters)
-
-def get_together_deepseek_32k(hyperparameters=None) -> ChatOpenAI:
-    model="deepseek-ai/deepseek-llm-405b-chat"
-    return get_together_model(model, hyperparameters)
-
-def get_openrouter_sonnet(hyperparameters=None) -> ChatOpenAI:
-    model="anthropic/claude-3.5-sonnet"
-    return get_openrouter_model(model, hyperparameters)
-
 def get_openai_embedder_large(hyperparameters=None) -> OpenAIEmbeddings:
     api_key = getenv("OPENAI_API_KEY")
     assert api_key, "Please set OPENAI_API_KEY in .env file"
@@ -279,38 +225,6 @@ def get_together_embedder_large(hyperparameters=None) -> TogetherEmbeddings:
     return TogetherEmbeddings(
         api_key=api_key,
         model="BAAI/bge-large-en-v1.5",
-    )
-
-def get_deepseek_coder(hyperparameters=None) -> ChatOpenAI:
-    model="deepseek-coder"
-    return get_deepseek_model(model, hyperparameters)
-
-def get_deepseek_chat(hyperparameters=None) -> ChatOpenAI:
-    model="deepseek-chat"
-    return get_deepseek_model(model, hyperparameters)
-
-def get_local_model(hyperparameters=None) -> ChatOpenAI:
-    model="local-model"
-    return get_local_model(model, hyperparameters)
-
-def get_ollama_llama3(hyperparameters=None) -> ChatOpenAI:
-    model="llama3"
-    return get_ollama_model(model, hyperparameters)
-
-def get_ollama_mistral(hyperparameters=None) -> ChatOpenAI:
-    model="mistral:7b-instruct-v0.3-q6_K"
-    return get_ollama_model(model, hyperparameters)
-
-def get_local_llama_cpp(hyperparameters=None) -> ChatOpenAI:
-    # This will be deprecated when port parameter is implemented
-    return ChatOpenAI(
-        base_url=LLAMA_CPP_BASE_URL,
-        api_key='LOCAL-API-KEY',
-        model="local-model",
-        temperature=0,
-        max_tokens=1000,
-        streaming=True,
-        # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
     )
 
 def get_ollama_local_embedder(hyperparameters=None) -> OpenAIEmbeddings:
@@ -328,38 +242,20 @@ def get_lmstudio_local_embedder(hyperparameters=None) -> OpenAIEmbeddings:
         api_key="LOCAL-API-KEY"
     )
 
-# This maps the model keys to the functions
-FUNCTION_MAP = {
-    "samba": get_model_wrapper("litellm", "openrouter/meta-llama/llama-3.1-70b-instruct:free"),
-    "smol": get_model_wrapper("litellm", "lmstudio/smollm2-1.7b-instruct"),
-    "get_gemini_flash": get_model_wrapper("litellm", "openrouter/google/gemini-flash-1.5"),
-    "gemini": get_model_wrapper("openrouter", "google/gemini-flash-1.5"),
-    "get_openai_gpt4": get_openai_gpt4,
-    "get_openai_gpt4_mini": get_openai_gpt4_mini,
-    "get_together_dolphin": get_together_dolphin,
-    "get_together_qwen": get_together_qwen,
-    "get_together_nous_mix": get_together_nous_mix,
-    "get_together_fn_mix": get_together_fn_mix,
-    "get_together_bigmix": get_together_bigmix,
-    "get_together_dbrx": get_together_dbrx,
-    "get_together_arctic": get_together_arctic,
-    "get_together_llama3": get_together_llama3,
-    "get_together_new_llama": get_model_wrapper("together", "meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo"),
-    "get_together_llama_400b": get_model_wrapper("together", "meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo"),
-    "get_together_deepseek_4k": get_together_deepseek_4k,
-    "get_together_deepseek_32k": get_together_deepseek_32k,
-    "get_deepseek_coder": get_deepseek_coder,
-    "get_deepseek_chat": get_deepseek_chat,
-    "get_openrouter_sonnet": get_openrouter_sonnet,
-    "get_local_model": get_local_model,
-    "get_ollama_llama3": get_ollama_llama3,
-    "get_ollama_mistral": get_ollama_mistral,
-    "get_local_llama_cpp": get_local_llama_cpp,
-    "get_openai_embedder_large": get_openai_embedder_large,
-    "get_together_embedder_large": get_together_embedder_large,
-    "get_ollama_local_embedder": get_ollama_local_embedder,
-    "get_lmstudio_local_embedder": get_lmstudio_local_embedder
+NICKNAME_TO_MODEL_INFO = {
+    "samba": ("litellm", "openrouter/meta-llama/llama-3.1-70b-instruct:free"),
+    "smol": ("litellm", "lmstudio/smollm2-1.7b-instruct"),
+    "qwen": ("together", "Qwen/Qwen2-72B-Instruct"),
+    "gemini": ("openrouter", "google/gemini-flash-1.5"),
+    "llama": ("litellm", "Llama-3.1-Nemotron-70B")
 }
+
+def get_model_wrapper_from_nickname(nickname: str) -> tuple[str, str]:
+    if nickname not in NICKNAME_TO_MODEL_INFO:
+        raise ValueError(f"Invalid nickname: {nickname}")
+    provider, model_name = NICKNAME_TO_MODEL_INFO[nickname]
+    return get_model_wrapper(provider, model_name)
+
 
 def model_key_from_name(model_name: str) -> str:
     """Get the model key from the model name"""
@@ -378,8 +274,6 @@ def model_name_from_key(model_key: str) -> str | None:
 # Create class LLM_FN that takes a function that is a value in MODEL_DICT
 class LLM_FN:
     def __init__(self, model_fn=None, hyperparameters=None, model_experimental: str | None = None):
-        # If it's not a value in MODEL_DICT, raise an error
-        # This means embedding models pass here (for now)
         if hyperparameters is not None and not isinstance(hyperparameters, dict):
             raise ValueError("Hyperparameters must be a dictionary")
         
@@ -387,30 +281,33 @@ class LLM_FN:
             assert model_fn is None, "model_fn must be None if model_experimental is not None"
             if model_experimental in MODEL_CODES:
                 model_experimental = MODEL_CODES[model_experimental]
+                
+        # Find matching model in MODEL_DICT
         for key, info in MODEL_DICT.items():
             if model_fn is not None:
-                if model_fn == FUNCTION_MAP[key]:
+                # NOTE: Deprecated method
+                # Get provider and model name from MODEL_DICT
+                provider = info['provider']
+                model_name = info['model_name']
+                # Create wrapper function for comparison
+                wrapper = get_model_wrapper(provider, model_name)
+                if model_fn == wrapper:
                     self.model_name = str(info["model_name"])
                     self.context_size = int(info["context_size"])
                     self.model_fn = model_fn
                     break
-            else:
-                if model_experimental is not None:
-                    if key == model_experimental:
-                        self.model_fn = FUNCTION_MAP[key]
-                        self.model_name = str(info["model_name"])
-                        self.context_size = int(info["context_size"])
-                        break
-                    if info["model_name"] == model_experimental:
-                        self.model_fn = FUNCTION_MAP[key]
-                        self.model_name = model_experimental
-                        self.context_size = int(info["context_size"])
-                        break
+            elif model_experimental is not None:
+                if key == model_experimental or info["model_name"] == model_experimental:
+                    provider = info['provider']
+                    model_name = info['model_name']
+                    self.model_fn = get_model_wrapper(provider, model_name)
+                    self.model_name = str(info["model_name"])
+                    self.context_size = int(info["context_size"])
+                    break
         else:
             raise ValueError("Model not found in MODEL_DICT")
         
         self.hyperparameters = hyperparameters
-        assert self.model_fn in FUNCTION_MAP.values()
         MODEL_NAMES = [model["model_name"] for model in MODEL_DICT.values()]
         assert self.model_name in MODEL_NAMES
         assert self.context_size > 0
