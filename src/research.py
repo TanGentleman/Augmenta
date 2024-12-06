@@ -44,6 +44,8 @@ def _set_env(var: str):
 # _set_env("OPENAI_API_KEY")
 _set_env("TAVILY_API_KEY")
 ###
+MAX_SEARCH_RESULTS = 10
+
 
 ### LLMS
 from augmenta.models.models import get_model_wrapper_from_nickname
@@ -341,7 +343,7 @@ gen_answer_chain = gen_answer_prompt | gpt_4o_mini.with_structured_output(
 ).with_config(run_name="GenerateAnswer")
 
 ### Search Engine
-MAX_SEARCH_RESULTS = 5
+
 search_engine = TavilySearchResults(max_results=MAX_SEARCH_RESULTS)
 
 ### Gen Answer
@@ -519,8 +521,11 @@ async def main(main_topic: str = "Education Crisis in the US"):
     import logging
     logging.basicConfig(level=logging.ERROR)
     logger = logging.getLogger(__name__)
+
+
     # example_topic = "Education Crisis in the US"
     example_topic = main_topic
+    print(f"Researching topic: {example_topic}")
     
     # Generate initial outline
     initial_outline = await generate_outline_direct.ainvoke({"topic": example_topic})
@@ -659,67 +664,74 @@ async def main(main_topic: str = "Education Crisis in the US"):
             lines = text.split('\n')
             for line in lines:
                 if not line.strip():
-                    self.ln(8)  # Increased spacing between paragraphs
+                    self.ln(5)  # Reduced paragraph spacing
                     continue
                     
-                # Headers with improved spacing
+                # Headers with compact spacing
                 if line.startswith('###'):
-                    self.ln(4)  # Space before header
+                    self.ln(2)
                     self.set_font('DejaVu', 'B', font_size + 2)
-                    self.multi_cell(0, 10, line.replace('###', '').strip())
-                    self.ln(6)  # Space after header
+                    self.multi_cell(0, 8, line.replace('###', '').strip())
+                    self.ln(3)
                 elif line.startswith('##'):
-                    self.ln(6)
+                    self.ln(3)
                     self.set_font('DejaVu', 'B', font_size + 4)
-                    self.multi_cell(0, 10, line.replace('##', '').strip())
-                    self.ln(8)
+                    self.multi_cell(0, 8, line.replace('##', '').strip())
+                    self.ln(4)
                 elif line.startswith('#'):
-                    self.ln(8)
+                    self.ln(4)
                     self.set_font('DejaVu', 'B', font_size + 6)
-                    self.multi_cell(0, 10, line.replace('#', '').strip())
-                    self.ln(10)
+                    self.multi_cell(0, 8, line.replace('#', '').strip())
+                    self.ln(5)
                 else:
                     self.set_font('DejaVu', '', font_size)
-                    self.multi_cell(0, 8, line.strip())
-                    self.ln(3)  # Slightly increased line spacing
-    try:
-        # Create PDF
-        pdf = MarkdownPDF()
-        pdf.add_page()
+                    self.multi_cell(0, 6, line.strip())
+                    self.ln(2)  # Reduced line spacing
 
-        # Title with more spacing
-        pdf.set_font('DejaVu', 'B', 24)
-        pdf.ln(15)  # Space at top of page
-        pdf.cell(0, 10, example_topic, ln=True, align='C')
-        pdf.ln(20)  # More space after title
+    def create_pdf(example_topic, article_content, initial_outline):
+        try:
+            # Create PDF
+            pdf = MarkdownPDF()
+            pdf.add_page()
 
-        # Initial Outline section
-        pdf.set_font('DejaVu', 'B', 16)
-        pdf.cell(0, 10, "Initial Outline", ln=True)
-        pdf.ln(5)
-        pdf.markdown_text(initial_outline.as_str)
-        pdf.ln(15)  # More space between sections
+            # Title page
+            pdf.set_font('DejaVu', 'B', 24)
+            pdf.ln(60)  # Add space at top
+            pdf.cell(0, 10, example_topic, ln=True, align='C')
+            pdf.ln(20)
+            
+            # Add date
+            pdf.set_font('DejaVu', '', 12)
+            from datetime import datetime
+            date_str = datetime.now().strftime("%B %d, %Y")
+            pdf.cell(0, 10, date_str, ln=True, align='C')
+            
+            # Start article content on new page
+            pdf.add_page()
+            pdf.markdown_text(article_content)
+            
+            # Add appendix with initial outline
+            pdf.add_page()
+            pdf.set_font('DejaVu', 'B', 16)
+            pdf.ln(10)
+            pdf.cell(0, 10, "Appendix: Initial Research Outline", ln=True)
+            pdf.ln(5)
+            pdf.markdown_text(initial_outline.as_str)
 
-        # Refined Outline section
-        pdf.set_font('DejaVu', 'B', 16)
-        pdf.cell(0, 10, "Refined Outline", ln=True)
-        pdf.ln(5)
-        pdf.markdown_text(refined_outline.as_str)
-        pdf.ln(15)
+            # Save PDF with sanitized filename
+            filename = f"research_{example_topic.lower().replace(' ', '_')[:30]}.pdf"
+            pdf.output(filename)
+            logger.info(f"PDF created: {filename}")
+            
+            # Open the file in the default PDF viewer
+            if os.path.exists(filename):
+                os.system(f"open '{filename}'")
+            return filename
+        except Exception as e:
+            logger.error(f"Failed to create and open PDF: {e}")
+            return None
 
-        # Final Article section
-        pdf.set_font('DejaVu', 'B', 16)
-        pdf.cell(0, 10, "Final Article", ln=True)
-        pdf.ln(5)
-        pdf.markdown_text(article_content)
-
-        # Save and open PDF
-        pdf.output("research_output.pdf")
-        logger.info(f"PDF created")
-        print(f"PDF created")
-        os.system("open research_output.pdf")
-    except Exception as e:
-        logger.error(f"Failed to create and open PDF: {e}")
+    create_pdf(example_topic, article_content, initial_outline)
 
 if __name__ == "__main__":
     import argparse
