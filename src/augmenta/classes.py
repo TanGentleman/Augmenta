@@ -13,36 +13,36 @@ logger = logging.getLogger(__name__)
 
 ACTIVE_JSON_FILE = "active.json"
 
-VALID_LLM = Literal[
-    "get_gemini_flash",
-    "gemini",
-    "get_openai_gpt4",
-    "get_openai_gpt4_mini", 
-    "get_together_dolphin",
-    "get_together_qwen",
-    "get_together_nous_mix",
-    "get_together_fn_mix",
-    "get_together_bigmix",
-    "get_together_dbrx",
-    "get_together_arctic",
-    "get_together_llama3",
-    "get_together_new_llama",
-    "get_together_llama_400b",
-    "get_together_deepseek_4k",
-    "get_together_deepseek_32k",
-    "get_deepseek_coder",
-    "get_deepseek_chat",
-    "get_openrouter_sonnet",
-    "get_local_model",
-    "get_ollama_llama3",
-    "get_ollama_mistral",
-    "get_local_llama_cpp"
-]
+# VALID_LLM = Literal[
+#     "get_gemini_flash",
+#     "gemini",
+#     "get_openai_gpt4",
+#     "get_openai_gpt4_mini", 
+#     "get_together_dolphin",
+#     "get_together_qwen",
+#     "get_together_nous_mix",
+#     "get_together_fn_mix",
+#     "get_together_bigmix",
+#     "get_together_dbrx",
+#     "get_together_arctic",
+#     "get_together_llama3",
+#     "get_together_new_llama",
+#     "get_together_llama_400b",
+#     "get_together_deepseek_4k",
+#     "get_together_deepseek_32k",
+#     "get_deepseek_coder",
+#     "get_deepseek_chat",
+#     "get_openrouter_sonnet",
+#     "get_local_model",
+#     "get_ollama_llama3",
+#     "get_ollama_mistral",
+#     "get_local_llama_cpp"
+# ]
 
-VALID_EMBEDDER = Literal["get_openai_embedder_large",
-                         "get_together_embedder_large",
-                         "get_ollama_local_embedder",
-                         "get_lmstudio_local_embedder"]
+# VALID_EMBEDDER = Literal["get_openai_embedder_large",
+#                          "get_together_embedder_large",
+#                          "get_ollama_local_embedder",
+#                          "get_lmstudio_local_embedder"]
 
 configValue = Union[str, int, float, bool]
 
@@ -51,7 +51,7 @@ class ManifestSchema(BaseModel):
     """
     Manifest schema
     """
-    embedding_model: VALID_EMBEDDER
+    embedding_model: str
     method: Literal["faiss", "chroma"]
     chunk_size: int
     chunk_overlap: int
@@ -63,8 +63,8 @@ class ChatSchema(BaseModel):
     """
     Configuration for Chat
     """
-    primary_model: VALID_LLM
-    backup_model: VALID_LLM
+    primary_model: str
+    backup_model: str
     enable_system_message: bool
     system_message: str
 
@@ -83,12 +83,12 @@ class RagSchema(BaseModel):
     """
     rag_mode: bool
     collection_name: str
-    embedding_model: VALID_EMBEDDER
+    embedding_model: str
     method: Literal["faiss", "chroma"]
     chunk_size: int = Field(ge=0)
     chunk_overlap: int = Field(ge=0)
     k_excerpts: int = Field(ge=0, le=30)
-    rag_llm: VALID_LLM
+    rag_llm: str
     inputs: list[str]
     multivector_enabled: bool
     multivector_method: Literal["summary", "qa"]
@@ -108,7 +108,7 @@ class OptionalSchema(BaseModel):
 
 def get_llm_fn(model_name: str,
                model_type: Literal["llm",
-                                   "embedder"]) -> LLM_FN:
+                                   "embedder"] = "llm") -> LLM_FN:
     """
     Get the LLM function from the name
     """
