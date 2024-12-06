@@ -14,9 +14,11 @@ from langchain.retrievers.multi_vector import MultiVectorRetriever
 from langchain_core.documents import Document
 from langchain.storage import InMemoryByteStore
 
+from paths import DOCUMENTS_DIR
+
 from . import rag
 from . import utils
-from .constants import MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SYSTEM_MESSAGE_CODES
+from .constants import HISTORY_CHAPTER_TO_PAGE_RANGE, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SYSTEM_MESSAGE_CODES, get_page_range_from_prompt
 from .config.config import DEFAULT_CONFIG_FILENAME, MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, OVERRIDE_FILENAME_KEY, SAVE_ONESHOT_RESPONSE, FILTER_TOPIC
 from .classes import Config
 from .models.models import LLM_FN, LLM
@@ -182,6 +184,9 @@ class Chatbot:
         else:
             self.chat_model = LLM(self.config.chat_settings.primary_model)
             self.set_messages()
+
+        # Experimental
+        self.docs = None
 
     def set_messages(self, messages: list[BaseMessage] | None = None):
         """
@@ -499,6 +504,8 @@ class Chatbot:
         # NOTE: Watch aliasing in the future
         if self.config.optional.filter:
             filter = {"topic": self.config.optional.filter}
+        else:
+            filter = None
 
         docs: list[Document] = vectorstore.similarity_search(
             similarity_query, k=k_excerpts, filter=filter)
@@ -1058,19 +1065,30 @@ class Chatbot:
         - AIMessage: The AI's response message.
         """
         assert self.chat_model is not None, "Chat model not initialized"
-
         EXPERIMENTAL_PROMPT_INJECTION = True
         if EXPERIMENTAL_PROMPT_INJECTION and self.config.optional.amnesia:
             prompt_prefix = self.config.optional.prompt_prefix
             prompt_suffix = self.config.optional.prompt_suffix
+            if self.docs:
+                page_start, page_end = get_page_range_from_prompt(prompt)
+                if page_end == -1:
+                    input("Press any key to continue...")
+                docs_string = rag.get_excerpt_from_docs(self.docs, page_start, page_end)
+                prompt_prefix = "CONTEXT:\n" + docs_string + "\n\n" + "PROMPT:\n"
+                print(f"Context Added! (Pages {page_start+1} to {page_end if page_end != -1 else 'end'})")
+                prompt_suffix = "\nIMPORTANT: Include your final result in the form of a JSON List with the ```json delimiter."
             if prompt_prefix or prompt_suffix:
-                print("Injecting text to prompt!")
+                logger.info("Injecting text to prompt!")
             # prompt_refactor_fn = self.config.optional.prompt_refactor_fn
             # NOTE: Assertions should be made here to ensure safe injection
             assert isinstance(prompt_prefix, str)
             assert isinstance(prompt_suffix, str)
             prompt = prompt_prefix + prompt + prompt_suffix
 
+        if len(prompt) > MAX_CHARS_IN_PROMPT:
+            print(f"WARNING: Prompt too long ({len(prompt)} characters), max is {MAX_CHARS_IN_PROMPT}")
+            print("Truncating prompt...")
+            prompt = prompt[:MAX_CHARS_IN_PROMPT]
         self.messages.append(HumanMessage(content=prompt))
         print(f'Fetching response #{self.response_count + 1}!')
         try:
@@ -1109,17 +1127,17 @@ class Chatbot:
                 manager.construct_flashcards(
                     response_object)
                 manager.display_flashcards(
-                    delay=0.1,
+                    delay=0.05,
                     include_answer=True
                 )
                 manager.save_to_json(FLASHCARD_FILEPATH)
             except BaseException:
-                print("Did not get valid JSON for flashcards.")
+                print("No flashcards found.")
         else:
             print('Flashcards disabled')
         if self.config.optional.amnesia:
             ### Amnesia mode ###
-            print('Amnesia mode enabled')
+            logger.info('Amnesia active.')
             
             self._pop_last_exchange()
         return response
@@ -1254,6 +1272,7 @@ class Chatbot:
                 utils.save_string_as_markdown_file(
                     self._get_message(-1).content, filename="response.md")
                 print('Saved response to response.md')
+        self.exit = False
         return self.messages
 
     def _pop_last_exchange(self) -> None:
@@ -1345,14 +1364,23 @@ def main_cli():
         type=str,
         default=DEFAULT_CONFIG_FILENAME,
         help='Load a JSON file as a Config')
+    
+    parser.add_argument(
+        '-d',
+        '--docs',
+        nargs='+',
+        help='List of documents to fully load into memory')
+
     args = parser.parse_args()
     if args.load_json is not None:
-        print(f"Using JSON file: {args.load_json} as base config")
+        logger.debug(f"Using JSON file: {args.load_json} as base config")
 
+    has_docs = False
     config_override = {
         OVERRIDE_FILENAME_KEY: args.load_json,
         "RAG": {},
-        "chat": {}
+        "chat": {},
+        "optional": {}
     }
     if args.inputs:
         args.rag_mode = True
@@ -1369,7 +1397,7 @@ def main_cli():
             config_override["chat"]["primary_model"] = args.model
 
     if args.amnesia:
-        config_override["optional"] = {"amnesia": True}
+        config_override["optional"]["amnesia"] = True
 
     if args.rag_mode:
         # Currently no way to disable rag mode from CLI if True in
@@ -1378,6 +1406,13 @@ def main_cli():
             print("Forcing RAG mode off")
             args.rag_mode = False
         config_override["RAG"]["rag_mode"] = args.rag_mode
+
+    if args.docs:
+        experimental_doc = args.docs[0]
+        experimental_filepath = DOCUMENTS_DIR / experimental_doc
+        assert experimental_filepath.exists(), f"File {experimental_doc} not found in documents"
+        has_docs = True
+        print("Loading pages from:", experimental_doc)
 
     config = Config(config_override=config_override)
     if args.prompt is None:
@@ -1390,6 +1425,9 @@ def main_cli():
 
     try:
         chatbot = Chatbot(config)
+        if has_docs:
+            chatbot.docs = rag.documents_from_local_pdf(experimental_doc)
+            print(f"Loaded {len(chatbot.docs)} pages from {experimental_doc}")
         chatbot.chat(prompt, persist=persist)
     except KeyboardInterrupt:
         print('Keyboard interrupt, exiting.')

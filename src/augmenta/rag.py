@@ -136,7 +136,7 @@ def split_documents(
             print("Warning: Document is really long, consider splitting it further.")
     return chunked_docs
 
-def documents_to_string(docs: list[Document]) -> str:
+def documents_to_string(docs: list[Document], is_pdf: bool = False) -> str:
     """
     Convert a list of Documents into a single string containing all their content.
 
@@ -146,14 +146,30 @@ def documents_to_string(docs: list[Document]) -> str:
     Returns:
         str: Combined string of all document contents
     """
+    if is_pdf:
+        return "\n".join([f"{doc.page_content}\n---PAGE {doc.metadata['page']}---" for doc in docs])
     return "\n\n".join(doc.page_content for doc in docs)
+
+def get_excerpt_from_docs(docs: list, page_start: int = 0, page_end: int = -1):
+    assert page_start >= 0, "Page start must be greater than or equal to 0"
+    if page_end == -1:
+        page_end = len(docs)
+    print(f"Getting excerpt from pages {page_start} to {page_end}")
+    new_docs = docs[page_start:page_end]
+    if not new_docs:
+        print("No pages found in the specified range! Returning empty string.")
+        return ""
+    if new_docs[0].metadata.get("page") is None:
+        is_pdf = False
+    else:
+        is_pdf = True
+    return documents_to_string(new_docs, is_pdf=is_pdf)
 
 def convert_pdf_to_text_file(filename: str) -> str:
     docs = documents_from_local_pdf(filename)
     docs_str = documents_to_string(docs)
     save_string_as_text_file(docs_str, filename + ".txt")
     return docs_str
-
 
 def get_chroma_vectorstore(
         collection_name: str,

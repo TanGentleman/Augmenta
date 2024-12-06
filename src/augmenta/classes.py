@@ -408,8 +408,8 @@ class RagSettings:
     def k_excerpts(self, value):
         if not isinstance(value, int):
             raise ValueError("k_excerpts must be an integer")
-        if value < 0 or value > 15:
-            raise ValueError("k_excerpts must be 0-25")
+        if value < 0 or value > 50:
+            raise ValueError("k_excerpts must be 0-50")
         self.__k_excerpts = value
 
     @property
@@ -649,7 +649,7 @@ class Config:
         assert OVERRIDE_FILENAME_KEY not in config_override, "Override filename key should be popped"
         config = utils.read_settings(config_filename)
         if config["RAG"]["rag_mode"] is False:
-            print("The RAG mode is disabled. The RAG settings could be unreliable.")
+            logger.debug("The RAG mode is disabled. The RAG settings could be unreliable.")
         if config_override is not None:
             if "RAG" in config_override:
                 for key in config_override["RAG"]:

@@ -1,6 +1,80 @@
 # Constants for chat.py
+import re
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.messages import SystemMessage
+
+
+HISTORY_CHAPTER_TO_PAGE_RANGE = {
+    1: (0, 25),
+    2: (25, 43),
+    3: (43, 66),
+    4: (66, 84),
+    5: (84, 106),
+    6: (106, 122),
+    7: (122, 142),
+    8: (142, 165),
+    9: (165, 191),
+    10: (191, 212),
+    11: (212, 234),
+    12: (234, 257),
+    13: (257, 288),
+    14: (288, 321),
+    15: (321, 349),
+    16: (349, 371),
+    17: (371, 391),
+    18: (391, 410),
+    19: (410, 435),
+    20: (435, 452),
+    21: (452, 478),
+    22: (478, 501),
+    23: (501, 529),
+    24: (529, 558),
+    25: (558, 591),
+    26: (591, 624),
+    27: (624, 645),
+    28: (645, 665),
+    29: (665, 688),
+    30: (688, 706),
+    31: (706, 729),
+    32: (729, 754),
+    33: (754, 779),
+    34: (779, 808),
+    35: (808, 829),
+    36: (829, 858),
+    37: (858, 889),
+    38: (889, 918),
+    39: (918, 948),
+    40: (948, 978),
+    41: (978, 1016),
+    42: (1016, 1036),
+}
+
+#TODO: Find a better home for this function
+def get_page_range_from_prompt(prompt: str) -> tuple[int, int]:
+    raw_prompt_string = prompt.lower()
+    
+    # Check for direct page range pattern (e.g., "page 5-10" or "pages 5-10")
+    page_pattern = r'(?:page|pages)\s*(\d+)-(\d+)'
+    page_match = re.search(page_pattern, raw_prompt_string)
+    if page_match:
+        start_page = int(page_match.group(1))
+        if start_page == 0:
+            start_page = 1
+        end_page = int(page_match.group(2))
+        return start_page - 1, end_page  # Convert to 0-based indexing
+        
+    # Check for chapter patterns (e.g., "ch 5", "ch. 5", "chapter 5")
+    chapter_pattern = r'(?:chapter|ch\.?)\s*(\d+)'
+    chapter_match = re.search(chapter_pattern, raw_prompt_string)
+    if chapter_match:
+        # Get the first non-None group (either group 1 or 2)
+        chapter_number = int(next(g for g in chapter_match.groups() if g is not None))
+        if chapter_number in HISTORY_CHAPTER_TO_PAGE_RANGE:
+            return HISTORY_CHAPTER_TO_PAGE_RANGE[chapter_number]
+        raise ValueError(f"Could not find valid chapter number in: {prompt}")
+        
+    print("WARNING: No page range or chapter number found in prompt. Using all pages!")
+    return 0, -1
 
 ### MISC ###
 VECTOR_DB_SUFFIX = "-vector-dbs"
