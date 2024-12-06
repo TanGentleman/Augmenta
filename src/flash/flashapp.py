@@ -15,8 +15,10 @@ from typeguard import typechecked
 from abc import ABC, abstractmethod
 from typing_extensions import Protocol
 
-from .flashcards import load_flashcards_from_json, Flashcard, save_flashcards_to_json, FLASH_DIR
-FLASHCARD_FILEPATH = FLASH_DIR / "flashcards.json"
+from paths import FLASHCARD_FILEPATH
+from .flashcard import Flashcard
+from .manager import Flashcards
+
 # Set up logging
 logging.basicConfig(
     level=logging.INFO,
@@ -53,6 +55,13 @@ class MenuChoice(Enum):
     CONFIGURE = "3"
     QUIT = "4"
 
+
+class Panels(Enum):
+    """Enum representing the panels."""
+    CARD_COUNT = "Card Count"
+    FLASHCARD = "Flashcard"
+    ANSWER = "Answer"
+    MENU = "Menu"
 
 class TypedPrompt:
     """Utility class for prompting user input with type checking."""
@@ -130,25 +139,27 @@ class LayoutConfig:
         self.show_menu = True
 
     @typechecked
-    def get_ratios(self) -> dict[Literal["card_count",
-                                         "flashcard", "answer", "menu"], int]:
+    def get_ratios(self) -> dict[Literal[Panels.CARD_COUNT,
+                                         Panels.FLASHCARD,
+                                         Panels.ANSWER,
+                                         Panels.MENU], int]:
         ratios = {
-            "card_count": 1,
-            "flashcard": 2,
-            "answer": 3,
-            "menu": 2
+            Panels.CARD_COUNT: 1,
+            Panels.FLASHCARD: 2,
+            Panels.ANSWER: 3,
+            Panels.MENU: 2
         }
         if not self.show_card_count:
-            ratios["card_count"] = 0
+            ratios[Panels.CARD_COUNT] = 0
 
         if not self.show_flashcard:
-            ratios["flashcard"] = 0
+            ratios[Panels.FLASHCARD] = 0
 
         if not self.show_answer:
-            ratios["answer"] = 0
+            ratios[Panels.ANSWER] = 0
 
         if not self.show_menu:
-            ratios["menu"] = 0
+            ratios[Panels.MENU] = 0
 
         return ratios
 
@@ -178,8 +189,8 @@ class TerminalLayout:
             console.print("No flashcard to display.")
             return
 
-        flashcard_panel = card.create_flashcard()
-        answer_panel = card.create_answer() if app.show_answer else Panel(
+        flashcard_panel = card.create_flashcard(include_answer=app.show_answer)
+        answer_panel = flashcard_panel if app.show_answer else Panel(
             "Press 'S' to show answer", title="Answer", border_style="green")
 
         menu_panel = Panel(
@@ -193,26 +204,26 @@ class TerminalLayout:
         layout_elements = []
         ratios = app.layout_config.get_ratios()
         for panel, ratio in ratios.items():
-            if panel == "card_count":
+            if panel == Panels.CARD_COUNT:
                 if ratio:
                     layout_elements.append(
                         Layout(
                             Panel(f"Card {app.flashcard_manager.get_current_index() + 1} of {app.flashcard_manager.get_card_count()}"),
                             name="card_count",
                             ratio=ratio))
-            elif panel == "flashcard":
+            elif panel == Panels.FLASHCARD:
                 if ratio and not app.show_answer:
                     layout_elements.append(Layout(
                         flashcard_panel,
                         name="flashcard",
                         ratio=ratio))
-            elif panel == "answer":
+            elif panel == Panels.ANSWER:
                 if ratio:
                     layout_elements.append(Layout(
                         answer_panel,
                         name="answer",
                         ratio=ratio))
-            elif panel == "menu":
+            elif panel == Panels.MENU:
                 if ratio:
                     layout_elements.append(Layout(
                         menu_panel,
@@ -323,14 +334,15 @@ class FlashcardManager(FlashcardManagerProtocol):
 
     def __init__(self) -> None:
         """Initialize the FlashcardManager."""
-        self.flashcards: list[Flashcard] = []
+        self.manager = Flashcards()
+        self.flashcards = self.manager.flashcards
+        self.keys = self.manager.keys
+        self.styles = self.manager.styles
         self.current_index: int = 0
-        self.keys: Dict[str, str] = {}
-        self.styles: list[Tuple[str, str]] = []
 
     def get_key_names(self) -> list[str]:
         """Get the keys for the flashcards."""
-        return list(self.keys.values())
+        return list(self.manager.keys.values())
 
     def get_current_index(self) -> int:
         """Get the current index of the flashcard."""
@@ -375,8 +387,9 @@ class FlashcardManager(FlashcardManagerProtocol):
             FlashcardLoadError: If there's an error loading the flashcards.
         """
         try:
-            self.flashcards, self.keys, self.styles = load_flashcards_from_json(
+            self.manager.load_from_json(
                 file_path)
+            self.flashcards, self.keys, self.styles = self.manager.flashcards, self.manager.keys, self.manager.styles
             logger.info(
                 f"Loaded {len(self.flashcards)} flashcards from {file_path}")
         except FileNotFoundError:
@@ -402,7 +415,7 @@ class FlashcardManager(FlashcardManagerProtocol):
             FlashcardSaveError: If there's an error saving the flashcards.
         """
         try:
-            save_flashcards_to_json(self.flashcards, file_path)
+            self.manager.save_to_json(file_path)
         except Exception as e:
             logger.error(f"Failed to save flashcards: {str(e)}")
             raise FlashcardSaveError(f"Failed to save flashcards: {str(e)}")
@@ -644,20 +657,31 @@ class FlashcardApp:
                     "0", "1", "2", "3", "4", "5"])
 
             if choice == "0":
-                self.transparent = True
-                self.show_answer = True
+                self.transparent = not self.transparent
+                if self.transparent:
+                    self.show_answer = True
+                console.print(
+                    f"[bold green]Transparency toggled to {'enabled' if self.transparent else 'disabled'}[/bold green]")
             elif choice == "1":
                 self.toggle_layout_element("show_card_count")
+                console.print(
+                    f"[bold green]Card count {'shown' if self.layout_config.show_card_count else 'hidden'}[/bold green]")
             elif choice == "2":
                 self.toggle_layout_element("show_flashcard")
+                console.print(
+                    f"[bold green]Flashcard {'shown' if self.layout_config.show_flashcard else 'hidden'}[/bold green]")
             elif choice == "3":
                 self.toggle_layout_element("show_answer")
+                console.print(
+                    f"[bold green]Answer {'shown' if self.layout_config.show_answer else 'hidden'}[/bold green]")
             elif choice == "4":
                 self.toggle_layout_element("show_menu")
+                console.print(
+                    f"[bold green]Menu {'shown' if self.layout_config.show_menu else 'hidden'}[/bold green]")
             elif choice == "5":
                 break
 
-            TypedPrompt.ask("Press Enter to continue", str)
+            TypedPrompt.ask("Press any key to continue", str)
 
     def print_help(self) -> bool:
         console.print(
