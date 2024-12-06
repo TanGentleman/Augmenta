@@ -740,4 +740,7 @@ if __name__ == "__main__":
                       help='Topic to research (default: "Education Crisis in the US")')
     args = parser.parse_args()
     
-    asyncio.run(main(args.topic))
+    try:
+        asyncio.run(main(args.topic))
+    except KeyboardInterrupt:
+        print("Aborting!")
