@@ -119,9 +119,8 @@ MODEL_CODES = {
     "deepseek": "get_together_deepseek_4k",
     "qwen": "get_together_qwen",
     "sonnet": "get_openrouter_sonnet",
-    "local": "get_local_model",
     "ollama": "get_ollama_llama3",
-    "flash": "get_gemini_flash",
+    "flash": "get_gemini_litellm",
 }
 
 SYSTEM_MESSAGE_CODES = {
@@ -147,7 +146,6 @@ RAG_COLLECTION_TO_SYSTEM_MESSAGE = {
 LOCAL_MODELS = [
     "llama3",
     "mistral:7b-instruct-v0.3-q6_K",
-    "local-model",
     "nomic-embed-text",
     "lmstudio-embedding-model",
 ]
