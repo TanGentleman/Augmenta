@@ -15,7 +15,11 @@ load_dotenv()
 
 MAX_MUTATION_COUNT = 50
 MAX_RESPONSE_COUNT = 3
-COMMAND_LIST = ["q", ".test", ".read"]
+COMMAND_LIST = [
+    "q", ".q",
+    ".test", ".read"
+]
+REFACTOR_COMMAND_LIST = [".test", ".read"]
 # Define state
 class GraphState(TypedDict):
     """
@@ -60,9 +64,7 @@ def apply_command_node(state: GraphState) -> GraphState:
     """
     state_dict = state["keys"]
     def handle_input(input: str) ->  str:
-        if input == "q":
-            return "QUIT"
-        elif input == ".test":
+        if input == ".test":
             print("Test command applied.")
             return "I successfully applied the test command. Celebrate with JSON of this moment."
         elif input == ".read":
@@ -71,8 +73,15 @@ def apply_command_node(state: GraphState) -> GraphState:
     assert "user_input" in state_dict, "No command in state keys!"
     command_string = state_dict["user_input"].strip()
     assert command_string in COMMAND_LIST, "Command not in command list!"
+    if command_string in ["q", ".q"]:
+        return {
+            "keys": state_dict,
+            "mutation_count": state["mutation_count"] + 1,
+            "is_done": True
+        }
     new_input = handle_input(command_string)
     state_dict["user_input"] = new_input
+    # NOTE: Be deliberate. When do we add other keys or mutate the state?
     return {
         "keys": state_dict,
         "mutation_count": state["mutation_count"] + 1,
@@ -91,7 +100,15 @@ def agent_node(state: GraphState) -> GraphState:
     """
     state_dict = state["keys"]
     config: Config = state_dict["config"]
-    if state["mutation_count"] == 1: # This is first entry to the agent node
+
+    if state["is_done"]:
+        return {
+            "keys": state_dict,
+            "mutation_count": state["mutation_count"] + 1,
+            "is_done": True
+        }
+
+    elif state["mutation_count"] == 1: # This is first entry to the agent node
         messages = []
         if config.chat_settings.enable_system_message:
             messages.append(SystemMessage(content=config.chat_settings.system_message))
@@ -101,16 +118,9 @@ def agent_node(state: GraphState) -> GraphState:
             "response_count": 0,
             "config": config,
         }
-        
     elif state_dict.get("user_input", ""):
         user_input = state_dict["user_input"]
         messages = state_dict["messages"]
-        if user_input == "QUIT":
-            return {
-                "keys": state_dict,
-                "mutation_count": state["mutation_count"] + 1,
-                "is_done": True
-            }
         messages.append(HumanMessage(content=user_input))
         # Here you can validate the messages array before assigning them to the state
         new_keys = {
@@ -344,7 +354,7 @@ def decide_from_tools(state: GraphState) -> Literal["agent_node", "generate_node
     tool_choice = state_dict["tool_choice"]
     if tool_choice is None:
         return "agent_node"
-    # There will be more confitions in the future here
+    # There will be more conditions in the future here
     return "generate_node"
 
 # Build graph
