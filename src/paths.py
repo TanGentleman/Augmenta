@@ -13,6 +13,8 @@ MANIFEST_FILEPATH = FLASH_DIR / "manifest.json"
 # Augmenta module paths
 CONFIG_DIR = AUGMENTA_DIR / "config"
 
+MODELS_YAML_PATH = AUGMENTA_DIR / "models" / "models.yaml"
+
 # Data subdirectories
 DOCUMENTS_DIR = ROOT_DIR / "documents"
 DATA_DIR = ROOT_DIR / "data"

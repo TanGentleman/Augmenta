@@ -113,7 +113,7 @@ def agent_node(state: GraphState) -> GraphState:
         if config.chat_settings.enable_system_message:
             messages.append(SystemMessage(content=config.chat_settings.system_message))
         new_keys = {
-            "chat_model": None,
+            "active_chain": None,
             "messages": messages,
             "response_count": 0,
             "config": config,
@@ -124,7 +124,7 @@ def agent_node(state: GraphState) -> GraphState:
         messages.append(HumanMessage(content=user_input))
         # Here you can validate the messages array before assigning them to the state
         new_keys = {
-            "chat_model": state_dict["chat_model"],
+            "active_chain": state_dict["active_chain"],
             "messages": messages,
             "response_count": state_dict["response_count"],
             "config": state_dict["config"],
@@ -170,7 +170,7 @@ def human_node(state: GraphState) -> GraphState:
     return {
         "keys": {
             "user_input": user_input,
-            "chat_model": state_dict["chat_model"],
+            "active_chain": state_dict["active_chain"],
             "messages": state_dict["messages"],
             "response_count": state_dict["response_count"],
             "config": state_dict["config"]
@@ -210,7 +210,7 @@ def tools_node(state: GraphState) -> GraphState:
 
     return {
         "keys": {
-            "chat_model": state_dict["chat_model"],
+            "active_chain": state_dict["active_chain"],
             "messages": messages,
             "response_count": state_dict["response_count"],
             "tool_choice": tool_choice,
@@ -231,14 +231,16 @@ def generate_node(state: GraphState) -> GraphState:
         GraphState: Update: 
     """
     state_dict = state["keys"]
-    chat_model = state_dict["chat_model"]
+    active_chain = state_dict["active_chain"]
     messages = state_dict["messages"]
     assert messages, "No messages to generate response from!"
     config: Config = state_dict["config"]
     stream = config.chat_settings.stream
-    if chat_model is None:
+    if active_chain is None:
         try:
             chat_model = LLM(config.chat_settings.primary_model)
+            active_chain = chat_model
+            # Note that a chain just needs to have invoke/stream with expected outputs to be valid
         except Exception as e:
             print(f"Error: {e}")
             return SystemExit
@@ -248,7 +250,7 @@ def generate_node(state: GraphState) -> GraphState:
     try:
         if stream:
             response_string = ""
-            for chunk in chat_model.stream(messages):
+            for chunk in active_chain.stream(messages):
                 print(chunk.content, end="", flush=True)
                 response_string += chunk.content
             print()
@@ -256,7 +258,7 @@ def generate_node(state: GraphState) -> GraphState:
                 raise ValueError('No response generated')
             response = AIMessage(content=response_string)
         else:
-            response = chat_model.invoke(messages)
+            response = active_chain.invoke(messages)
             assert isinstance(
                 response, AIMessage), "Response not AIMessage"
             print(response.content)
@@ -272,7 +274,7 @@ def generate_node(state: GraphState) -> GraphState:
     response_count = state_dict["response_count"] + 1
     return {
         "keys": {
-            "chat_model": chat_model,
+            "active_chain": active_chain,
             "messages": messages,
             "response_count": response_count,
             "config": config

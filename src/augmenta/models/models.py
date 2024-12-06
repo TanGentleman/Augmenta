@@ -14,6 +14,7 @@ from langchain_together import TogetherEmbeddings
 from langchain.schema import BaseMessage
 
 from ..constants import LOCAL_MODELS, MODEL_CODES
+from paths import MODELS_YAML_PATH
 
 # FOR DEBUG OR PIPING OUTPUT
 # NOTE: Is this usable in any use cases like asynchronously populating convex tables?
@@ -22,15 +23,9 @@ from langchain.callbacks.manager import CallbackManager
 import yaml
 logger = logging.getLogger(__name__)
 
-# DEPRECATED
-# from langchain_community.embeddings import OllamaEmbeddings
-# from langchain_community.llms.ollama import Ollama
-
 ## NEW ##
 def get_model_config_from_yaml(filename: str):
-    models_dir = path.dirname(path.realpath(__file__))
-    file_path = path.join(models_dir, filename)
-    with open(file_path, 'r') as f:
+    with open(MODELS_YAML_PATH, 'r') as f:
         models_config = yaml.safe_load(f)
     # Make assertions about the structure of the yaml file
     if 'models' not in models_config:
@@ -335,6 +330,8 @@ def get_lmstudio_local_embedder(hyperparameters=None) -> OpenAIEmbeddings:
 
 # This maps the model keys to the functions
 FUNCTION_MAP = {
+    "samba": get_model_wrapper("litellm", "openrouter/meta-llama/llama-3.1-70b-instruct:free"),
+    "smol": get_model_wrapper("litellm", "lmstudio/smollm2-1.7b-instruct"),
     "get_gemini_flash": get_model_wrapper("litellm", "openrouter/google/gemini-flash-1.5"),
     "gemini": get_model_wrapper("openrouter", "google/gemini-flash-1.5"),
     "get_openai_gpt4": get_openai_gpt4,
@@ -491,26 +488,3 @@ class LLM:
 
     def __repr__(self):
         return f"LLM(model_name={self.model_name}, context_size={self.context_size})"
-
-### DEPRECATED ###
-
-# def get_claude_opus(hyperparameters=None) -> ChatAnthropic:
-#     api_key = getenv("ANTHROPIC_API_KEY")
-#     assert api_key, "Please set ANTHROPIC_API_KEY in .env file"
-#     return ChatAnthropic(
-#         temperature=0,
-#         anthropic_api_key=api_key,
-#         model_name="claude-3-opus-20240229",
-#         max_tokens_to_sample=4000,
-#         streaming=True,
-#         # callback_manager=CallbackManager([StreamingStdOutCallbackHandler()])
-#     )
-
-# def get_together_embedder_large(hyperparameters=None) -> OpenAIEmbeddings:
-#     api_key = getenv("TOGETHER_API_KEY")
-#     assert api_key, "Please set TOGETHER_API_KEY in .env file"
-#     return OpenAIEmbeddings(
-#         base_url=TOGETHER_BASE_URL,
-#         api_key=api_key,
-#         model="BAAI/bge-large-en-v1.5",
-#     )

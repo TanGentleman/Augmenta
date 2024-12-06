@@ -41,16 +41,16 @@ class RAGChain(SimpleChain):
         return self.chain(input_data)
 
 
-def get_object_from_response(string: str,
+def get_object_from_response(response_string: str,
                              validity_fn: Callable[[dict],
                                                    bool] | None = None) -> Any:
     """
     A JSON output parser that returns the response object.
     """
-    if not isinstance(string, str):
-        print("CRITICAL: Expected string, got", type(string))
+    if not isinstance(response_string, str):
+        print("CRITICAL: Expected string, got", type(response_string))
         try:
-            string = string.content
+            response_string = response_string.content
             assert isinstance(string, str)
         except BaseException:
             raise ValueError("Could not convert input to string")
@@ -68,7 +68,7 @@ def get_object_from_response(string: str,
         print("No validity function provided. Using default.")
         validity_fn = is_output_valid
     try:
-        response_object = JsonOutputParser().parse(string)
+        response_object = JsonOutputParser().parse(response_string)
         print("Checking validity of response object")
         if not validity_fn(response_object):
             print("JSON output does not contain the required keys")
@@ -116,7 +116,7 @@ def music_output_handler(response_string: str):
                 print(f"At least one song does not contain the required keys")
                 return False
         return True
-    return get_object_from_response(response_string, is_output_valid)
+    return get_object_from_response(response_string, validity_fn=is_output_valid)
 
 
 def get_music_chain(llm, few_shot_examples=None):
