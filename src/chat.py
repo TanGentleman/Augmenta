@@ -1127,7 +1127,7 @@ class Chatbot:
                 manager.construct_flashcards(
                     response_object)
                 manager.display_flashcards(
-                    delay=0.05,
+                    delay=0,
                     include_answer=True
                 )
                 manager.save_to_json(FLASHCARD_FILEPATH)
@@ -1426,11 +1426,15 @@ def main_cli():
     try:
         chatbot = Chatbot(config)
         if has_docs:
-            chatbot.docs = rag.documents_from_local_pdf(experimental_doc)
-            print(f"Loaded {len(chatbot.docs)} pages from {experimental_doc}")
+            docs = rag.documents_from_local_pdf(experimental_doc)
+            if docs:
+                chatbot.docs = docs
+                print(f"Loaded {len(chatbot.docs)} pages from {experimental_doc}")
+            else:
+                raise ValueError(f"No pages loaded from {experimental_doc}")
         chatbot.chat(prompt, persist=persist)
     except KeyboardInterrupt:
-        print('Keyboard interrupt, exiting.')
+        print('Aborted!')
         raise SystemExit
 
 
