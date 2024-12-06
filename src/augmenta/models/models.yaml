@@ -7,8 +7,6 @@ valid_together_models:
   - mistralai/Mixtral-8x7B-Instruct-v0.1
   - mistralai/Mixtral-8x22B-Instruct-v0.1
   - databricks/dbrx-instruct
-  - Snowflake/snowflake-arctic-instruct
-  - meta-llama/Llama-3-70b-chat-hf
   - meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo
   - meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo
   - mistralai/Mistral-7B-Instruct-v0.1
@@ -27,9 +25,6 @@ valid_openrouter_models:
   - anthropic/claude-3.5-sonnet
   - google/gemini-flash-1.5
 
-valid_local_models:
-  - local-model
-
 valid_ollama_models:
   - llama3
   - mistral:7b-instruct-v0.3-q6_K
@@ -38,7 +33,8 @@ valid_litellm_models:
   - openrouter/google/gemini-flash-1.5
   - lmstudio/smollm2-1.7b-instruct
   - openrouter/meta-llama/llama-3.1-70b-instruct:free
-
+  - Llama-3.1-Nemotron-70B
+  
 models:
   - key: get_openai_gpt4
     provider: openai
@@ -80,16 +76,6 @@ models:
     model: databricks/dbrx-instruct
     type: llm
     context_size: 32768
-  - key: get_together_arctic
-    provider: together
-    model: Snowflake/snowflake-arctic-instruct
-    type: llm
-    context_size: 4096
-  - key: get_together_llama3
-    provider: together
-    model: meta-llama/Llama-3-70b-chat-hf
-    type: llm
-    context_size: 8192
   - key: get_together_new_llama
     provider: together
     model: meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo
@@ -125,11 +111,6 @@ models:
     model: anthropic/claude-3.5-sonnet
     type: llm
     context_size: 200000
-  - key: get_local_model
-    provider: local
-    model: local-model
-    type: llm
-    context_size: 32768
   - key: get_ollama_llama3
     provider: ollama
     model: llama3
@@ -145,7 +126,7 @@ models:
     model: local-model
     type: llm
     context_size: 4096
-  - key: get_gemini_flash
+  - key: get_gemini_litellm
     provider: litellm
     model: openrouter/google/gemini-flash-1.5
     type: llm
@@ -165,6 +146,11 @@ models:
     model: openrouter/meta-llama/llama-3.1-70b-instruct:free
     type: llm
     context_size: 8192
+  - key: llama
+    provider: litellm
+    model: Llama-3.1-Nemotron-70B
+    type: llm
+    context_size: 16384
 
 
   - key: get_openai_embedder_large
