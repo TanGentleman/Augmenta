@@ -67,7 +67,6 @@ ALL_MODELS = {
         "together": MODEL_CONFIG['valid_together_models'],
         "deepseek": MODEL_CONFIG['valid_deepseek_models'],
         "openrouter": MODEL_CONFIG['valid_openrouter_models'],
-        "local": MODEL_CONFIG['valid_local_models'],
         "ollama": MODEL_CONFIG['valid_ollama_models'],
         "litellm": MODEL_CONFIG['valid_litellm_models']
     }
@@ -77,7 +76,6 @@ VALID_TOGETHER_MODELS = ALL_MODELS["providers"]["together"]
 VALID_OPENAI_MODELS = ALL_MODELS["providers"]["openai"]
 VALID_DEEPSEEK_MODELS = ALL_MODELS["providers"]["deepseek"]
 VALID_OPENROUTER_MODELS = ALL_MODELS["providers"]["openrouter"]
-VALID_LOCAL_MODELS = ALL_MODELS["providers"]["local"]
 VALID_OLLAMA_MODELS = ALL_MODELS["providers"]["ollama"]
 VALID_LITELLM_MODELS = ALL_MODELS["providers"]["litellm"]
 DEFAULT_TEMPERATURE = 0
@@ -145,8 +143,6 @@ def validate_model_name(provider: str, model_name: str):
         assert model_name in VALID_DEEPSEEK_MODELS, f"Invalid model name: {model_name}"
     elif provider == "openrouter":
         assert model_name in VALID_OPENROUTER_MODELS, f"Invalid model name: {model_name}"
-    elif provider == "local":
-        assert model_name in VALID_LOCAL_MODELS, f"Invalid model name: {model_name}"
     elif provider == "ollama":
         assert model_name in VALID_OLLAMA_MODELS, f"Invalid model name: {model_name}"
     elif provider == "litellm":
@@ -247,7 +243,11 @@ NICKNAME_TO_MODEL_INFO = {
     "smol": ("litellm", "lmstudio/smollm2-1.7b-instruct"),
     "qwen": ("together", "Qwen/Qwen2-72B-Instruct"),
     "gemini": ("openrouter", "google/gemini-flash-1.5"),
-    "llama": ("litellm", "Llama-3.1-Nemotron-70B")
+    "llama": ("litellm", "Llama-3.1-Nemotron-70B"),
+    "llama-3.1-70b": ("litellm", "Llama-3.1-70B"),
+    "openrouter-gpt-4o": ("litellm", "openrouter/openai/gpt-4o"),
+    "openrouter-gpt-4o-mini": ("litellm", "openrouter/openai/gpt-4o-mini"),
+    "openrouter-gpt-3.5-turbo": ("litellm", "openrouter/openai/gpt-3.5-turbo"),
 }
 
 def get_model_wrapper_from_nickname(nickname: str) -> tuple[str, str]:

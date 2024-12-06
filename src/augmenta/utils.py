@@ -234,7 +234,7 @@ def format_docs(
     return context_string
 
 
-def database_exists(collection_name: str, method: str) -> bool:
+def database_exists(collection_name: str, method: Literal["faiss", "chroma"]) -> bool:
     """
     Check if a vector database exists from the given collection name and method.
     """
@@ -249,7 +249,7 @@ def database_exists(collection_name: str, method: str) -> bool:
     return filepath.exists()
 
 
-def clear_database(collection_name: str, method: str) -> bool:
+def clear_database(collection_name: str, method: Literal["faiss", "chroma"]) -> bool:
     """
     Clear the database from the given collection name and method.
     """
@@ -270,7 +270,7 @@ def clear_database(collection_name: str, method: str) -> bool:
     return False
 
 
-def get_manifest_data(collection_name: str, method: str) -> dict | None:
+def get_manifest_data(collection_name: str, method: Literal["faiss", "chroma"]) -> dict | None:
     """
     Check if an entry exists in the manifest.json file.
     """
@@ -344,7 +344,7 @@ def get_db_collection_names(
 
 def update_manifest(
         embedding_model_name: str,
-        method: str,
+        method: Literal["faiss", "chroma"],
         chunk_size: int,
         chunk_overlap: int,
         inputs: list[str],

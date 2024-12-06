@@ -34,7 +34,11 @@ valid_litellm_models:
   - lmstudio/smollm2-1.7b-instruct
   - openrouter/meta-llama/llama-3.1-70b-instruct:free
   - Llama-3.1-Nemotron-70B
-  
+  - Llama-3.1-70B
+  - openrouter/openai/gpt-4o-mini
+  - openrouter/openai/gpt-4o
+  - openrouter/openai/gpt-3.5-turbo
+
 models:
   - key: get_openai_gpt4
     provider: openai
@@ -151,8 +155,27 @@ models:
     model: Llama-3.1-Nemotron-70B
     type: llm
     context_size: 16384
-
-
+  - key: llama-3.1-70b
+    provider: litellm
+    model: Llama-3.1-70B
+    type: llm
+    context_size: 16384
+  - key: openrouter-gpt-4o
+    provider: openrouter
+    model: openai/gpt-4o
+    type: llm
+    context_size: 128000
+  - key: openrouter-gpt-4o-mini
+    provider: openrouter
+    model: openai/gpt-4o-mini
+    type: llm
+    context_size: 128000
+  - key: openrouter-gpt-3.5-turbo
+    provider: openrouter
+    model: openai/gpt-3.5-turbo
+    type: llm
+    context_size: 128000
+  
   - key: get_openai_embedder_large
     provider: openai
     model: text-embedding-3-large

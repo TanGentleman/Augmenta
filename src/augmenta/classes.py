@@ -12,38 +12,6 @@ from . import utils
 logger = logging.getLogger(__name__)
 
 ACTIVE_JSON_FILE = "active.json"
-
-# VALID_LLM = Literal[
-#     "get_gemini_flash",
-#     "gemini",
-#     "get_openai_gpt4",
-#     "get_openai_gpt4_mini", 
-#     "get_together_dolphin",
-#     "get_together_qwen",
-#     "get_together_nous_mix",
-#     "get_together_fn_mix",
-#     "get_together_bigmix",
-#     "get_together_dbrx",
-#     "get_together_arctic",
-#     "get_together_llama3",
-#     "get_together_new_llama",
-#     "get_together_llama_400b",
-#     "get_together_deepseek_4k",
-#     "get_together_deepseek_32k",
-#     "get_deepseek_coder",
-#     "get_deepseek_chat",
-#     "get_openrouter_sonnet",
-#     "get_local_model",
-#     "get_ollama_llama3",
-#     "get_ollama_mistral",
-#     "get_local_llama_cpp"
-# ]
-
-# VALID_EMBEDDER = Literal["get_openai_embedder_large",
-#                          "get_together_embedder_large",
-#                          "get_ollama_local_embedder",
-#                          "get_lmstudio_local_embedder"]
-
 configValue = Union[str, int, float, bool]
 
 
