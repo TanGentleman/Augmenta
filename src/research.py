@@ -364,9 +364,14 @@ async def gen_answer(
     successful_results = [
         res for res in query_results if not isinstance(res, Exception)
     ]
-    all_query_results = {
-        res["url"]: res["content"] for results in successful_results for res in results
-    }
+    # all_query_results = {
+    #     res["url"]: res["content"] for results in successful_results for res in results
+    # }
+    all_query_results = {}
+    for results in successful_results:
+        for res in results:
+            if isinstance(res, dict) and "url" in res and "content" in res:
+                all_query_results[res["url"]] = res["content"]
     # We could be more precise about handling max token length if we wanted to here
     dumped = json.dumps(all_query_results)[:max_str_len]
     ai_message: AIMessage = queries["raw"]
@@ -512,7 +517,7 @@ class ResearchState(TypedDict):
     article: str
 async def main(main_topic: str = "Education Crisis in the US"):
     import logging
-    logging.basicConfig(level=logging.INFO)
+    logging.basicConfig(level=logging.ERROR)
     logger = logging.getLogger(__name__)
     # example_topic = "Education Crisis in the US"
     example_topic = main_topic
@@ -520,11 +525,13 @@ async def main(main_topic: str = "Education Crisis in the US"):
     # Generate initial outline
     initial_outline = await generate_outline_direct.ainvoke({"topic": example_topic})
     logger.info(f"Generated initial outline")
+    print(f"Generated initial outline")
     # print(initial_outline.as_str)
     
     # Get perspectives
     perspectives = await survey_subjects.ainvoke(example_topic)
     logger.info(f"Got perspectives")
+    print(f"Got perspectives")
     # Generate question
     # messages = [HumanMessage(f"So you said you were writing an article on {example_topic}?")]
     # question = await generate_question.ainvoke({
@@ -565,6 +572,7 @@ async def main(main_topic: str = "Education Crisis in the US"):
     
     final_state = next(iter(final_step.values()))
     logger.info(f"Conducted interviews")
+    print(f"Conducted interviews")
 
     # Refine outline
     refined_outline = await refine_outline_chain.ainvoke({
@@ -576,6 +584,7 @@ async def main(main_topic: str = "Education Crisis in the US"):
     })
     # print(refined_outline.as_str)
     logger.info(f"Refined outline")
+    print(f"Refined outline")
     
     # Setup embeddings and vectorstore
     embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
@@ -589,6 +598,7 @@ async def main(main_topic: str = "Education Crisis in the US"):
     )
     retriever = vectorstore.as_retriever(k=3)
     logger.info(f"Vector database setup complete.")
+    print(f"Vector database setup complete.")
 
 
     # Write section
@@ -614,6 +624,7 @@ async def main(main_topic: str = "Education Crisis in the US"):
         "topic": example_topic,
     })
     logger.info(f"Wrote section")
+    print(f"Wrote section")
     # print(section.as_str)
     
     # Generate final article
@@ -623,7 +634,13 @@ async def main(main_topic: str = "Education Crisis in the US"):
         # print(tok, end="")
     
     logger.info(f"Generated final article")
+    print(f"Generated final article")
     
+    # Save article content to markdown file
+    with open("article.md", "w", encoding="utf-8") as f:
+        f.write(article_content)
+    logger.info("Saved article content to article.md")
+    print("Saved article content to article.md")
     # Create PDF
     from fpdf import FPDF
 
@@ -642,65 +659,72 @@ async def main(main_topic: str = "Education Crisis in the US"):
             lines = text.split('\n')
             for line in lines:
                 if not line.strip():
-                    self.ln(5)
+                    self.ln(8)  # Increased spacing between paragraphs
                     continue
                     
-                # Headers
+                # Headers with improved spacing
                 if line.startswith('###'):
+                    self.ln(4)  # Space before header
                     self.set_font('DejaVu', 'B', font_size + 2)
                     self.multi_cell(0, 10, line.replace('###', '').strip())
-                    self.ln(3)
+                    self.ln(6)  # Space after header
                 elif line.startswith('##'):
+                    self.ln(6)
                     self.set_font('DejaVu', 'B', font_size + 4)
                     self.multi_cell(0, 10, line.replace('##', '').strip())
-                    self.ln(3)
+                    self.ln(8)
                 elif line.startswith('#'):
+                    self.ln(8)
                     self.set_font('DejaVu', 'B', font_size + 6)
                     self.multi_cell(0, 10, line.replace('#', '').strip())
-                    self.ln(3)
+                    self.ln(10)
                 else:
                     self.set_font('DejaVu', '', font_size)
                     self.multi_cell(0, 8, line.strip())
-                    self.ln(2)
+                    self.ln(3)  # Slightly increased line spacing
     try:
         # Create PDF
         pdf = MarkdownPDF()
         pdf.add_page()
 
-        # Title
+        # Title with more spacing
         pdf.set_font('DejaVu', 'B', 24)
+        pdf.ln(15)  # Space at top of page
         pdf.cell(0, 10, example_topic, ln=True, align='C')
-        pdf.ln(10)
+        pdf.ln(20)  # More space after title
 
-        # Initial Outline
+        # Initial Outline section
         pdf.set_font('DejaVu', 'B', 16)
         pdf.cell(0, 10, "Initial Outline", ln=True)
+        pdf.ln(5)
         pdf.markdown_text(initial_outline.as_str)
-        pdf.ln(10)
+        pdf.ln(15)  # More space between sections
 
-        # Refined Outline
+        # Refined Outline section
         pdf.set_font('DejaVu', 'B', 16)
         pdf.cell(0, 10, "Refined Outline", ln=True)
+        pdf.ln(5)
         pdf.markdown_text(refined_outline.as_str)
-        pdf.ln(10)
+        pdf.ln(15)
 
-        # Final Article
+        # Final Article section
         pdf.set_font('DejaVu', 'B', 16)
         pdf.cell(0, 10, "Final Article", ln=True)
+        pdf.ln(5)
         pdf.markdown_text(article_content)
 
-        # Save PDF
+        # Save and open PDF
         pdf.output("research_output.pdf")
         logger.info(f"PDF created")
-        # Open the file in the easiest way possible
+        print(f"PDF created")
         os.system("open research_output.pdf")
     except Exception as e:
-        logger.error(f"Failed to open create and open PDF: {e}")
+        logger.error(f"Failed to create and open PDF: {e}")
 
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser(description='Generate a research article on a given topic')
-    parser.add_argument('--topic', type=str, default="Education Crisis in the US",
+    parser.add_argument('topic', type=str, nargs='?', default="Education Crisis in the US",
                       help='Topic to research (default: "Education Crisis in the US")')
     args = parser.parse_args()
     
