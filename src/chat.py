@@ -16,13 +16,13 @@ from langchain.storage import InMemoryByteStore
 
 from paths import DOCUMENTS_DIR
 
-from . import rag
-from . import utils
-from .constants import HISTORY_CHAPTER_TO_PAGE_RANGE, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SYSTEM_MESSAGE_CODES, get_page_range_from_prompt
-from .config.config import DEFAULT_CONFIG_FILENAME, MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, OVERRIDE_FILENAME_KEY, SAVE_ONESHOT_RESPONSE, FILTER_TOPIC
-from .classes import Config
-from .models.models import LLM_FN, LLM
-from .chains import get_summary_chain, get_rag_chain, get_eval_chain
+from augmenta import rag
+from augmenta import utils
+from augmenta.constants import HISTORY_CHAPTER_TO_PAGE_RANGE, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SYSTEM_MESSAGE_CODES, get_page_range_from_prompt
+from augmenta.config.config import DEFAULT_CONFIG_FILENAME, MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, OVERRIDE_FILENAME_KEY, SAVE_ONESHOT_RESPONSE, FILTER_TOPIC
+from augmenta.classes import Config
+from augmenta.models.models import LLM_FN, LLM
+from augmenta.chains import get_summary_chain, get_rag_chain, get_eval_chain
 
 try:
     from paths import FLASHCARD_FILEPATH
