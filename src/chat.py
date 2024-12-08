@@ -21,7 +21,7 @@ from augmenta import utils
 from augmenta.constants import HISTORY_CHAPTER_TO_PAGE_RANGE, MAX_CHARS_IN_PROMPT, MAX_CHAT_EXCHANGES, PROMPT_CHOOSER_SYSTEM_MESSAGE, RAG_COLLECTION_TO_SYSTEM_MESSAGE, SYSTEM_MESSAGE_CODES, get_page_range_from_prompt
 from augmenta.config.config import DEFAULT_CONFIG_FILENAME, MAX_CHARACTERS_IN_PARENT_DOC, MAX_PARENT_DOCS, OVERRIDE_FILENAME_KEY, SAVE_ONESHOT_RESPONSE, FILTER_TOPIC
 from augmenta.classes import Config
-from augmenta.models.models import LLM_FN, LLM
+from augmenta.models.models import LLM_FN, LLM, ALL_MODELS
 from augmenta.chains import get_summary_chain, get_rag_chain, get_eval_chain
 
 try:
@@ -87,7 +87,8 @@ COMMAND_LIST = [
     ".eval",
     ".a",
     ".pick",
-    ".flush"
+    ".flush",
+    ".m"
 ]
 
 COMMAND_HELP_MESSAGE = """Commands:
@@ -110,6 +111,7 @@ COMMAND_HELP_MESSAGE = """Commands:
     - .pick: Select chat exchanges to remove.
     - .eval: Evaluates the vectorstore.
     - .a: Amnesia mode.
+    - .m: Display available models.
 """
 
 
@@ -746,6 +748,7 @@ class Chatbot:
         - .pick: Select chat exchanges to remove.
         - .eval: Evaluates the vectorstore.
         - .a: Amnesia mode.
+        - .m: Display available models.
         """
         assert prompt in COMMAND_LIST, "Invalid command"
         print("Executing command")
@@ -936,6 +939,15 @@ class Chatbot:
             else:
                 self.chat_model = LLM(self.config.chat_settings.primary_model)
                 self.set_messages()
+            return
+        # Display available models
+        elif prompt == ".m":
+            # TODO: Add model swap - think with LangGraph concepts
+            print("Available models (swapper coming soon):")
+            for provider, model_list in ALL_MODELS["providers"].items():
+                print(f"- {provider}:")
+                for model_name in model_list:
+                    print(f"  - {model_name}")
             return
         else:
             print(f'Invalid command:{prompt}')
