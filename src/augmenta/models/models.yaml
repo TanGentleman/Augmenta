@@ -2,10 +2,8 @@
 # Supported types: llm, embedder
 valid_together_models:
   - cognitivecomputations/dolphin-2.5-mixtral-8x7b
-  - Qwen/Qwen2-72B-Instruct
-  - NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO
+  - Qwen/Qwen2.5-72B-Instruct-Turbo
   - mistralai/Mixtral-8x7B-Instruct-v0.1
-  - mistralai/Mixtral-8x22B-Instruct-v0.1
   - databricks/dbrx-instruct
   - meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo
   - meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo
@@ -35,145 +33,117 @@ valid_litellm_models:
   - openrouter/meta-llama/llama-3.1-70b-instruct:free
   - Llama-3.1-Nemotron-70B
   - Llama-3.1-70B
+
   - openrouter/openai/gpt-4o-mini
   - openrouter/openai/gpt-4o
   - openrouter/openai/gpt-3.5-turbo
+  - sambanova/Qwen2.5-Coder-32B-Instruct
+  - sambanova/Qwen2.5-72B-Instruct
+  - sambanova/Meta-Llama-3.2-1B-Instruct
+  - sambanova/Meta-Llama-3.2-3B-Instruct
+  - sambanova/Llama-3.2-11B-Vision-Instruct
+  - sambanova/Llama-3.2-90B-Vision-Instruct
+  - sambanova/Meta-Llama-3.1-8B-Instruct
+  - sambanova/Meta-Llama-3.1-70B-Instruct
+  - sambanova/Meta-Llama-3.1-405B-Instruct
+  - sambanova/Meta-Llama-Guard-3-8B
 
 models:
   - key: get_openai_gpt4
     provider: openai
-    type: llm
     model: gpt-4o
     context_size: 128000
   - key: get_openai_gpt4_mini
     provider: openai
-    type: llm
     model: gpt-4o-mini
     context_size: 128000
   - key: get_together_dolphin
     provider: together
     model: cognitivecomputations/dolphin-2.5-mixtral-8x7b
-    type: llm
     context_size: 32768
   - key: get_together_qwen
     provider: together
-    model: Qwen/Qwen2-72B-Instruct
-    type: llm
+    model: Qwen/Qwen2.5-72B-Instruct-Turbo
     context_size: 4096
-  - key: get_together_nous_mix
-    provider: together
-    model: NousResearch/Nous-Hermes-2-Mixtral-8x7B-DPO
-    type: llm
-    context_size: 32768
   - key: get_together_fn_mix
     provider: together
     model: mistralai/Mixtral-8x7B-Instruct-v0.1
-    type: llm
     context_size: 32768
-  - key: get_together_bigmix
-    provider: together
-    model: mistralai/Mixtral-8x22B-Instruct-v0.1
-    type: llm
-    context_size: 65536
   - key: get_together_dbrx
     provider: together
     model: databricks/dbrx-instruct
-    type: llm
     context_size: 32768
   - key: get_together_new_llama
     provider: together
     model: meta-llama/Meta-Llama-3.1-70B-Instruct-Turbo
-    type: llm
     context_size: 8192
   - key: get_together_llama_400b
     provider: together
     model: meta-llama/Meta-Llama-3.1-405B-Instruct-Turbo
-    type: llm
     context_size: 4096
   - key: get_together_deepseek_4k
     provider: together
     model: deepseek-ai/deepseek-llm-67b-chat
-    type: llm
     context_size: 4096
   - key: get_together_deepseek_32k
     provider: together
     model: deepseek-ai/deepseek-coder-33b-instruct
-    type: llm
     context_size: 32768
   - key: get_deepseek_coder
     provider: deepseek
     model: deepseek-coder
-    type: llm
     context_size: 128000
   - key: get_deepseek_chat
     provider: deepseek
     model: deepseek-chat
-    type: llm
     context_size: 128000
   - key: get_openrouter_sonnet
     provider: deepseek
     model: anthropic/claude-3.5-sonnet
-    type: llm
     context_size: 200000
   - key: get_ollama_llama3
     provider: ollama
     model: llama3
-    type: llm
     context_size: 4096
   - key: get_ollama_mistral
     provider: ollama
     model: mistral:7b-instruct-v0.3-q6_K
-    type: llm
-    context_size: 4096
-  - key: get_local_llama_cpp
-    provider: local
-    model: local-model
-    type: llm
     context_size: 4096
   - key: get_gemini_litellm
     provider: litellm
     model: openrouter/google/gemini-flash-1.5
-    type: llm
     context_size: 1000000
   - key: gemini
     provider: openrouter
     model: google/gemini-flash-1.5
-    type: llm
     context_size: 1000000
   - key: smol
     provider: litellm
     model: lmstudio/smollm2-1.7b-instruct
-    type: llm
     context_size: 4096
   - key: samba
     provider: litellm
     model: openrouter/meta-llama/llama-3.1-70b-instruct:free
-    type: llm
     context_size: 8192
   - key: llama
     provider: litellm
     model: Llama-3.1-Nemotron-70B
-    type: llm
     context_size: 16384
   - key: llama-3.1-70b
     provider: litellm
     model: Llama-3.1-70B
-    type: llm
     context_size: 16384
   - key: openrouter-gpt-4o
     provider: openrouter
     model: openai/gpt-4o
-    type: llm
     context_size: 128000
   - key: openrouter-gpt-4o-mini
     provider: openrouter
     model: openai/gpt-4o-mini
-    type: llm
     context_size: 128000
   - key: openrouter-gpt-3.5-turbo
     provider: openrouter
     model: openai/gpt-3.5-turbo
-    type: llm
     context_size: 128000
   
   - key: get_openai_embedder_large

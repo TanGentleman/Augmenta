@@ -23,26 +23,74 @@ from langchain.callbacks.manager import CallbackManager
 import yaml
 logger = logging.getLogger(__name__)
 
-## NEW ##
+NICKNAME_TO_MODEL_INFO = {
+    "samba": ("litellm", "openrouter/meta-llama/llama-3.1-70b-instruct:free"),
+    "smol": ("litellm", "lmstudio/smollm2-1.7b-instruct"),
+    "qwen": ("together", "Qwen/Qwen2.5-72B-Instruct-Turbo"),
+    "gemini": ("openrouter", "google/gemini-flash-1.5"),
+    "llama": ("litellm", "Llama-3.1-Nemotron-70B"),
+    "llama-3.1-70b": ("litellm", "Llama-3.1-70B"),
+    "openrouter-gpt-4o": ("litellm", "openrouter/openai/gpt-4o"),
+    "openrouter-gpt-4o-mini": ("litellm", "openrouter/openai/gpt-4o-mini"),
+    "openrouter-gpt-3.5-turbo": ("litellm", "openrouter/openai/gpt-3.5-turbo"),
+}
+
 def get_model_config_from_yaml(filename: str):
+    """Load and validate model configuration from YAML file."""
     with open(MODELS_YAML_PATH, 'r') as f:
         models_config = yaml.safe_load(f)
-    # Make assertions about the structure of the yaml file
-    if 'models' not in models_config:
-        raise ValueError("models key not found in models.yaml")
+    
+    required_keys = ['models', 'valid_together_models', 'valid_openai_models', 
+                    'valid_deepseek_models', 'valid_openrouter_models',
+                    'valid_ollama_models', 'valid_litellm_models']
+    
+    for key in required_keys:
+        if key not in models_config:
+            raise ValueError(f"{key} not found in models.yaml")
+            
     return models_config
 
 MODEL_CONFIG = get_model_config_from_yaml('models.yaml')
 
+# Build provider-to-models mapping
+ALL_MODELS = {
+    "providers": {
+        "openai": MODEL_CONFIG['valid_openai_models'],
+        "together": MODEL_CONFIG['valid_together_models'], 
+        "deepseek": MODEL_CONFIG['valid_deepseek_models'],
+        "openrouter": MODEL_CONFIG['valid_openrouter_models'],
+        "ollama": MODEL_CONFIG['valid_ollama_models'],
+        "litellm": MODEL_CONFIG['valid_litellm_models']
+    }
+}
+
 def get_model_dict():
+    """Create a comprehensive model dictionary from valid models and model configs."""
     model_dict = {}
-    for model in MODEL_CONFIG['models']:
-        model_dict[model['key']] = {
-            'provider': model['provider'],
-            'model_name': model['model'],
-            'context_size': model.get('context_size', 4096),
-            'model_type': model.get('model_type', 'llm')
-        }
+    
+    # First populate from valid provider models
+    for provider, models in ALL_MODELS["providers"].items():
+        for model_name in models:
+            model_dict[model_name] = {
+                'provider': provider,
+                'model_name': model_name,
+                'context_size': 4096,  # Default context size
+                'model_type': 'llm'    # Default type
+            }
+    
+    # Then update/override with specific configurations from models list
+    for model_config in MODEL_CONFIG['models']:
+        model_name = model_config['model']
+        key = model_config['key']
+        
+        # Only update if model name matches key
+        if model_name in model_dict:
+            model_dict[key] = {
+                'provider': model_config['provider'],
+                'model_name': model_name,
+                'context_size': model_config.get('context_size', 4096),
+                'model_type': model_config.get('type', 'llm')
+            }
     return model_dict
 
 MODEL_DICT = get_model_dict()
@@ -61,16 +109,7 @@ TOGETHER_BASE_URL = "https://api.together.xyz"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
 LITELLM_BASE_URL = "http://localhost:4000/v1"
 
-ALL_MODELS = {
-    "providers": {
-        "openai": MODEL_CONFIG['valid_openai_models'],
-        "together": MODEL_CONFIG['valid_together_models'],
-        "deepseek": MODEL_CONFIG['valid_deepseek_models'],
-        "openrouter": MODEL_CONFIG['valid_openrouter_models'],
-        "ollama": MODEL_CONFIG['valid_ollama_models'],
-        "litellm": MODEL_CONFIG['valid_litellm_models']
-    }
-}
+
 
 VALID_TOGETHER_MODELS = ALL_MODELS["providers"]["together"]
 VALID_OPENAI_MODELS = ALL_MODELS["providers"]["openai"]
@@ -150,12 +189,7 @@ def validate_model_name(provider: str, model_name: str):
     else:
         raise ValueError("Invalid provider")
 
-def get_model_wrapper(provider: str, model_name: str, hyperparameters=None, validate: bool = True):
-    ENFORCE_STREAMING_CALLBACK = False
-    if ENFORCE_STREAMING_CALLBACK:
-        callback_manager = CallbackManager([StreamingStdOutCallbackHandler()])
-    else:
-        callback_manager = None
+def get_model_wrapper(provider: str, model_name: str, hyperparameters=None, validate: bool = True, callback_printer: bool = False):
     if validate:
         validate_model_name(provider, model_name)
     def wrapped_function(hyperparameters=hyperparameters):
@@ -167,7 +201,7 @@ def get_model_wrapper(provider: str, model_name: str, hyperparameters=None, vali
             temperature=temperature,
             max_tokens=max_tokens,
             streaming=True,
-            callback_manager=callback_manager
+            callbacks=[StreamingStdOutCallbackHandler()] if callback_printer else None
         )
     return wrapped_function
 
@@ -238,17 +272,7 @@ def get_lmstudio_local_embedder(hyperparameters=None) -> OpenAIEmbeddings:
         api_key="LOCAL-API-KEY"
     )
 
-NICKNAME_TO_MODEL_INFO = {
-    "samba": ("litellm", "openrouter/meta-llama/llama-3.1-70b-instruct:free"),
-    "smol": ("litellm", "lmstudio/smollm2-1.7b-instruct"),
-    "qwen": ("together", "Qwen/Qwen2-72B-Instruct"),
-    "gemini": ("openrouter", "google/gemini-flash-1.5"),
-    "llama": ("litellm", "Llama-3.1-Nemotron-70B"),
-    "llama-3.1-70b": ("litellm", "Llama-3.1-70B"),
-    "openrouter-gpt-4o": ("litellm", "openrouter/openai/gpt-4o"),
-    "openrouter-gpt-4o-mini": ("litellm", "openrouter/openai/gpt-4o-mini"),
-    "openrouter-gpt-3.5-turbo": ("litellm", "openrouter/openai/gpt-3.5-turbo"),
-}
+
 
 def get_model_wrapper_from_nickname(nickname: str) -> tuple[str, str]:
     if nickname not in NICKNAME_TO_MODEL_INFO:
