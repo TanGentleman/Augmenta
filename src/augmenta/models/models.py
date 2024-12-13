@@ -7,6 +7,7 @@
 
 from os import getenv, path
 import logging
+from typing import Callable
 
 from langchain_openai import ChatOpenAI, OpenAIEmbeddings
 from langchain_together import TogetherEmbeddings
@@ -28,8 +29,8 @@ NICKNAME_TO_MODEL_INFO = {
     "smol": ("litellm", "lmstudio/smollm2-1.7b-instruct"),
     "qwen": ("together", "Qwen/Qwen2.5-72B-Instruct-Turbo"),
     "gemini": ("openrouter", "google/gemini-flash-1.5"),
-    "llama": ("litellm", "Llama-3.1-Nemotron-70B"),
-    "llama-3.1-70b": ("litellm", "Llama-3.1-70B"),
+    "llama-nemotron": ("litellm", "Llama-3.1-Nemotron-70B"),
+    "llama": ("litellm", "Llama-3.3-70B"),
     "openrouter-gpt-4o": ("litellm", "openrouter/openai/gpt-4o"),
     "openrouter-gpt-4o-mini": ("litellm", "openrouter/openai/gpt-4o-mini"),
     "openrouter-gpt-3.5-turbo": ("litellm", "openrouter/openai/gpt-3.5-turbo"),
@@ -274,7 +275,7 @@ def get_lmstudio_local_embedder(hyperparameters=None) -> OpenAIEmbeddings:
 
 
 
-def get_model_wrapper_from_nickname(nickname: str) -> tuple[str, str]:
+def get_model_wrapper_from_nickname(nickname: str) -> Callable[[], ChatOpenAI]:
     if nickname not in NICKNAME_TO_MODEL_INFO:
         raise ValueError(f"Invalid nickname: {nickname}")
     provider, model_name = NICKNAME_TO_MODEL_INFO[nickname]
@@ -297,40 +298,52 @@ def model_name_from_key(model_key: str) -> str | None:
 
 # Create class LLM_FN that takes a function that is a value in MODEL_DICT
 class LLM_FN:
-    def __init__(self, model_fn=None, hyperparameters=None, model_experimental: str | None = None):
+    def __init__(self, model_experimental: str | None = None, model_fn: Callable[[], ChatOpenAI] | None = None, hyperparameters=None):
         if hyperparameters is not None and not isinstance(hyperparameters, dict):
             raise ValueError("Hyperparameters must be a dictionary")
+            
+        # Handle nickname models first
+        # if model_experimental in NICKNAME_TO_MODEL_INFO:
+        #     model_fn = get_model_wrapper_from_nickname(model_experimental)
+        #     model_experimental = None
         
+        # Handle experimental model string
         if model_experimental is not None:
-            assert model_fn is None, "model_fn must be None if model_experimental is not None"
+            if model_fn is not None:
+                raise ValueError("Cannot specify both model_fn and model_experimental")
+                
             if model_experimental in MODEL_CODES:
                 model_experimental = MODEL_CODES[model_experimental]
                 
-        # Find matching model in MODEL_DICT
-        for key, info in MODEL_DICT.items():
-            if model_fn is not None:
-                # NOTE: Deprecated method
-                # Get provider and model name from MODEL_DICT
-                provider = info['provider']
-                model_name = info['model_name']
-                # Create wrapper function for comparison
-                wrapper = get_model_wrapper(provider, model_name)
-                if model_fn == wrapper:
-                    self.model_name = str(info["model_name"])
-                    self.context_size = int(info["context_size"])
-                    self.model_fn = model_fn
-                    break
-            elif model_experimental is not None:
+            # Look up model by key or model name
+            for key, info in MODEL_DICT.items():
                 if key == model_experimental or info["model_name"] == model_experimental:
                     provider = info['provider']
                     model_name = info['model_name']
                     self.model_fn = get_model_wrapper(provider, model_name)
-                    self.model_name = str(info["model_name"])
-                    self.context_size = int(info["context_size"])
+                    self.model_name = model_name
+                    self.context_size = info["context_size"]
                     break
+            else:
+                raise ValueError(f"Model '{model_experimental}' not found in MODEL_DICT")
+                
+        # Handle model_fn (deprecated method)
+        elif model_fn is not None:
+            # Try to find matching model in MODEL_DICT
+            for info in MODEL_DICT.values():
+                provider = info['provider']
+                model_name = info['model_name']
+                wrapper = get_model_wrapper(provider, model_name)
+                if model_fn == wrapper:
+                    self.model_fn = model_fn
+                    self.model_name = model_name
+                    self.context_size = info["context_size"]
+                    break
+            else:
+                raise ValueError("Provided model_fn does not match any model in MODEL_DICT")
         else:
-            raise ValueError("Model not found in MODEL_DICT")
-        
+            raise ValueError("Must specify either model_fn or model_experimental")
+            
         self.hyperparameters = hyperparameters
         MODEL_NAMES = [model["model_name"] for model in MODEL_DICT.values()]
         assert self.model_name in MODEL_NAMES
