@@ -4,9 +4,10 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langgraph.graph.state import CompiledStateGraph
 import logging
 
+from agents.template import INITIAL_STATE_DICT
 from augmenta.models.models import LLM, LLM_FN
 
-from .graph_classes import GraphState, Config, AgentState, Task, Command, CommandType, TaskStatus
+from .graph_classes import GraphState, Config, AgentState, Task, Command, CommandType, TaskStatus, TaskType
 from .utils.message_utils import insert_system_message, remove_last_message, clear_messages
 from .utils.action_utils import execute_action
 
@@ -31,6 +32,8 @@ def execute_command_node(state: GraphState) -> GraphState:
     cmd_type = command.type
     
     if cmd_type == CommandType.QUIT:
+        # TODO: Change the status here to Quit
+        # Task manager will decide in-progress, done, or failed
         for task in state_dict["task_dict"].values():
             task["status"] = TaskStatus.DONE
             
@@ -86,22 +89,24 @@ def execute_command_node(state: GraphState) -> GraphState:
 
 def start_node(state: GraphState) -> GraphState:
     """Initialize the graph state with configuration and default task"""
-    config = Config()
-    default_task: Task = {
-        "status": TaskStatus.IN_PROGRESS,
-        "conditions": ["$"],
-        "actions": []
-    }
+    # config = Config()
+    # default_task: Task = {
+    #     "type": TaskType.CHAT,
+    #     "status": TaskStatus.IN_PROGRESS,
+    #     "conditions": ["$"],
+    #     "actions": []
+    # }
     
-    initial_state: AgentState = {
-        "config": config,
-        "messages": [],
-        "action_count": 0,
-        "active_chain": None,
-        "tool_choice": None,
-        "task_dict": {"chat_task": default_task},
-        "user_input": None
-    }
+    # initial_state: AgentState = {
+    #     "config": config,
+    #     "messages": [],
+    #     "action_count": 0,
+    #     "active_chain": None,
+    #     "tool_choice": None,
+    #     "task_dict": {"chat_task": default_task},
+    #     "user_input": None
+    # }
+    initial_state = INITIAL_STATE_DICT
 
     # NOTE: Right now this is replacing ALL initial graph state except for the mutation count
     return {
@@ -124,7 +129,7 @@ def agent_node(state: GraphState) -> GraphState:
             current_task["status"] = TaskStatus.FAILED
     
     # Handle initialization
-    if state["mutation_count"] == 1 and state_dict["config"].chat_settings.enable_system_message:
+    if state["mutation_count"] == 1 and not state_dict["config"].chat_settings.disable_system_message:
         insert_system_message(
             state_dict["messages"],
             state_dict["config"].chat_settings.system_message
@@ -193,14 +198,27 @@ def processor_node(state: GraphState) -> GraphState:
         current_task = next((task for task in task_dict.values() if task["status"] == TaskStatus.IN_PROGRESS), None)
         if not current_task:
             raise ValueError("No in-progress task found")
-        current_task["actions"].append("generate")
-        if state_dict["active_chain"] is None:
-            try:
-                llm = LLM(LLM_FN(state_dict["config"].chat_settings.primary_model))
-                state_dict["active_chain"] = llm
-            except Exception as e:
-                print(f"Error: {e}")
-                return ValueError("Error initializing LLM")
+        # UPDATE STATE BASED ON TASK TYPE
+        if current_task["type"] == TaskType.CHAT:
+            if state_dict["active_chain"] is None:
+                try:
+                    llm = LLM(LLM_FN(state_dict["config"].chat_settings.primary_model))
+                    state_dict["active_chain"] = llm
+                except Exception as e:
+                    print(f"Error: {e}")
+                    return ValueError("Error initializing LLM")
+            current_task["actions"].append("generate")
+
+        elif current_task["type"] == TaskType.RAG:
+            # TODO: Add RAG logic here
+            if state_dict["config"].rag_settings.enabled:
+                print("RAG task. Doing nothing for now.")
+                pass
+            else:
+                print("ERROR: RAG task is disabled!")
+                raise ValueError("RAG task is disabled!")
+        else:
+            raise ValueError("Current task is not a chat task")
     
     return {
         "keys": state_dict,

@@ -6,7 +6,7 @@ from enum import Enum
 
 class ChatSettings(BaseModel):
     """Chat-specific configuration settings"""
-    primary_model: str = "qwen"
+    primary_model: str = "llama"
     stream: bool = True
     enable_system_message: bool = False
     system_message: str = ""
@@ -24,12 +24,20 @@ class Config(BaseModel):
 
 class TaskStatus(Enum):
     """Status values for tasks in the system"""
+    NOT_STARTED = "not_started"
     IN_PROGRESS = "in_progress"
     DONE = "done" 
     FAILED = "failed"
 
+class TaskType(Enum):
+    """Types of tasks in the system"""
+    CHAT = "chat"
+    RAG = "rag"
+
+
 class Task(TypedDict):
     """Represents a single task in the system"""
+    type: TaskType
     status: TaskStatus
     conditions: list[str]
     actions: list[str]
