@@ -8,7 +8,42 @@ from .graph_classes import GraphState, Config, AgentState, Task, ActionType, Act
 
 # Constants
 MAX_MUTATIONS = 20
-MAX_RESPONSES = 3
+
+def insert_system_message(messages: list, system_content: str) -> None:
+    """Insert or update system message at start of messages list."""
+    if not messages:
+        messages.append(SystemMessage(content=system_content))
+    elif isinstance(messages[0], SystemMessage):
+        messages[0] = SystemMessage(content=system_content)
+    else:
+        messages.insert(0, SystemMessage(content=system_content))
+
+def remove_last_message(messages: list) -> None:
+    """Remove last non-system message from messages list."""
+    if not messages:
+        return
+        
+    # Don't remove system message if it's the only message
+    if len(messages) == 1 and isinstance(messages[0], SystemMessage):
+        return
+        
+    # Remove last non-system message
+    for i in range(len(messages)-1, -1, -1):
+        if not isinstance(messages[i], SystemMessage):
+            messages.pop(i)
+            break
+
+def clear_messages(messages: list, preserve_system: bool = True) -> None:
+    """Clear messages list, optionally preserving system message."""
+    if not messages:
+        return
+        
+    if preserve_system and isinstance(messages[0], SystemMessage):
+        system_msg = messages[0]
+        messages.clear()
+        messages.append(system_msg)
+    else:
+        messages.clear()
 
 def process_command_node(state: GraphState) -> GraphState:
     """Process a command and update state"""
@@ -35,7 +70,7 @@ def process_command_node(state: GraphState) -> GraphState:
             print(f"/{cmd.value}")
             
     elif cmd_type == CommandType.CLEAR:
-        state_dict["messages"] = []
+        clear_messages(state_dict["messages"])
         
     elif cmd_type == CommandType.SETTINGS:
         print("\nCurrent Settings:")
@@ -55,9 +90,8 @@ def process_command_node(state: GraphState) -> GraphState:
         print(f"Tasks: {state_dict['task_dict']}")
         
     elif cmd_type == CommandType.RETRY:
-        if state_dict["messages"]:
-            state_dict["messages"].pop()
-            
+        remove_last_message(state_dict["messages"])
+        
     elif cmd_type == CommandType.UNDO:
         if state_dict["messages"]:
             state_dict["messages"] = state_dict["messages"][:-2]
@@ -115,10 +149,9 @@ def agent_node(state: GraphState) -> GraphState:
     
     # Handle initialization
     if state["mutation_count"] == 1 and state_dict["config"].chat_settings.enable_system_message:
-        print("Adding system message")
-        # TODO: Add assertions / checks on messages array?
-        state_dict["messages"].append(
-            SystemMessage(content=state_dict["config"].chat_settings.system_message)
+        insert_system_message(
+            state_dict["messages"],
+            state_dict["config"].chat_settings.system_message
         )
 
     return {
@@ -355,7 +388,7 @@ def main():
     
     initial_state: GraphState = {
         "keys": {},
-        "mutation_count": 19,
+        "mutation_count": 0,
         "is_done": False
     }
     
