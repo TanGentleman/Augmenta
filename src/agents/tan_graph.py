@@ -1,8 +1,10 @@
-from typing import Literal, Dict, Any, Optional
+from typing import Literal
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langgraph.graph.state import CompiledStateGraph
 import logging
+
+from augmenta.models.models import LLM, LLM_FN
 
 from .graph_classes import GraphState, Config, AgentState, Task, Command, CommandType, TaskStatus
 from .utils.message_utils import insert_system_message, remove_last_message, clear_messages
@@ -192,6 +194,13 @@ def processor_node(state: GraphState) -> GraphState:
         if not current_task:
             raise ValueError("No in-progress task found")
         current_task["actions"].append("generate")
+        if state_dict["active_chain"] is None:
+            try:
+                llm = LLM(LLM_FN(state_dict["config"].chat_settings.primary_model))
+                state_dict["active_chain"] = llm
+            except Exception as e:
+                print(f"Error: {e}")
+                return ValueError("Error initializing LLM")
     
     return {
         "keys": state_dict,
@@ -222,10 +231,17 @@ def action_node(state: GraphState) -> GraphState:
     # Get next action and execute it
     action = current_task["actions"].pop(0)
     result = execute_action(action, state_dict)
+    logging.info(result)
     
     if result["success"]:
         logging.info(f"Action succeeded: {result['data']}")
         state_dict["action_count"] += 1
+
+        if action == "generate":
+            # TODO: Handle more complex chains here!
+            response_string = result["data"]
+            state_dict["messages"].append(AIMessage(content=response_string))
+        
         if state_dict["action_count"] > MAX_ACTIONS:
             logging.error("Action count exceeded max actions, marking task as failed")
             current_task["status"] = TaskStatus.FAILED
@@ -275,7 +291,8 @@ def create_workflow() -> CompiledStateGraph:
     workflow.add_node("action_node", action_node)
     
     # Add edges
-    workflow.set_entry_point("start_node")
+    # workflow.set_entry_point("start_node")
+    workflow.add_edge(START, "start_node")
     workflow.add_edge("start_node", "agent_node")
     
     workflow.add_conditional_edges(
@@ -347,5 +364,7 @@ def save_graph():
         pass
 
 if __name__ == "__main__":
+    from dotenv import load_dotenv
+    load_dotenv()
     main()
     # save_graph()

@@ -1,3 +1,4 @@
+import logging
 from typing import Optional
 from typing_extensions import TypedDict
 from pydantic import BaseModel
@@ -5,7 +6,7 @@ from enum import Enum
 
 class ChatSettings(BaseModel):
     """Chat-specific configuration settings"""
-    primary_model: str = "gpt-3.5-turbo"
+    primary_model: str = "qwen"
     stream: bool = True
     enable_system_message: bool = False
     system_message: str = ""
