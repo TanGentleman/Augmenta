@@ -5,6 +5,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent
 FLASH_DIR = ROOT_DIR / "flash"
 AUGMENTA_DIR = ROOT_DIR / "augmenta"
+AGENTS_DIR = ROOT_DIR / "agents"
 
 # Flash module paths
 FLASHCARD_FILEPATH = FLASH_DIR / "flashcards.json"
@@ -45,6 +46,7 @@ def ensure_valid_framework():
     TEXT_FILE_DIR.mkdir(exist_ok=True)
     CHROMA_FOLDER_PATH.mkdir(exist_ok=True)
     FAISS_FOLDER_PATH.mkdir(exist_ok=True)
+    AGENTS_DIR.mkdir(exist_ok=True)
 
     # Create manifest.json if it doesn't exist
     if not MANIFEST_FILEPATH.exists():

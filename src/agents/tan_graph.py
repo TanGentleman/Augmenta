@@ -9,10 +9,11 @@ from .utils.message_utils import insert_system_message, remove_last_message, cle
 from .utils.action_utils import execute_action
 
 # Constants
-MAX_MUTATIONS = 20
+RECURSION_LIMIT = 50
+MAX_MUTATIONS = 50
 MAX_ACTIONS = 5
 
-def process_command_node(state: GraphState) -> GraphState:
+def execute_command_node(state: GraphState) -> GraphState:
     """Process a command and update state"""
     state_dict = state["keys"]
     command = Command(state_dict["user_input"])
@@ -46,6 +47,12 @@ def process_command_node(state: GraphState) -> GraphState:
     elif cmd_type == CommandType.SAVE:
         # Implement save state logic
         print("Saving state...")
+        print("\nMessages:")
+        for message in state_dict["messages"]:
+            if isinstance(message, HumanMessage):
+                print(f"Human: {message.content}")
+            elif isinstance(message, AIMessage):
+                print(f"AI: {message.content}")
         
     elif cmd_type == CommandType.LOAD:
         # Implement load state logic
@@ -192,9 +199,9 @@ def processor_node(state: GraphState) -> GraphState:
         "is_done": False
     }
 
-def decide_from_processor(state: GraphState) -> Literal["process_command", "agent_node"]:
+def decide_from_processor(state: GraphState) -> Literal["execute_command", "agent_node"]:
     """Routes from processor based on input type"""
-    return "process_command" if state["keys"]["user_input"].startswith('/') else "agent_node"
+    return "execute_command" if state["keys"]["user_input"].startswith('/') else "agent_node"
 
 def action_node(state: GraphState) -> GraphState:
     """Executes in-progress actions in the current task"""
@@ -264,7 +271,7 @@ def create_workflow() -> CompiledStateGraph:
     workflow.add_node("task_manager", task_manager_node)
     workflow.add_node("human_node", human_node)
     workflow.add_node("processor_node", processor_node)
-    workflow.add_node("process_command", process_command_node)
+    workflow.add_node("execute_command", execute_command_node)
     workflow.add_node("action_node", action_node)
     
     # Add edges
@@ -287,11 +294,11 @@ def create_workflow() -> CompiledStateGraph:
         "processor_node",
         decide_from_processor,
         {
-            "process_command": "process_command",
+            "execute_command": "execute_command",
             "agent_node": "agent_node"
         }
     )
-    workflow.add_edge("process_command", "agent_node")
+    workflow.add_edge("execute_command", "agent_node")
     workflow.add_edge("action_node", "agent_node")
     workflow.add_edge("task_manager", "agent_node")
     
@@ -307,8 +314,10 @@ def main():
         "mutation_count": 0,
         "is_done": False
     }
+
+    app_config = {"recursion_limit": RECURSION_LIMIT}
     
-    for output in app.stream(initial_state):
+    for output in app.stream(initial_state, app_config):
         for key, value in output.items():
             print(f"\nNode: {key}")
             print(f"Mutations: {value['mutation_count']}")
@@ -324,9 +333,11 @@ def main():
     print("Workflow completed.")
 
 def save_graph():
-    # app = workflow.compile()
-    file_path = "graph_mermaids/agent_graph.png"
+    VERSION = "v3"
+    filename = f"agent_graph_{VERSION}.png"
     try:
+        from paths import AGENTS_DIR
+        file_path = AGENTS_DIR / "graph_mermaids" / filename
         app = create_workflow()
         app.get_graph().draw_mermaid_png(output_file_path=file_path)
         print(f"Graph saved to {file_path}")
