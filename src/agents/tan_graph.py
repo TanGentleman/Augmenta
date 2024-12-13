@@ -4,47 +4,13 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langgraph.graph.state import CompiledStateGraph
 import logging
 
-from .graph_classes import GraphState, Config, AgentState, Task, ActionType, ActionResult, Command, CommandType, TaskStatus
+from .graph_classes import GraphState, Config, AgentState, Task, Command, CommandType, TaskStatus
+from .utils.message_utils import insert_system_message, remove_last_message, clear_messages
+from .utils.action_utils import execute_action
 
 # Constants
 MAX_MUTATIONS = 20
 MAX_ACTIONS = 5
-
-def insert_system_message(messages: list, system_content: str) -> None:
-    """Insert or update system message at start of messages list."""
-    if not messages:
-        messages.append(SystemMessage(content=system_content))
-    elif isinstance(messages[0], SystemMessage):
-        messages[0] = SystemMessage(content=system_content)
-    else:
-        messages.insert(0, SystemMessage(content=system_content))
-
-def remove_last_message(messages: list) -> None:
-    """Remove last non-system message from messages list."""
-    if not messages:
-        return
-        
-    # Don't remove system message if it's the only message
-    if len(messages) == 1 and isinstance(messages[0], SystemMessage):
-        return
-        
-    # Remove last non-system message
-    for i in range(len(messages)-1, -1, -1):
-        if not isinstance(messages[i], SystemMessage):
-            messages.pop(i)
-            break
-
-def clear_messages(messages: list, preserve_system: bool = True) -> None:
-    """Clear messages list, optionally preserving system message."""
-    if not messages:
-        return
-        
-    if preserve_system and isinstance(messages[0], SystemMessage):
-        system_msg = messages[0]
-        messages.clear()
-        messages.append(system_msg)
-    else:
-        messages.clear()
 
 def process_command_node(state: GraphState) -> GraphState:
     """Process a command and update state"""
@@ -121,7 +87,7 @@ def start_node(state: GraphState) -> GraphState:
     initial_state: AgentState = {
         "config": config,
         "messages": [],
-        "response_count": 0,
+        "action_count": 0,
         "active_chain": None,
         "tool_choice": None,
         "task_dict": {"chat_task": default_task},
@@ -226,66 +192,9 @@ def processor_node(state: GraphState) -> GraphState:
         "is_done": False
     }
 
-def decide_processor(state: GraphState) -> Literal["process_command", "agent_node"]:
+def decide_from_processor(state: GraphState) -> Literal["process_command", "agent_node"]:
     """Routes from processor based on input type"""
     return "process_command" if state["keys"]["user_input"].startswith('/') else "agent_node"
-
-def execute_action(action: str, state_dict: Dict[str, Any]) -> ActionResult:
-    """Execute a specific action and return the result."""
-    # NOTE: Do NOT modify state_dict.
-    try:
-        # Parse action string to get type and parameters
-        action_parts = action.split(":", 1)
-        action_type = ActionType(action_parts[0])
-        action_params = action_parts[1] if len(action_parts) > 1 else ""
-
-        if action_type == ActionType.GENERATE:
-            # Handle LLM generation
-            print("Generating LLM response!")
-            return {
-                "success": True,
-                "data": "Generated response",
-                "error": None
-            }
-            
-        elif action_type == ActionType.WEB_SEARCH:
-            # Handle web search
-            return {
-                "success": True,
-                "data": "Search results",
-                "error": None
-            }
-            
-        elif action_type == ActionType.SAVE_DATA:
-            # Handle data persistence
-            return {
-                "success": True,
-                "data": "Data saved",
-                "error": None
-            }
-            
-        elif action_type == ActionType.TOOL_CALL:
-            # Handle tool calling
-            return {
-                "success": True,
-                "data": "Tool called",
-                "error": None
-            }
-            
-        else:
-            return {
-                "success": False,
-                "data": None,
-                "error": f"Unknown action type: {action_type}"
-            }
-            
-    except Exception as e:
-        logging.error(f"Action execution failed: {str(e)}")
-        return {
-            "success": False,
-            "data": None,
-            "error": str(e)
-        }
 
 def action_node(state: GraphState) -> GraphState:
     """Executes in-progress actions in the current task"""
@@ -376,7 +285,7 @@ def create_workflow() -> CompiledStateGraph:
     workflow.add_edge("human_node", "processor_node")
     workflow.add_conditional_edges(
         "processor_node",
-        decide_processor,
+        decide_from_processor,
         {
             "process_command": "process_command",
             "agent_node": "agent_node"
