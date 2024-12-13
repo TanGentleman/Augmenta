@@ -8,6 +8,7 @@ from .graph_classes import GraphState, Config, AgentState, Task, ActionType, Act
 
 # Constants
 MAX_MUTATIONS = 20
+MAX_ACTIONS = 5
 
 def insert_system_message(messages: list, system_content: str) -> None:
     """Insert or update system message at start of messages list."""
@@ -306,7 +307,13 @@ def action_node(state: GraphState) -> GraphState:
     action = current_task["actions"].pop(0)
     result = execute_action(action, state_dict)
     
-    if not result["success"]:
+    if result["success"]:
+        logging.info(f"Action succeeded: {result['data']}")
+        state_dict["action_count"] += 1
+        if state_dict["action_count"] > MAX_ACTIONS:
+            logging.error("Action count exceeded max actions, marking task as failed")
+            current_task["status"] = TaskStatus.FAILED
+    else:
         logging.error(f"Action failed: {result['error']}")
         # Optionally handle failure (retry, skip, or mark task as failed)
         current_task["status"] = TaskStatus.FAILED  # For now, we'll just mark it as done
