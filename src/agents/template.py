@@ -1,4 +1,5 @@
 from agents.graph_classes import AgentState, ChatSettings, Config, RAGSettings, Task, TaskStatus, TaskType
+from augmenta.utils import read_sample
 
 
 STATE_ZERO = {
@@ -9,7 +10,7 @@ STATE_ZERO = {
 
 DEFAULT_TASK: Task = {
     "type": TaskType.CHAT,
-    "status": TaskStatus.IN_PROGRESS,
+    "status": TaskStatus.NOT_STARTED,
     "conditions": [],
     "actions": []
 }
@@ -23,7 +24,7 @@ RAG_TASK: Task = {
 
 DEFAULT_CONFIG = Config(
     chat_settings=ChatSettings(
-        primary_model="llama",
+        primary_model="samba",
         stream=True,
         system_message="Speak with lots of emojis",
         disable_system_message=False
@@ -33,6 +34,12 @@ DEFAULT_CONFIG = Config(
     )
 )
 
+
+class MOCK_INPUTS:
+    SUMMARY = ["/mode summary", "/read", "/quit"]
+    DEFAULT = ["What's the capital of France?", "/quit"]
+    EMPTY = []
+
 INITIAL_STATE_DICT: AgentState = {
     "config": DEFAULT_CONFIG,
     "messages": [],
@@ -40,5 +47,6 @@ INITIAL_STATE_DICT: AgentState = {
     "active_chain": None,
     "tool_choice": None,
     "task_dict": {"chat_task": DEFAULT_TASK},
-    "user_input": None
+    "user_input": None,
+    "mock_inputs": MOCK_INPUTS.EMPTY
 }

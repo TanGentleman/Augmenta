@@ -5,8 +5,10 @@ from langgraph.graph.state import CompiledStateGraph
 import logging
 
 from agents.template import INITIAL_STATE_DICT
-from agents.utils.task_utils import get_task, log_failed_task, save_completed_tasks, save_failed_tasks, start_next_task
+from agents.utils.chains import get_summary_chain, get_llm
+from agents.utils.task_utils import get_task, save_completed_tasks, save_failed_tasks, start_next_task
 from augmenta.models.models import LLM, LLM_FN
+from augmenta.utils import read_sample
 
 from .graph_classes import GraphState, Config, AgentState, Task, Command, CommandType, TaskStatus, TaskType
 from .utils.message_utils import insert_system_message, remove_last_message, clear_messages
@@ -79,6 +81,33 @@ def execute_command_node(state: GraphState) -> GraphState:
     elif cmd_type == CommandType.TOOLS:
         print("\nAvailable Tools:")
         # Implement tool listing logic
+    
+    elif cmd_type == CommandType.MODE:
+        current_task = get_task(state_dict["task_dict"], status=TaskStatus.IN_PROGRESS)
+        if current_task:
+            if current_task["type"] == TaskType.CHAT:
+                cmd_args = command.args
+                if cmd_args == "summary":
+                    print("CHANGING TO SUMMARY MODE")
+                    new_chain = get_summary_chain(state_dict["config"].chat_settings.primary_model)
+                    if new_chain is not None:
+                        state_dict["active_chain"] = new_chain
+                    else:
+                        raise ValueError("Summary chain not initialized!")
+                else:
+                    print("\nCurrent Mode:")
+                    print(current_task["type"])
+        else:
+            print("No in-progress task found")
+
+    elif cmd_type == CommandType.READ:
+        # TODO: Read file(s) from args
+        print("Reading from file...")
+        user_input = read_sample()
+        if user_input:
+            state_dict["mock_inputs"].insert(0, user_input)
+        else:
+            print("No text found in file!")
     else:
         print(f"Command not implemented: {command.command}")
 
@@ -128,9 +157,15 @@ def agent_node(state: GraphState) -> GraphState:
                 state_dict["messages"],
                 state_dict["config"].chat_settings.system_message
             )
-        started = start_next_task(task_dict)
-        if not started:
-            logging.error("No tasks to start!")
+        # INIT_WITH_CHAT_CHAIN = False
+        # if INIT_WITH_CHAT_CHAIN and state_dict["active_chain"] is None:
+        #     llm = get_llm(state_dict["config"].chat_settings.primary_model)
+        #     if llm is not None:
+        #         state_dict["active_chain"] = llm
+        #     else:
+        #         raise ValueError("Chain not initialized!")
+            
+    
     # Check failure conditions
     if state["mutation_count"] > MAX_MUTATIONS:
         logging.warning("Mutation count exceeded max mutations!")
@@ -138,8 +173,6 @@ def agent_node(state: GraphState) -> GraphState:
         if current_task:
             logging.error("Task is still in progress, marking as failed")
             current_task["status"] = TaskStatus.FAILED
-    
-    
 
     return {
         "keys": state_dict,
@@ -186,8 +219,17 @@ def task_manager_node(state: GraphState) -> GraphState:
 def human_node(state: GraphState) -> GraphState:
     """Handles human input"""
     state_dict = state["keys"]
+    mock_inputs = state_dict["mock_inputs"]
+    if mock_inputs:
+        user_input = mock_inputs.pop(0)
+    else:
+        user_input = input("Enter your message: ").strip()
+        if not user_input:
+            print("No input provided, click enter again to quit...")
+            user_input = input().strip()
+            if not user_input:
+                user_input = "/quit"
     
-    user_input = input("Enter your message: ").strip()
     state_dict["user_input"] = user_input
     
     return {
@@ -211,12 +253,11 @@ def processor_node(state: GraphState) -> GraphState:
         # UPDATE STATE BASED ON TASK TYPE
         if current_task["type"] == TaskType.CHAT:
             if state_dict["active_chain"] is None:
-                try:
-                    llm = LLM(LLM_FN(state_dict["config"].chat_settings.primary_model))
+                llm = get_llm(state_dict["config"].chat_settings.primary_model)
+                if llm is not None:
                     state_dict["active_chain"] = llm
-                except Exception as e:
-                    print(f"Error: {e}")
-                    return ValueError("Error initializing LLM")
+                else:
+                    raise ValueError("Chain not initialized!")
             current_task["actions"].append("generate")
 
         elif current_task["type"] == TaskType.RAG:
