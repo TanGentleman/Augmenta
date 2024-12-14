@@ -1,3 +1,26 @@
+"""
+This module implements a state machine graph for managing conversational AI interactions.
+
+Graph Flow:
+1. START -> start_node: Initializes graph state and configuration
+2. start_node -> agent_node: Central node that manages agent state and decisions
+3. agent_node branches to:
+   - human_node: Handles user input collection
+   - task_manager: Manages task lifecycle and completion
+   - action_node: Executes actions like generating responses
+   - END: Terminates workflow when complete
+4. human_node -> processor_node: Processes user input
+5. processor_node branches to:
+   - execute_command: Handles system commands (prefixed with /)
+   - agent_node: Continues normal conversation flow
+6. execute_command -> agent_node: Returns to main loop after command
+7. action_node -> agent_node: Returns after executing actions
+8. task_manager -> agent_node: Returns after task management
+
+The graph implements a flexible conversation loop with command processing,
+task management, and action execution capabilities.
+"""
+
 from typing import Literal
 from langgraph.graph import StateGraph, START, END
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
@@ -10,7 +33,7 @@ from agents.utils.task_utils import get_task, save_completed_tasks, save_failed_
 from augmenta.models.models import LLM, LLM_FN
 from augmenta.utils import read_sample
 
-from .graph_classes import GraphState, Config, AgentState, Task, Command, CommandType, TaskStatus, TaskType
+from .graph_classes import GraphState, Command, CommandType, TaskStatus, TaskType
 from .utils.message_utils import insert_system_message, remove_last_message, clear_messages
 from .utils.action_utils import execute_action
 
@@ -70,18 +93,12 @@ def execute_command_node(state: GraphState) -> GraphState:
         print("\nCurrent State:")
         print(f"Messages: {len(state_dict['messages'])}")
         print(f"Tasks: {state_dict['task_dict']}")
-        
-    elif cmd_type == CommandType.RETRY:
-        remove_last_message(state_dict["messages"])
+
         
     elif cmd_type == CommandType.UNDO:
         if state_dict["messages"]:
-            state_dict["messages"] = state_dict["messages"][:-2]
-            
-    elif cmd_type == CommandType.TOOLS:
-        print("\nAvailable Tools:")
-        # Implement tool listing logic
-    
+            remove_last_message(state_dict["messages"])
+
     elif cmd_type == CommandType.MODE:
         current_task = get_task(state_dict["task_dict"], status=TaskStatus.IN_PROGRESS)
         if current_task:
