@@ -51,6 +51,7 @@ class AgentState(TypedDict):
     tool_choice: Optional[str]
     task_dict: dict[str, Task]
     user_input: Optional[str]
+    mock_inputs: list[str]
 
 class GraphState(TypedDict):
     """Overall graph state"""
@@ -84,6 +85,8 @@ class CommandType(Enum):
     RETRY = "retry"
     UNDO = "undo"
     TOOLS = "tools"
+    MODE = "mode"
+    READ = "read"
 
 class Command:
     """Represents a parsed command"""

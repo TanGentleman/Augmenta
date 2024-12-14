@@ -1,4 +1,4 @@
-from langchain_core.messages import SystemMessage
+from langchain_core.messages import SystemMessage, HumanMessage
 
 def insert_system_message(messages: list, system_content: str) -> None:
     """Insert or update system message at start of messages list."""
@@ -33,3 +33,10 @@ def clear_messages(messages: list, preserve_system: bool = True) -> None:
         messages.append(system_msg)
     else:
         messages.clear()
+
+def get_last_user_message(messages: list) -> str:
+    """Get the last user message from the messages list."""
+    message = messages[-1]
+    if isinstance(message, HumanMessage):
+        return str(message.content)
+    raise ValueError("No user message found!")

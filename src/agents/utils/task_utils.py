@@ -13,7 +13,7 @@ def get_task(task_dict: dict[str, Task], task_name: Optional[str] = None, status
         raise ValueError("Either task_name or status must be provided")
     
     if not task:
-        logging.error(f"Task not found! {task_name or str(status)}")
+        logging.debug(f"Task not found! {task_name or str(status)}")
         return None
     
     return task
