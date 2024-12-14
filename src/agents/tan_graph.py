@@ -5,6 +5,7 @@ from langgraph.graph.state import CompiledStateGraph
 import logging
 
 from agents.template import INITIAL_STATE_DICT
+from agents.utils.task_utils import get_task, log_failed_task, save_completed_tasks, save_failed_tasks, start_next_task
 from augmenta.models.models import LLM, LLM_FN
 
 from .graph_classes import GraphState, Config, AgentState, Task, Command, CommandType, TaskStatus, TaskType
@@ -120,20 +121,25 @@ def agent_node(state: GraphState) -> GraphState:
     state_dict = state["keys"]
     task_dict = state_dict["task_dict"]
     
+    # Handle initialization
+    if state["mutation_count"] == 1:
+        if not state_dict["config"].chat_settings.disable_system_message:
+            insert_system_message(
+                state_dict["messages"],
+                state_dict["config"].chat_settings.system_message
+            )
+        started = start_next_task(task_dict)
+        if not started:
+            logging.error("No tasks to start!")
     # Check failure conditions
     if state["mutation_count"] > MAX_MUTATIONS:
         logging.warning("Mutation count exceeded max mutations!")
-        current_task = task_dict["chat_task"]
-        if current_task["status"] == TaskStatus.IN_PROGRESS:
+        current_task = get_task(task_dict, status=TaskStatus.IN_PROGRESS)
+        if current_task:
             logging.error("Task is still in progress, marking as failed")
             current_task["status"] = TaskStatus.FAILED
     
-    # Handle initialization
-    if state["mutation_count"] == 1 and not state_dict["config"].chat_settings.disable_system_message:
-        insert_system_message(
-            state_dict["messages"],
-            state_dict["config"].chat_settings.system_message
-        )
+    
 
     return {
         "keys": state_dict,
@@ -146,27 +152,31 @@ def task_manager_node(state: GraphState) -> GraphState:
     state_dict = state["keys"]
     task_dict = state_dict["task_dict"]
     
+    # Save completed tasks
+    completed_task_names = save_completed_tasks(task_dict)
+    if completed_task_names:
+        logging.info(f"Saved completed tasks: {completed_task_names}")
+        for task_name in completed_task_names:
+            del task_dict[task_name]
+
     # Check for failed tasks
-    failed_task = next((task for task in task_dict.values() if task["status"] == TaskStatus.FAILED), None)
-    if failed_task:
-        print("Error: Task failed")
-        return {
-            "keys": state_dict,
-            "mutation_count": state["mutation_count"] + 1,
-            "is_done": True
-        }
+    failed_task_names = save_failed_tasks(task_dict)
+    if failed_task_names:
+        logging.error(f"Failed tasks: {failed_task_names}")
+        for task_name in failed_task_names:
+            del task_dict[task_name]
     
+    is_running = start_next_task(task_dict)
     # Check task completion
-    all_complete = all(task["status"] == TaskStatus.DONE for task in task_dict.values())
-    if all_complete:
-        # Save logic or task mutation logic here
+    if not is_running:
+        logging.info("No tasks remaining!")
+        # TODO: Add logic to fetch new tasks
         return {
             "keys": state_dict,
             "mutation_count": state["mutation_count"] + 1,
             "is_done": True
         }
-    
-    state_dict["task_dict"] = task_dict
+
     return {
         "keys": state_dict,
         "mutation_count": state["mutation_count"] + 1,
@@ -283,16 +293,15 @@ def decide_from_agent(state: GraphState) -> Literal["human_node", "task_manager"
     state_dict = state["keys"]
     task_dict = state_dict["task_dict"]
     
-    # Check if tasks need management
-    if not task_dict or all(task["status"] in [TaskStatus.DONE, TaskStatus.FAILED] for task in task_dict.values()):
-        return "task_manager"
-    
     # Check for pending actions
-    current_task = next((task for task in task_dict.values() if task["status"] == TaskStatus.IN_PROGRESS), None)
-    if current_task and current_task["actions"]:
-        return "action_node"
+    current_task = get_task(task_dict, status=TaskStatus.IN_PROGRESS)
+    if current_task:
+        if current_task["actions"]:
+            return "action_node"
+        else:
+            return "human_node"
     
-    return "human_node"
+    return "task_manager"
 
 # Build graph
 def create_workflow() -> CompiledStateGraph:
