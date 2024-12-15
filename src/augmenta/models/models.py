@@ -24,17 +24,6 @@ from langchain.callbacks.manager import CallbackManager
 import yaml
 logger = logging.getLogger(__name__)
 
-NICKNAME_TO_MODEL_INFO = {
-    "samba": ("litellm", "openrouter/meta-llama/llama-3.1-70b-instruct:free"),
-    "smol": ("litellm", "lmstudio/smollm2-1.7b-instruct"),
-    "qwen": ("together", "Qwen/Qwen2.5-72B-Instruct-Turbo"),
-    "gemini": ("openrouter", "google/gemini-flash-1.5"),
-    "llama-nemotron": ("litellm", "Llama-3.1-Nemotron-70B"),
-    "llama": ("litellm", "Llama-3.3-70B"),
-    "openrouter-gpt-4o": ("litellm", "openrouter/openai/gpt-4o"),
-    "openrouter-gpt-4o-mini": ("litellm", "openrouter/openai/gpt-4o-mini"),
-    "openrouter-gpt-3.5-turbo": ("litellm", "openrouter/openai/gpt-3.5-turbo"),
-}
 
 def get_model_config_from_yaml(filename: str):
     """Load and validate model configuration from YAML file."""
@@ -275,13 +264,6 @@ def get_lmstudio_local_embedder(hyperparameters=None) -> OpenAIEmbeddings:
 
 
 
-def get_model_wrapper_from_nickname(nickname: str) -> Callable[[], ChatOpenAI]:
-    if nickname not in NICKNAME_TO_MODEL_INFO:
-        raise ValueError(f"Invalid nickname: {nickname}")
-    provider, model_name = NICKNAME_TO_MODEL_INFO[nickname]
-    return get_model_wrapper(provider, model_name)
-
-
 def model_key_from_name(model_name: str) -> str:
     """Get the model key from the model name"""
     for key, model in MODEL_DICT.items():
@@ -301,11 +283,7 @@ class LLM_FN:
     def __init__(self, model_experimental: str | None = None, model_fn: Callable[[], ChatOpenAI] | None = None, hyperparameters=None):
         if hyperparameters is not None and not isinstance(hyperparameters, dict):
             raise ValueError("Hyperparameters must be a dictionary")
-            
-        # Handle nickname models first
-        # if model_experimental in NICKNAME_TO_MODEL_INFO:
-        #     model_fn = get_model_wrapper_from_nickname(model_experimental)
-        #     model_experimental = None
+
         
         # Handle experimental model string
         if model_experimental is not None:

@@ -3,10 +3,8 @@ from agents.utils.message_utils import get_last_user_message
 from augmenta.chains import SimpleChain
 from augmenta.constants import get_summary_template
 from augmenta.models.models import LLM, LLM_FN
-from langchain_core.output_parsers import StrOutputParser#, JsonOutputParser
-from langchain_core.messages import SystemMessage, HumanMessage
 
-def get_llm(model_name: str) -> LLM:
+def get_llm(model_name: str) -> LLM | None:
     try:
         llm = LLM(LLM_FN(model_name))
         return llm
@@ -24,12 +22,12 @@ def get_summary_chain(model_name: str, system_prompt: str = 'You are a helpful A
         if llm is None:
             raise ValueError("LLM not initialized!")
         
-        chain = SimpleChain(
+        raw_chain = (
             {"excerpt": lambda x: get_last_user_message(x)}
             | get_summary_template(system_prompt)
             | llm.llm
-            # | StrOutputParser()
         )
+        chain = SimpleChain(raw_chain, description="Summary Chain")
         return chain
     except Exception as e:
         logging.error(f"Error creating summary chain: {e}")

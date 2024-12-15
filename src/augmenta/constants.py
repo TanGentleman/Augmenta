@@ -106,21 +106,17 @@ FLASHCARD_SYSTEM_MESSAGE = """You are Flashcard AI. Use the document excerpts to
 FLASHCARD_SIMPLE_SYSTEM_MESSAGE = "Generate a list of JSON flashcards with consistent keys appropriate for the given request. Only output a list[dict] with valid JSON."
 # "Output a list[dict]. Each JSON object should stay consistent to the schema. Use lowercase for boolean values."
 
+
 MODEL_CODES = {
-    "gpt4": "get_openai_gpt4",
-    "bigmix": "get_together_bigmix",
-    "mix": "get_together_fn_mix",
-    "code": "get_deepseek_coder",
-    "dbrx": "get_together_dbrx",
-    "arctic": "get_together_arctic",
-    # "llama": "get_together_llama3",
-    "llama": "get_together_new_llama",
-    "llama400": "get_together_llama_400b",
-    "deepseek": "get_together_deepseek_4k",
-    "qwen": "get_together_qwen",
-    "sonnet": "get_openrouter_sonnet",
-    "ollama": "get_ollama_llama3",
-    "flash": "get_gemini_litellm",
+    "gpt4o": "open/openai/gpt-4o",
+    "gpt4o-mini": "open/openai/gpt-4o-mini",
+    "gemini": "gemini-exp-1206",
+    "llama": "Llama-3.3-70B",
+    "llama-nemotron": "together/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
+    "qwen": "Qwen/Qwen2.5-72B-Instruct-Turbo",
+    "sonnet": "anthropic/claude-3.5-sonnet",
+    # "ollama": "ollama_llama3",
+    "flash": "gemini-flash-1.5",
 }
 
 SYSTEM_MESSAGE_CODES = {
@@ -166,8 +162,7 @@ Question: {question}
 SUMMARY_TEMPLATE = """Summarize the following text, retaining the main keywords:
 <excerpt>
 {excerpt}
-</excerpt>
-"""
+</excerpt>"""
 
 EVAL_TEMPLATE = """Evaluate the following text excerpt(s) based on the given criteria:
 <excerpt>
@@ -220,15 +215,14 @@ def get_rag_template(system_message=None):
     return rag_prompt_template
 
 
-def get_summary_template():
+def get_summary_template(system_prompt: str = 'You are a helpful AI.'):
     """
     Fetches the template for summarization.
     """
     template = SUMMARY_TEMPLATE
     summary_template = ChatPromptTemplate.from_template(template)
     summary_template.messages.insert(
-        0, SystemMessage(
-            content="You are a helpful AI."))
+        0, SystemMessage(content=system_prompt))
     return summary_template
 
 
