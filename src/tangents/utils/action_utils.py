@@ -17,7 +17,6 @@ def execute_action(action: str, state_dict: Dict[str, Any]) -> ActionResult:
             messages = state_dict["messages"]
             config = state_dict["config"]
             stream = config.chat_settings.stream
-
             try:
                 if stream:
                     response_string = ""

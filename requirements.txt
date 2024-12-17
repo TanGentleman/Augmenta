@@ -5,6 +5,8 @@ langchain_community
 
 langchain-anthropic
 
+langgraph
+
 faiss-cpu
 chromadb
 

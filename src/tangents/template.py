@@ -1,6 +1,5 @@
-from agents.graph_classes import AgentState, ChatSettings, Config, RAGSettings, Task, TaskStatus, TaskType
-from augmenta.utils import read_sample
-
+from tangents.graph_classes import AgentState, ChatSettings, Config, RAGSettings, Task, TaskStatus, TaskType
+from tangents.utils.chains import get_llm
 
 STATE_ZERO = {
     "keys": {},
@@ -41,6 +40,17 @@ class MOCK_INPUTS:
     EMPTY = []
 
 INITIAL_STATE_DICT: AgentState = {
+    "config": DEFAULT_CONFIG,
+    "messages": [],
+    "action_count": 0,
+    "active_chain": None,
+    "tool_choice": None,
+    "task_dict": {"chat_task": DEFAULT_TASK},
+    "user_input": None,
+    "mock_inputs": MOCK_INPUTS.EMPTY
+}
+
+TEST_STATE_DICT = {
     "config": DEFAULT_CONFIG,
     "messages": [],
     "action_count": 0,

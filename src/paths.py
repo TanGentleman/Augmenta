@@ -5,7 +5,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent
 FLASH_DIR = ROOT_DIR / "flash"
 AUGMENTA_DIR = ROOT_DIR / "augmenta"
-AGENTS_DIR = ROOT_DIR / "agents"
+AGENTS_DIR = ROOT_DIR / "tangents"
 
 # Flash module paths
 FLASHCARD_FILEPATH = FLASH_DIR / "flashcards.json"

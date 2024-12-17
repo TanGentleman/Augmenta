@@ -27,9 +27,9 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langgraph.graph.state import CompiledStateGraph
 import logging
 
-from agents.template import INITIAL_STATE_DICT
-from agents.utils.chains import get_summary_chain, get_llm
-from agents.utils.task_utils import get_task, save_completed_tasks, save_failed_tasks, start_next_task
+from tangents.template import INITIAL_STATE_DICT, MOCK_INPUTS
+from tangents.utils.chains import get_summary_chain, get_llm
+from tangents.utils.task_utils import get_task, save_completed_tasks, save_failed_tasks, start_next_task
 from augmenta.models.models import LLM, LLM_FN
 from augmenta.utils import read_sample
 
@@ -134,7 +134,7 @@ def execute_command_node(state: GraphState) -> GraphState:
         "is_done": False
     }
 
-def start_node(state: GraphState) -> GraphState:
+def start_node(state: GraphState, mock_inputs: list[str] = MOCK_INPUTS.DEFAULT) -> GraphState:
     """Initialize the graph state with configuration and default task"""
     # config = Config()
     # default_task: Task = {
@@ -154,6 +154,13 @@ def start_node(state: GraphState) -> GraphState:
     #     "user_input": None
     # }
     initial_state = INITIAL_STATE_DICT
+    state_dict = initial_state
+
+    # Mutations from args
+    if mock_inputs:
+        # TODO: Add logic to handle validation of mock inputs
+        state_dict["mock_inputs"] = mock_inputs
+
 
     # NOTE: Right now this is replacing ALL initial graph state except for the mutation count
     return {
@@ -316,6 +323,7 @@ def action_node(state: GraphState) -> GraphState:
 
     # Get next action and execute it
     action = current_task["actions"].pop(0)
+    print(f"Executing action: {action}")
     result = execute_action(action, state_dict)
     logging.info(result)
     

@@ -28,6 +28,8 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from dotenv import load_dotenv
 
+from augmenta.classes import get_llm_fn
+
 load_dotenv()
 
 ### ENV
@@ -48,15 +50,14 @@ MAX_SEARCH_RESULTS = 10
 
 
 ### LLMS
-from augmenta.models.models import get_model_wrapper_from_nickname
-
-gpt_4o_mini = get_model_wrapper_from_nickname("openrouter-gpt-4o-mini")()
-gpt_4o = get_model_wrapper_from_nickname("openrouter-gpt-4o")()
-
-samba = get_model_wrapper_from_nickname("samba")()
-llama = get_model_wrapper_from_nickname("llama-3.1-70b")()
-gpt_3_5 = get_model_wrapper_from_nickname("openrouter-gpt-3.5-turbo")()
-
+try:
+    gpt_4o_mini = get_llm_fn("gpt4o-mini").get_llm()
+    gpt_4o = get_llm_fn("gpt4o").get_llm()
+    samba = get_llm_fn("samba").get_llm()
+    llama = get_llm_fn("llama").get_llm()
+    gpt_3_5 = get_llm_fn("gpt3.5-turbo").get_llm()
+except Exception as e:
+    raise ValueError(f"Error initializing LLMs: {e}")
 
 
 ### Generate Initial Outline
