@@ -58,7 +58,7 @@ class Action(TypedDict):
     """Represents an action"""
     type: ActionType
     status: Status
-    args: Optional[ActionArgs]
+    args: ActionArgs
     result: Optional[ActionResult]
     
 
@@ -169,11 +169,8 @@ taskapp = create_workflow() [...]
 #TODO: Finish this
 """
 
-def create_action(action_type: ActionType | PlanActionType, args: Optional[ActionArgs] = None) -> Action:
+def create_action(action_type: ActionType | PlanActionType, args: ActionArgs = {}) -> Action:
     assert isinstance(action_type, ActionType | PlanActionType)
-    if args is None:
-        args = {}
-    
     assert isinstance(args, dict)
     if action_type == PlanActionType.REVISE_PLAN:
         DEFAULT_MAX_REVISIONS = 3
@@ -189,8 +186,6 @@ def create_action(action_type: ActionType | PlanActionType, args: Optional[Actio
             args["plan_context"] = None
 
     elif action_type == ActionType.GENERATE:
-        if "stream" not in args:
-            args["stream"] = True
         if "chain" not in args:
             args["chain"] = None
         if "messages" not in args:
