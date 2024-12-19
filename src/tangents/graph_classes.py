@@ -171,10 +171,31 @@ taskapp = create_workflow() [...]
 
 def create_action(action_type: ActionType | PlanActionType, args: Optional[ActionArgs] = None) -> Action:
     assert isinstance(action_type, ActionType | PlanActionType)
-    if args is not None:
-        # TODO: Add validation for args
-        assert isinstance(args, dict)
+    if args is None:
+        args = {}
+    
+    assert isinstance(args, dict)
+    if action_type == PlanActionType.REVISE_PLAN:
+        DEFAULT_MAX_REVISIONS = 3
+        if "max_revisions" not in args:
+            args["max_revisions"] = DEFAULT_MAX_REVISIONS
+        if "revision_count" not in args:
+            args["revision_count"] = 0
+        if "proposed_plan" not in args:
+            args["proposed_plan"] = None
+    
+    elif action_type == PlanActionType.CREATE_PLAN:
+        if "plan_context" not in args:
+            args["plan_context"] = None
 
+    elif action_type == ActionType.GENERATE:
+        if "stream" not in args:
+            args["stream"] = True
+        if "chain" not in args:
+            args["chain"] = None
+        if "messages" not in args:
+            args["messages"] = []
+    
     return Action(
         type=action_type,
         status=Status.NOT_STARTED,

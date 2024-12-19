@@ -135,7 +135,7 @@ def get_api_key(provider: str):
     elif provider == "local":
         api_key = "LOCAL-API-KEY"
     elif provider == "litellm":
-        api_key = getenv("LLM_API_KEY")
+        api_key = getenv("LITELLM_API_KEY")
     else:
         raise ValueError("Invalid provider")
     if not api_key:
