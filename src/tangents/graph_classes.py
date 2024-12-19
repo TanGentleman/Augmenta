@@ -1,5 +1,5 @@
 import logging
-from typing import Optional
+from typing import Any, Optional
 from typing_extensions import TypedDict
 from pydantic import BaseModel
 from enum import Enum
@@ -22,7 +22,7 @@ class Config(BaseModel):
     chat_settings: ChatSettings = ChatSettings()
     rag_settings: RAGSettings = RAGSettings()
 
-class TaskStatus(Enum):
+class Status(Enum):
     """Status values for tasks in the system"""
     NOT_STARTED = "not_started"
     IN_PROGRESS = "in_progress"
@@ -33,36 +33,73 @@ class TaskType(Enum):
     """Types of tasks in the system"""
     CHAT = "chat"
     RAG = "rag"
-    PLAN_FROM_SOURCE = "plan_from_source"
+    PLANNING = "planning"
+
+class ActionResult(TypedDict):
+    """Result of an action execution"""
+    success: bool
+    data: Optional[dict]
+    error: Optional[str]
 
 class ActionType(Enum):
     """Types of actions that can be executed"""
     GENERATE = "generate"
-    READ_EMAIL = "read_email"
-    CREATE_PLAN = "create_plan"
-    REVISE_PLAN = "revise_plan"
     WEB_SEARCH = "web_search"
     SAVE_DATA = "save_data"
     TOOL_CALL = "tool_call"
-    CUSTOM = "custom"
 
+
+class ActionArgs(TypedDict):
+    """Arguments for an action"""
+    pass
+
+
+class Action(TypedDict):
+    """Represents an action"""
+    type: ActionType
+    status: Status
+    args: Optional[ActionArgs]
+    result: Optional[ActionResult]
+    
+
+class PlanActionType(Enum):
+    """Types of actions specific to plan execution"""
+    FETCH = "fetch"
+    CREATE_PLAN = "create_plan" 
+    REVISE_PLAN = "revise_plan"
+
+# We
 class Task(TypedDict):
     """Represents a single task in the system"""
     type: TaskType
-    status: TaskStatus
-    conditions: list[str]
-    actions: list[ActionType]
+    status: Status
+    conditions: Optional[dict]
+    actions: list[Action]
 
-class AgentState(TypedDict):
+class PlanActionArgs(ActionArgs):
+    """Arguments for a plan action"""
+    plan_context: Optional[str]
+    proposed_plan: Optional[dict[str, Task]]
+    plan: Optional[dict[str, Task]]
+
+# TODO: Implement this in lieu of passing state_dict to execute_action
+class GenerateActionArgs(ActionArgs):
+    """Arguments for a generate action"""
+    stream: Optional[bool]
+    chain: Optional[Any]
+    messages: Optional[list[dict]]
+    pass
+
+class AgentState(TypedDict, total=True):
     """Core state maintained by the agent"""
     config: Config
     messages: list[dict]
     response_count: int
     active_chain: Optional[object]
     tool_choice: Optional[str]
-    task_dict: dict[str, Task]
     user_input: Optional[str]
     mock_inputs: list[str]
+    task_dict: dict[str, Task]
 
 class GraphState(TypedDict):
     """Overall graph state"""
@@ -70,11 +107,6 @@ class GraphState(TypedDict):
     mutation_count: int
     is_done: bool
 
-class ActionResult(TypedDict):
-    """Result of an action execution"""
-    success: bool
-    data: Optional[dict]
-    error: Optional[str]
 
 class CommandType(Enum):
     """Available command types"""
@@ -112,12 +144,6 @@ class Command:
             return None
 
 
-class Plan(TypedDict):
-    """Represents a plan"""
-    plan_text: str
-    plan_status: TaskStatus
-    plan_actions: list[ActionType]
-
 """
 Graph-Based Task Management System
 --------------------------------
@@ -135,10 +161,23 @@ Key Components:
 Task Types:
 - CHAT: Basic conversational tasks
 - RAG: Retrieval-augmented generation tasks
-- PLAN_FROM_SOURCE: Multi-step planning tasks
+- PLANNING: Multi-step planning tasks
 
 Example Usage:
 Initialize with default chat:
 taskapp = create_workflow() [...]
 #TODO: Finish this
 """
+
+def create_action(action_type: ActionType | PlanActionType, args: Optional[ActionArgs] = None) -> Action:
+    assert isinstance(action_type, ActionType | PlanActionType)
+    if args is not None:
+        # TODO: Add validation for args
+        assert isinstance(args, dict)
+
+    return Action(
+        type=action_type,
+        status=Status.NOT_STARTED,
+        args=args,
+        result=None
+    )

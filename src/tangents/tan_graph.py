@@ -27,25 +27,28 @@ from langchain_core.messages import HumanMessage, AIMessage, SystemMessage
 from langgraph.graph.state import CompiledStateGraph
 import logging
 
-from tangents.template import INITIAL_STATE_DICT, MOCK_INPUTS
+from tangents.template import INITIAL_STATE_DICT, MOCK_INPUTS, PLANNING_STATE_DICT
 from tangents.utils.chains import get_summary_chain, get_llm
 from tangents.utils.task_utils import get_task, save_completed_tasks, save_failed_tasks, start_next_task
 from augmenta.models.models import LLM, LLM_FN
 from augmenta.utils import read_sample
 
-from .graph_classes import GraphState, Command, CommandType, TaskStatus, TaskType
+from .graph_classes import Action, ActionType, GraphState, Command, CommandType, PlanActionType, Status, TaskType
 from .utils.message_utils import insert_system_message, remove_last_message, clear_messages
-from .utils.action_utils import execute_action
+from .utils.action_utils import execute_action, save_action_data
 
 # Constants
 RECURSION_LIMIT = 50
 MAX_MUTATIONS = 50
 MAX_ACTIONS = 5
 
+DEFAULT_STATE_DICT = PLANNING_STATE_DICT
+
 def execute_command_node(state: GraphState) -> GraphState:
     """Process a command and update state"""
     state_dict = state["keys"]
     command = Command(state_dict["user_input"])
+    state_dict["user_input"] = None
     
     if not command.is_valid:
         logging.warning(f"Invalid command: {command.command}")
@@ -60,9 +63,13 @@ def execute_command_node(state: GraphState) -> GraphState:
     if cmd_type == CommandType.QUIT:
         # TODO: Change the status here to Quit
         # Task manager will decide in-progress, done, or failed
-        for task in state_dict["task_dict"].values():
-            task["status"] = TaskStatus.DONE
-            
+        task_dict = state_dict["task_dict"]
+        if not task_dict:
+            raise ValueError("No tasks found!")
+        current_task = get_task(task_dict, status=Status.IN_PROGRESS)
+        if current_task and not current_task["actions"]:
+            current_task["status"] = Status.DONE
+    
     elif cmd_type == CommandType.HELP:
         print("\nAvailable Commands:")
         for cmd in CommandType:
@@ -100,7 +107,7 @@ def execute_command_node(state: GraphState) -> GraphState:
             remove_last_message(state_dict["messages"])
 
     elif cmd_type == CommandType.MODE:
-        current_task = get_task(state_dict["task_dict"], status=TaskStatus.IN_PROGRESS)
+        current_task = get_task(state_dict["task_dict"], status=Status.IN_PROGRESS)
         if current_task:
             if current_task["type"] == TaskType.CHAT:
                 cmd_args = command.args
@@ -134,37 +141,13 @@ def execute_command_node(state: GraphState) -> GraphState:
         "is_done": False
     }
 
-def start_node(state: GraphState, mock_inputs: list[str] = MOCK_INPUTS.DEFAULT) -> GraphState:
+def start_node(state: GraphState) -> GraphState:
     """Initialize the graph state with configuration and default task"""
-    # config = Config()
-    # default_task: Task = {
-    #     "type": TaskType.CHAT,
-    #     "status": TaskStatus.IN_PROGRESS,
-    #     "conditions": ["$"],
-    #     "actions": []
-    # }
-    
-    # initial_state: AgentState = {
-    #     "config": config,
-    #     "messages": [],
-    #     "action_count": 0,
-    #     "active_chain": None,
-    #     "tool_choice": None,
-    #     "task_dict": {"chat_task": default_task},
-    #     "user_input": None
-    # }
-    initial_state = INITIAL_STATE_DICT
-    state_dict = initial_state
-
-    # Mutations from args
-    if mock_inputs:
-        # TODO: Add logic to handle validation of mock inputs
-        state_dict["mock_inputs"] = mock_inputs
-
+    state_dict = DEFAULT_STATE_DICT
 
     # NOTE: Right now this is replacing ALL initial graph state except for the mutation count
     return {
-        "keys": initial_state,
+        "keys": state_dict,
         "mutation_count": state["mutation_count"] + 1,
         "is_done": False
     }
@@ -193,10 +176,10 @@ def agent_node(state: GraphState) -> GraphState:
     # Check failure conditions
     if state["mutation_count"] > MAX_MUTATIONS:
         logging.warning("Mutation count exceeded max mutations!")
-        current_task = get_task(task_dict, status=TaskStatus.IN_PROGRESS)
+        current_task = get_task(task_dict, status=Status.IN_PROGRESS)
         if current_task:
             logging.error("Task is still in progress, marking as failed")
-            current_task["status"] = TaskStatus.FAILED
+            current_task["status"] = Status.FAILED
 
     return {
         "keys": state_dict,
@@ -205,7 +188,21 @@ def agent_node(state: GraphState) -> GraphState:
     }
 
 def task_manager_node(state: GraphState) -> GraphState:
-    """Manages task lifecycle and completion"""
+    """
+    Manages the lifecycle of tasks in the system.
+    
+    Responsibilities:
+    1. Saves completed tasks to persistent storage
+    2. Removes completed/failed tasks from active dictionary
+    3. Starts next available task if no task is in progress
+    4. Determines if workflow should terminate
+    
+    Args:
+        state (GraphState): Current graph state containing task dictionary
+        
+    Returns:
+        GraphState: Updated state with modified task dictionary and completion status
+    """
     state_dict = state["keys"]
     task_dict = state_dict["task_dict"]
     
@@ -245,6 +242,7 @@ def human_node(state: GraphState) -> GraphState:
     state_dict = state["keys"]
     mock_inputs = state_dict["mock_inputs"]
     if mock_inputs:
+        print(f"Mock inputs: {mock_inputs}")
         user_input = mock_inputs.pop(0)
     else:
         user_input = input("Enter your message: ").strip()
@@ -271,9 +269,10 @@ def processor_node(state: GraphState) -> GraphState:
     if not user_input.startswith('/'):
         state_dict["messages"].append(HumanMessage(content=user_input))
         task_dict = state_dict["task_dict"]
-        current_task = next((task for task in task_dict.values() if task["status"] == TaskStatus.IN_PROGRESS), None)
+        current_task = next((task for task in task_dict.values() if task["status"] == Status.IN_PROGRESS), None)
         if not current_task:
             raise ValueError("No in-progress task found")
+        
         # UPDATE STATE BASED ON TASK TYPE
         if current_task["type"] == TaskType.CHAT:
             if state_dict["active_chain"] is None:
@@ -282,7 +281,12 @@ def processor_node(state: GraphState) -> GraphState:
                     state_dict["active_chain"] = llm
                 else:
                     raise ValueError("Chain not initialized!")
-            current_task["actions"].append("generate")
+            current_task["actions"].append(Action(
+                type=ActionType.GENERATE,
+                status=Status.NOT_STARTED,
+                args=None,
+                result=None
+            ))
 
         elif current_task["type"] == TaskType.RAG:
             # TODO: Add RAG logic here
@@ -292,6 +296,13 @@ def processor_node(state: GraphState) -> GraphState:
             else:
                 print("ERROR: RAG task is disabled!")
                 raise ValueError("RAG task is disabled!")
+        elif current_task["type"] == TaskType.PLANNING:
+            # TODO: Add planning logic here
+            if state_dict["plan_dict"]["proposed_plan"]:
+                if state_dict["plan_dict"]["plan"] is not None:
+                    raise ValueError("Plan is already created!")
+                print("Using your revision!")
+            pass
         else:
             raise ValueError("Current task is not a chat task")
     
@@ -312,7 +323,7 @@ def action_node(state: GraphState) -> GraphState:
     
     # Find current in-progress task
     current_task = next(
-        (task for task in task_dict.values() if task["status"] == TaskStatus.IN_PROGRESS),
+        (task for task in task_dict.values() if task["status"] == Status.IN_PROGRESS),
         None
     )
     if not current_task:
@@ -322,7 +333,13 @@ def action_node(state: GraphState) -> GraphState:
     
 
     # Get next action and execute it
-    action = current_task["actions"].pop(0)
+    action = current_task["actions"][0]
+    action_type = action["type"]
+    if action["status"] == Status.NOT_STARTED:
+        action["status"] = Status.IN_PROGRESS
+    assert action["status"] == Status.IN_PROGRESS
+
+
     print(f"Executing action: {action}")
     result = execute_action(action, state_dict)
     logging.info(result)
@@ -330,19 +347,55 @@ def action_node(state: GraphState) -> GraphState:
     if result["success"]:
         logging.info(f"Action succeeded: {result['data']}")
         state_dict["action_count"] += 1
+        action["status"] = Status.DONE
 
-        if action == "generate":
+        if action_type == ActionType.GENERATE:
             # TODO: Handle more complex chains here!
             response_string = result["data"]
             state_dict["messages"].append(AIMessage(content=response_string))
+
+        elif action_type == PlanActionType.FETCH:
+            # TODO: Handle
+            # Fetch the data from the source
+            print("Fetching data from the source...")
+            state_dict["plan_dict"]["context"] = result["data"]
+
+        elif action_type == PlanActionType.CREATE_PLAN:
+            # TODO: Handle creating a plan here
+            print("Proposing a plan...")
+            state_dict["plan_dict"]["proposed_plan"] = result["data"]
         
-        if state_dict["action_count"] > MAX_ACTIONS:
-            logging.error("Action count exceeded max actions, marking task as failed")
-            current_task["status"] = TaskStatus.FAILED
+        elif action_type == PlanActionType.REVISE_PLAN:
+            # TODO: Handle revising a plan here
+            # TODO: Run a PlanGraph here. The plan graph should take in the plan_context and return a proposed plan
+            state_dict["plan_dict"]["plan"] = result["data"]
+            print("Finalized plan!")
+            print(f"Plan: {state_dict['plan_dict']['plan']}")
+            current_task["status"] = Status.DONE
+        
     else:
-        logging.error(f"Action failed: {result['error']}")
-        # Optionally handle failure (retry, skip, or mark task as failed)
-        current_task["status"] = TaskStatus.FAILED  # For now, we'll just mark it as done
+        if result["error"]:
+            if action_type == ActionType.GENERATE:
+                print("Popping human message")
+                assert isinstance(state_dict["messages"][-1], HumanMessage)
+                state_dict["messages"].pop()
+            logging.error(f"Action failed: {result['error']}")
+            action["status"] = Status.FAILED
+        else:
+            if state_dict["action_count"] > MAX_ACTIONS and current_task["status"] == Status.IN_PROGRESS:
+                logging.error("Action count exceeded max actions, marking action as failed")
+                action["status"] = Status.FAILED
+            
+    if action["status"] == Status.FAILED:
+        logging.error("Action failed, marking task as failed")
+        current_task["status"] = Status.FAILED
+
+    if action["status"] in [Status.DONE, Status.FAILED]:
+        completed_action = current_task["actions"].pop(0)
+        save_action_data(completed_action)
+    else:
+        assert action["status"] == Status.IN_PROGRESS
+        logging.warning("Action is still in progress!")
     
     return {
         "keys": state_dict,
@@ -360,7 +413,7 @@ def decide_from_agent(state: GraphState) -> Literal["human_node", "task_manager"
     task_dict = state_dict["task_dict"]
     
     # Check for pending actions
-    current_task = get_task(task_dict, status=TaskStatus.IN_PROGRESS)
+    current_task = get_task(task_dict, status=Status.IN_PROGRESS)
     if current_task:
         if current_task["actions"]:
             return "action_node"
@@ -371,7 +424,20 @@ def decide_from_agent(state: GraphState) -> Literal["human_node", "task_manager"
 
 # Build graph
 def create_workflow() -> CompiledStateGraph:
-    """Creates and returns the compiled workflow"""
+    """
+    Creates and compiles the task management workflow graph.
+    
+    The workflow consists of several interconnected nodes:
+    - start_node: Initializes graph state and configuration
+    - agent_node: Central node managing agent state and decisions
+    - task_manager: Handles task lifecycle and completion
+    - human_node: Processes user input
+    - processor_node: Routes input to appropriate handlers
+    - action_node: Executes task-specific actions
+    
+    Returns:
+        CompiledStateGraph: Compiled workflow ready for execution
+    """
     workflow = StateGraph(GraphState)
     
     # Add nodes
@@ -437,6 +503,7 @@ def main():
                 print("\nTask Status:")
                 for task_name, task in value['keys']['task_dict'].items():
                     print(f"{task_name}: {task['status']}")
+                    break
         
         print("\n---\n")
     

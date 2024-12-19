@@ -1,9 +1,9 @@
 
 import logging
 from typing import Optional
-from tangents.graph_classes import Task, TaskStatus
+from tangents.graph_classes import Task, Status
 
-def get_task(task_dict: dict[str, Task], task_name: Optional[str] = None, status: Optional[TaskStatus] = TaskStatus.IN_PROGRESS) -> Task | None:
+def get_task(task_dict: dict[str, Task], task_name: Optional[str] = None, status: Optional[Status] = Status.IN_PROGRESS) -> Task | None:
     """Get a task from the task dictionary"""
     if task_name:
         task = task_dict.get(task_name)
@@ -20,7 +20,7 @@ def get_task(task_dict: dict[str, Task], task_name: Optional[str] = None, status
 
 def get_current_task(task_dict: dict[str, Task]) -> Task | None:
     """Get the next in progress task from the task dictionary"""
-    return get_task(task_dict, status=TaskStatus.IN_PROGRESS)
+    return get_task(task_dict, status=Status.IN_PROGRESS)
 
 def save_task_to_convex(task_name: str, task: Task, to_fail_table: bool = False) -> bool:
     """Save the task to the convex database"""
@@ -31,7 +31,7 @@ def save_completed_tasks(task_dict: dict[str, Task]) -> list[str]:
     """Save completed tasks to the task dictionary"""
     completed_tasks = []
     for task_name, task in task_dict.items():
-        if task["status"] == TaskStatus.DONE:
+        if task["status"] == Status.DONE:
             success = save_task_to_convex(task_name, task)
             if success:
                 completed_tasks.append(task_name)
@@ -44,7 +44,7 @@ def save_failed_tasks(task_dict: dict[str, Task]) -> list[str]:
     """Save failed tasks to the task dictionary"""
     failed_tasks = []
     for task_name, task in task_dict.items():
-        if task["status"] == TaskStatus.FAILED:
+        if task["status"] == Status.FAILED:
             success = save_task_to_convex(task_name, task, to_fail_table=True)
             if success:
                 failed_tasks.append(task_name)
@@ -55,13 +55,13 @@ def save_failed_tasks(task_dict: dict[str, Task]) -> list[str]:
 
 def start_next_task(task_dict: dict[str, Task]) -> bool:
     """Start the next task in the task dictionary. Returns True if a task is in progress."""
-    current_task = get_task(task_dict, status=TaskStatus.IN_PROGRESS)
+    current_task = get_task(task_dict, status=Status.IN_PROGRESS)
     if current_task:
         print("Task is already in progress!")
         return True
     
-    next_task = get_task(task_dict, status=TaskStatus.NOT_STARTED)
+    next_task = get_task(task_dict, status=Status.NOT_STARTED)
     if next_task:
-        next_task["status"] = TaskStatus.IN_PROGRESS
+        next_task["status"] = Status.IN_PROGRESS
         return True
     return False
