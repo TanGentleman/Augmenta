@@ -22,7 +22,7 @@ class Display:
     
     def __init__(self):
         """Initialize Display object with default values."""
-        self.delay = 0.05  # Seconds between displaying cards
+        self.delay = 0.05  # Default delay in seconds
         self.manager = Flashcards()
         
     def parse_args(self):
@@ -58,6 +58,12 @@ Examples:
             action="store_true",
             help="Show answers when displaying cards"
         )
+        display_parser.add_argument(
+            "--delay",
+            type=float,
+            default=0.05,
+            help="Delay in seconds between displaying cards (default: 0.05)"
+        )
 
         # Import command
         import_parser = subparsers.add_parser('import', help='Import flashcards from any JSON file')
@@ -91,10 +97,13 @@ Examples:
         if not filepath.exists():
             raise FileNotFoundError(f"JSON file not found: {filepath}")
         
-        with open(filepath) as f:
-            data = json.load(f)
-            if not isinstance(data, list):
-                raise ValueError(f"JSON file must contain a list: {filepath}")
+        try:    
+            with open(filepath) as f:
+                data = json.load(f)
+                if not isinstance(data, list):
+                    raise ValueError(f"JSON file must contain a list: {filepath}")
+        except json.decoder.JSONDecodeError as e:
+            raise ValueError(f"Broken JSON file: {e}")
         return True
 
     def display_command(self, args):
@@ -111,7 +120,10 @@ Examples:
         if args.limit > 0:
             self.manager.flashcards = self.manager.flashcards[:args.limit]
             
-        self.manager.display_flashcards(include_answer=args.show_answers, delay=self.delay)
+        self.manager.display_flashcards(
+            include_answer=args.show_answers,
+            delay=args.delay  # Use the delay from command line args
+        )
 
     def import_command(self, args):
         """
