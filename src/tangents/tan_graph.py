@@ -1,83 +1,67 @@
-"""
-State machine graph for managing conversational AI interactions.
+"""Directed graph implementation for managing conversational AI workflows.
 
-This module implements a directed graph that manages the flow of conversation, task execution,
-and action handling for an AI agent. The graph coordinates multiple components including:
+This module provides a state machine that coordinates conversations between users and AI agents,
+handling tasks, actions, and system commands. The graph manages state transitions between
+different processing nodes while maintaining conversation context and task state.
 
-- User input/output handling
-- Task management and execution
-- Action processing (generation, web search, etc.)
-- Command processing (system commands prefixed with /)
-- State management and persistence
+Components:
+    - GraphState: State container for messages, tasks, and config
+    - Nodes: Processing steps (agent, human, action handlers)
+    - Decision Functions: Route graph flow based on state
+    - Task Manager: Manages task lifecycle
+    - Action Executor: Handles individual task actions
 
-Key Components:
-- GraphState: Main state container tracking messages, tasks, config
-- Nodes: Discrete processing steps (agent, human, action, etc.)
-- Decision Functions: Route flow between nodes based on state
-- Task Manager: Handles task lifecycle (start, complete, fail)
-- Action Executor: Processes individual actions within tasks
+Example:
+    >>> app = create_workflow()
+    >>> state = {"keys": {}, "mutation_count": 0, "is_done": False}
+    >>> app.stream(state)
 
-Usage:
-    app = create_workflow()
-    initial_state = {
-        "keys": {},
-        "mutation_count": 0, 
-        "is_done": False
-    }
-    app.stream(initial_state)
-
-Graph Flow:
-START -> start_node: Initialize state
-start_node -> agent_node: Central coordinator
-agent_node -> human_node: Get user input
-agent_node -> task_manager: Handle tasks
-agent_node -> action_node: Execute actions
-agent_node -> END: Terminate workflow
+Flow:
+    START -> start_node (init) -> agent_node (coordinator) -> [
+        human_node (input) |
+        task_manager (tasks) |
+        action_node (execution) |
+        END (termination)
+    ]
 
 Configuration:
-- RECURSION_LIMIT: Max graph traversal depth (default: 50)
-- MAX_MUTATIONS: Max state mutations (default: 50) # TODO: Move to config
-- MAX_ACTIONS: Max actions per task (default: 5) # TODO: Move to config
-
-See Also:
-    GraphState: Main state container class
-    Action: Action definition and execution
-    Command: System command processing
+    RECURSION_LIMIT: Maximum graph traversal depth (default: 50)
+    MAX_MUTATIONS: Maximum state mutations per run (default: 50)
+    MAX_ACTIONS: Maximum actions per task (default: 5)
 """
 import logging
 from uuid import uuid4
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.state import CompiledStateGraph
 
-
 from tangents.template import INITIAL_GRAPH_STATE
-from .graph_classes import GraphState
+from .classes.graph_classes import GraphState
+from .nodes import (
+    start_node, agent_node, task_manager_node, human_node,
+    processor_node, execute_command_node, action_node,
+    decide_from_agent, decide_from_processor
+)
 
-# Constants
-from .nodes import start_node, agent_node, task_manager_node, human_node, processor_node, execute_command_node, action_node
-from .nodes import decide_from_agent, decide_from_processor
-# Constants
+# Maximum recursion depth for graph traversal
 RECURSION_LIMIT = 50
 
-# Build graph
 def create_workflow() -> CompiledStateGraph:
-    """
-    Creates and compiles the task management workflow graph.
+    """Create and compile the conversation workflow graph.
     
-    The workflow consists of several interconnected nodes:
-    - start_node: Initializes graph state and configuration
-    - agent_node: Central node managing agent state and decisions
-    - task_manager: Handles task lifecycle and completion
-    - human_node: Processes user input
-    - processor_node: Routes input to appropriate handlers
-    - action_node: Executes task-specific actions
+    Constructs a directed graph with nodes for:
+    - State initialization
+    - Agent coordination
+    - Task management
+    - User interaction
+    - Input processing
+    - Action execution
     
     Returns:
-        CompiledStateGraph: Compiled workflow ready for execution
+        CompiledStateGraph: Executable workflow graph
     """
     workflow = StateGraph(GraphState)
     
-    # Add nodes
+    # Core processing nodes
     workflow.add_node("start_node", start_node)
     workflow.add_node("agent_node", agent_node)
     workflow.add_node("task_manager", task_manager_node)
@@ -86,22 +70,23 @@ def create_workflow() -> CompiledStateGraph:
     workflow.add_node("execute_command", execute_command_node)
     workflow.add_node("action_node", action_node)
     
-    # Add edges
-    # workflow.set_entry_point("start_node")
+    # Graph structure
     workflow.add_edge(START, "start_node")
     workflow.add_edge("start_node", "agent_node")
     
+    # Agent decision routing
     workflow.add_conditional_edges(
         "agent_node",
         decide_from_agent,
         {
             "human_node": "human_node",
-            "task_manager": "task_manager",
+            "task_manager": "task_manager", 
             "action_node": "action_node",
             "end_node": END
         }
     )
     
+    # Input processing flow
     workflow.add_edge("human_node", "processor_node")
     workflow.add_conditional_edges(
         "processor_node",
@@ -111,15 +96,16 @@ def create_workflow() -> CompiledStateGraph:
             "agent_node": "agent_node"
         }
     )
+    
+    # Return paths to agent
     workflow.add_edge("execute_command", "agent_node")
     workflow.add_edge("action_node", "agent_node")
     workflow.add_edge("task_manager", "agent_node")
     
-    app = workflow.compile()
-    return app
+    return workflow.compile()
 
 def main():
-    """Main execution function"""
+    """Execute the workflow with initial state and configuration."""
     app = create_workflow()
     
     initial_state: GraphState = {
@@ -129,15 +115,17 @@ def main():
     }
     assert initial_state == INITIAL_GRAPH_STATE
 
-    app_config = {"recursion_limit": RECURSION_LIMIT,
-                  "configurable": {"thread_id": uuid4()}}
+    app_config = {
+        "recursion_limit": RECURSION_LIMIT,
+        "configurable": {"thread_id": uuid4()}
+    }
     
+    # Process workflow outputs
     for output in app.stream(initial_state, app_config):
         for key, value in output.items():
             print(f"\nNode: {key}")
             print(f"Mutations: {value['mutation_count']}")
             
-            # Debug task state
             if 'task_dict' in value['keys']:
                 print("\nTask Status:")
                 for task_name, task in value['keys']['task_dict'].items():
@@ -149,19 +137,13 @@ def main():
     print("Workflow completed.")
 
 def set_env_vars():
-    """
-    This function sets the environment variables for the workflow.
-
-    Configures:
-    - Provider keys
-    - Langsmith tracing 
-
-    Environment variables:
-    ---
-    LANGCHAIN_TRACING_V2=""
-    LANGCHAIN_API_KEY=""
-    LANGCHAIN_PROJECT=""
-    LITELLM_API_KEY=""
+    """Load environment variables from .env file.
+    
+    Required variables:
+        LANGCHAIN_TRACING_V2: Tracing configuration
+        LANGCHAIN_API_KEY: LangChain API credentials  
+        LANGCHAIN_PROJECT: Project identifier
+        LITELLM_API_KEY: LiteLLM API credentials
     """
     from dotenv import load_dotenv
     load_dotenv()
@@ -169,4 +151,3 @@ def set_env_vars():
 if __name__ == "__main__":
     set_env_vars()
     main()
-    # save_graph()
