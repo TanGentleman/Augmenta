@@ -1,7 +1,66 @@
 import logging
 from typing import Dict, Any
 
-from ..graph_classes import Action, ActionType, ActionResult, PlanActionType
+from ..classes.graph_classes import Action, ActionArgs, ActionType, ActionResult, PlanActionType, Status
+
+
+def get_revise_plan_args(args: ActionArgs) -> ActionArgs:
+    """Get default arguments for revise plan action."""
+    DEFAULT_MAX_REVISIONS = 3
+    if "max_revisions" not in args:
+        args["max_revisions"] = DEFAULT_MAX_REVISIONS
+    if "revision_count" not in args:
+        args["revision_count"] = 0
+    if "proposed_plan" not in args:
+        args["proposed_plan"] = None
+    return args
+
+def get_create_plan_args(args: ActionArgs) -> ActionArgs:
+    """Get default arguments for create plan action."""
+    if "plan_context" not in args:
+        args["plan_context"] = None
+    return args
+
+def get_generate_args(args: ActionArgs) -> ActionArgs:
+    """Get default arguments for generate action."""
+    if "chain" not in args:
+        args["chain"] = None
+    if "messages" not in args:
+        args["messages"] = []
+    return args
+
+ACTION_ARG_HANDLERS = {
+    PlanActionType.REVISE_PLAN: get_revise_plan_args,
+    PlanActionType.CREATE_PLAN: get_create_plan_args,
+    ActionType.GENERATE: get_generate_args
+}
+
+def create_action(action_type: ActionType | PlanActionType, args: ActionArgs = {}) -> Action:
+    """Create a new action with default configuration.
+    
+    Args:
+        action_type: Type of action to create
+        args: Optional action arguments
+        
+    Returns:
+        Configured Action instance
+        
+    Raises:
+        AssertionError: If arguments are invalid
+    """
+    assert isinstance(action_type, ActionType | PlanActionType)
+    assert isinstance(args, dict)
+
+    if action_type in ACTION_ARG_HANDLERS:
+        args = ACTION_ARG_HANDLERS[action_type](args)
+    
+    return Action(
+        type=action_type,
+        status=Status.NOT_STARTED,
+        args=args,
+        result=None
+    )
+
 
 def execute_action(action: Action, state_dict: Dict[str, Any]) -> ActionResult:
     """Execute a specific action and return the result."""

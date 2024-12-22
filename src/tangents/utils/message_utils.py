@@ -1,3 +1,4 @@
+import logging
 from langchain_core.messages import SystemMessage, HumanMessage
 
 def insert_system_message(messages: list, system_content: str) -> None:
@@ -5,6 +6,7 @@ def insert_system_message(messages: list, system_content: str) -> None:
     if not messages:
         messages.append(SystemMessage(content=system_content))
     elif isinstance(messages[0], SystemMessage):
+        logging.warning("System message already exists, updating")
         messages[0] = SystemMessage(content=system_content)
     else:
         messages.insert(0, SystemMessage(content=system_content))

@@ -1,7 +1,7 @@
 
 import logging
 from typing import Optional
-from tangents.graph_classes import Task, Status
+from tangents.classes.graph_classes import Task, Status
 
 def get_task(task_dict: dict[str, Task], task_name: Optional[str] = None, status: Optional[Status] = Status.IN_PROGRESS) -> Task | None:
     """Get a task from the task dictionary"""
