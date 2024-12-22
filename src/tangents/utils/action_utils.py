@@ -1,7 +1,7 @@
 import logging
 from typing import Dict, Any
 
-from ..classes.graph_classes import Action, ActionArgs, ActionType, ActionResult, PlanActionType, Status
+from tangents.classes.actions import Action, ActionArgs, ActionType, ActionResult, PlanActionType, Status
 
 
 def get_revise_plan_args(args: ActionArgs) -> ActionArgs:

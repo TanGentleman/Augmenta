@@ -1,4 +1,8 @@
-from tangents.classes.graph_classes import AgentState, ChatSettings, Config, PlanActionType, RAGSettings, Task, Status, TaskType
+from tangents.classes.states import AgentState
+from tangents.classes.tasks import Task, TaskType
+from tangents.classes.actions import PlanActionType, Status
+from tangents.classes.settings import Config, ChatSettings, RAGSettings
+
 from tangents.utils.action_utils import create_action
 INITIAL_GRAPH_STATE = {
     "keys": {},

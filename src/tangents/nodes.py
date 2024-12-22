@@ -38,7 +38,11 @@ from tangents.utils.chains import get_summary_chain, get_llm
 from tangents.utils.task_utils import get_task, save_completed_tasks, save_failed_tasks, start_next_task
 from augmenta.utils import read_sample
 
-from .classes.graph_classes import Action, ActionType, GraphState, Command, CommandType, PlanActionType, Status, TaskType
+from .classes.tasks import Task, TaskType
+from .classes.actions import Action, PlanActionType, Status, ActionType
+from .classes.commands import Command, CommandType
+from .classes.states import GraphState, PlanState
+
 from .utils.message_utils import insert_system_message, remove_last_message, clear_messages
 from .utils.action_utils import execute_action, save_action_data, create_action
 

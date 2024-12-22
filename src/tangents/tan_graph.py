@@ -35,7 +35,7 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.graph.state import CompiledStateGraph
 
 from tangents.template import INITIAL_GRAPH_STATE
-from .classes.graph_classes import GraphState
+from .classes.states import GraphState
 from .nodes import (
     start_node, agent_node, task_manager_node, human_node,
     processor_node, execute_command_node, action_node,
