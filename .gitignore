@@ -1,20 +1,36 @@
+# System and IDE files
 .DS_Store
-.env
-.venv/
-.venv310/
-.venv311/
-.venv312/
-__pycache__/
-
-*.pdf
-*.md
-*.txt
-*.json
-# *.png
-
-src/data/databases/
-deprecated/
-images/
-notebooks/
 .cache
+.env
+.gitattributes
+.gitignore
+.vscode/settings.json
+
+# Python
+__pycache__/
+.venv/
+poetry.lock
+
+# Project directories
+deprecated/
+deprecated-documents/
+example-outputs/
+images/
 junk-to-sort/
+pdfs/
+
+# Source exclusions
+src/*
+!src/tangents/
+
+# Specific paths
+src/augmenta/config/active.json
+src/data/databases/
+src/flash/data/
+
+# Commented file types
+# *.json
+# *.md
+# *.pdf
+# *.png
+# *.txt
