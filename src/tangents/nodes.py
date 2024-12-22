@@ -38,9 +38,9 @@ from tangents.utils.chains import get_summary_chain, get_llm
 from tangents.utils.task_utils import get_task, save_completed_tasks, save_failed_tasks, start_next_task
 from augmenta.utils import read_sample
 
-from .graph_classes import Action, ActionType, GraphState, Command, CommandType, PlanActionType, Status, TaskType, create_action
+from .classes.graph_classes import Action, ActionType, GraphState, Command, CommandType, PlanActionType, Status, TaskType
 from .utils.message_utils import insert_system_message, remove_last_message, clear_messages
-from .utils.action_utils import execute_action, save_action_data
+from .utils.action_utils import execute_action, save_action_data, create_action
 
 # Constants
 MAX_MUTATIONS = 50
@@ -69,15 +69,7 @@ def agent_node(state: GraphState) -> GraphState:
             insert_system_message(
                 state_dict["messages"],
                 state_dict["config"].chat_settings.system_message
-            )
-        # INIT_WITH_CHAT_CHAIN = False
-        # if INIT_WITH_CHAT_CHAIN and state_dict["active_chain"] is None:
-        #     llm = get_llm(state_dict["config"].chat_settings.primary_model)
-        #     if llm is not None:
-        #         state_dict["active_chain"] = llm
-        #     else:
-        #         raise ValueError("Chain not initialized!")
-            
+            )            
     
     # Check failure conditions
     if state["mutation_count"] > MAX_MUTATIONS:

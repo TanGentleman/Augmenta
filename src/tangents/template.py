@@ -1,7 +1,6 @@
-from typing import Optional
-from tangents.graph_classes import Action, ActionArgs, ActionType, AgentState, ChatSettings, Config, PlanActionType, RAGSettings, Task, Status, TaskType, create_action
-
-STATE_ZERO = {
+from tangents.classes.graph_classes import AgentState, ChatSettings, Config, PlanActionType, RAGSettings, Task, Status, TaskType
+from tangents.utils.action_utils import create_action
+INITIAL_GRAPH_STATE = {
     "keys": {},
     "mutation_count": 0,
     "is_done": False
@@ -85,8 +84,7 @@ PLANNING_STATE_DICT = {
     "user_input": None,
     "active_chain": None,
     "tool_choice": None,
-    "task_dict": {"plan_from_email_task": EXAMPLE_PLANNING_TASK,
-                  "chat_task": EXAMPLE_CHAT_TASK},
+    "task_dict": {"plan_from_email_task": EXAMPLE_PLANNING_TASK},
     "mock_inputs": MOCK_INPUTS.DEFAULT,
     "plan_dict": {
         "context": None,
