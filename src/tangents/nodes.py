@@ -21,12 +21,12 @@ from tangents.utils.task_utils import (
 from augmenta.utils import read_sample
 
 from .classes.tasks import Task, TaskType
-from .classes.actions import PlanActionType, Status, ActionType  
+from .classes.actions import Action, PlanActionType, Status, ActionType  
 from .classes.commands import Command, CommandType
 from .classes.states import GraphState
 
 from .utils.message_utils import insert_system_message, remove_last_message, clear_messages
-from .utils.action_utils import add_stash_action, is_stash_action_next, save_action_data, create_action
+from .utils.action_utils import add_stash_action, is_human_action_next, is_stash_action_next, save_action_data, create_action
 from .utils.execute_action import execute_action
 
 # Constants
@@ -78,7 +78,7 @@ def agent_node(state: GraphState) -> GraphState:
         "is_done": is_done
     }
 
-def start_task(task: Task, config: Config):
+def start_task(task: Task, config: Config) -> Task:
     """Initialize a new task with proper state based on task type."""
     if task["status"] != Status.NOT_STARTED:
         raise ValueError("Task must have NOT_STARTED status to start!")
@@ -171,10 +171,16 @@ def task_manager_node(state: GraphState) -> GraphState:
             for name in stashed_task_names:
                 del task_dict[name]
     
+    if not task_dict:
+        logging.info("No tasks remaining!")
+        is_done = True
+    else:
+        is_done = False
+
     return {
         "keys": state_dict,
         "mutation_count": state["mutation_count"] + 1,
-        "is_done": False
+        "is_done": is_done
     }
 
 def human_node(state: GraphState) -> GraphState:
@@ -186,15 +192,19 @@ def human_node(state: GraphState) -> GraphState:
     """
     state_dict = state["keys"]
     mock_inputs = state_dict["mock_inputs"]
-    
+    current_task = get_task(state_dict["task_dict"], status=Status.IN_PROGRESS)
+    assert current_task is not None, "No in-progress task found"
+
+    if is_human_action_next(current_task["actions"]):
+        # TODO: Handle interrupt_context based on task
+        pass
+
     if mock_inputs:
         print(f"Mock inputs: {mock_inputs}")
         user_input = mock_inputs.pop(0)
     else:
-        task_dict = state_dict["task_dict"]
-        current_task = get_task(task_dict, status=Status.IN_PROGRESS)
-        assert current_task is not None, "No in-progress task found"
-        
+        # TODO: Handle interrupt_context based on task
+        # NOTE: Three different cases: 1. Get user input string, 2. Validate with bool, 3. Updates to state
         interrupt_context = {
             # "task_type": current_task["type"].value,
             # "task_state": current_task["state"],
@@ -221,12 +231,17 @@ def processor_node(state: GraphState) -> GraphState:
     """
     state_dict = state["keys"]
     task_dict = state_dict["task_dict"]
-    user_input = state_dict["user_input"]
     config = state_dict["config"]
+    current_task = get_task(task_dict, status=Status.IN_PROGRESS)
+    assert current_task is not None, "No in-progress task found"
     
-    # NOTE: Add logic for HITL tasks that shouldn't append messages
+    # TODO: HITL behavior is set by ActionType.HUMAN_INPUT
+    if is_human_action_next(current_task["actions"]):
+        # TODO: Handle interrupt_context based on task
+        current_task["actions"].pop(0)
+
+    user_input = state_dict["user_input"]
     if not user_input.startswith('/'):
-        current_task = get_task(task_dict, status=Status.IN_PROGRESS)
         if not current_task:
             raise ValueError("No in-progress task found")
         
@@ -249,9 +264,9 @@ def processor_node(state: GraphState) -> GraphState:
                         "stream": task_state["stream"]
                     }
                 )
-                # current_task["actions"].append(create_action(ActionType.STASH))
-                # NOTE: Should this always be appended?
                 current_task["actions"].append(generate_action)
+                assert len(current_task["actions"]) == 1 or is_stash_action_next(current_task["actions"]), "Only one action should be queued for chat!"
+                # Can stash here if needed
 
             case TaskType.RAG:
                 if config.rag_settings.enabled:
@@ -260,6 +275,7 @@ def processor_node(state: GraphState) -> GraphState:
                     raise ValueError("RAG task is disabled!")
                     
             case TaskType.PLANNING:
+                # Handle cases during PLANNING task
                 if task_state["proposed_plan"]:
                     if task_state["plan"] is not None:
                         raise ValueError("Plan is already created!")
@@ -268,11 +284,43 @@ def processor_node(state: GraphState) -> GraphState:
             case _:
                 raise ValueError("Invalid task type")
     
+    assert not is_human_action_next(current_task["actions"]), "Human action should be removed by the end of the node!"
     return {
         "keys": state_dict,
         "mutation_count": state["mutation_count"] + 1,
         "is_done": False
     }
+
+def start_action(action: Action, task: Task) -> Action:
+    """Initialize an action with required state before execution."""
+    action["status"] = Status.IN_PROGRESS
+    
+    # Initialize action args from task state if needed
+    task_state = task["state"]
+    action_args = action["args"]
+
+    if action["type"] == ActionType.GENERATE:
+        if task["type"] == TaskType.CHAT:
+            if action_args.get("active_chain") is None:
+                action_args["active_chain"] = task_state["active_chain"]
+            if action_args.get("messages") is None:
+                action_args["messages"] = task_state["messages"]
+            if action_args.get("stream") is None:
+                action_args["stream"] = task_state["stream"]
+        else:
+            raise ValueError("Missing support in start_action for ActionType.GENERATE!")
+
+    elif action["type"] == PlanActionType.PROPOSE_PLAN:
+        if action_args.get("plan_context") is None:
+            action_args["plan_context"] = task_state["context"]
+
+    elif action["type"] == PlanActionType.REVISE_PLAN:
+        if action_args.get("proposed_plan") is None:
+            action_args["proposed_plan"] = task_state["proposed_plan"]
+        if action_args.get("revision_count") is None:
+            action_args["revision_count"] = 0
+
+    return action
 
 def action_node(state: GraphState) -> GraphState:
     """
@@ -303,8 +351,9 @@ def action_node(state: GraphState) -> GraphState:
         action["status"] = Status.IN_PROGRESS
     assert action["status"] == Status.IN_PROGRESS
 
+    action = start_action(action, current_task)
     logging.info(f"Executing action: {action}")
-    result = execute_action(action, current_task)
+    result = execute_action(action)
     logging.info(result)
 
     task_state = current_task["state"]
@@ -325,7 +374,7 @@ def action_node(state: GraphState) -> GraphState:
                 print("Fetching data from the source...")
                 task_state["context"] = result["data"]
 
-            case PlanActionType.CREATE_PLAN:
+            case PlanActionType.PROPOSE_PLAN:
                 print("Proposing a plan...")
                 task_state["proposed_plan"] = result["data"]
             
@@ -501,7 +550,12 @@ def decide_from_agent(state: GraphState) -> Literal["human_node", "task_manager"
     current_task = get_task(task_dict, status=Status.IN_PROGRESS)
     if current_task:
         if current_task["actions"]:
-            return "task_manager" if is_stash_action_next(current_task["actions"]) else "action_node"
+            if is_stash_action_next(current_task["actions"]):
+                return "task_manager"
+            elif is_human_action_next(current_task["actions"]):
+                return "human_node"
+            else:
+                return "action_node"
         return "human_node"
     
     return "task_manager"

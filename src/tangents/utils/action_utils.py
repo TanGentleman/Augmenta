@@ -14,7 +14,7 @@ def get_revise_plan_args(args: ActionArgs) -> ActionArgs:
         args["proposed_plan"] = None
     return args
 
-def get_create_plan_args(args: ActionArgs) -> ActionArgs:
+def get_PROPOSE_PLAN_args(args: ActionArgs) -> ActionArgs:
     """Get default arguments for create plan action."""
     if "plan_context" not in args:
         args["plan_context"] = None
@@ -30,7 +30,7 @@ def get_generate_args(args: ActionArgs) -> ActionArgs:
 
 ACTION_ARG_HANDLERS = {
     PlanActionType.REVISE_PLAN: get_revise_plan_args,
-    PlanActionType.CREATE_PLAN: get_create_plan_args,
+    PlanActionType.PROPOSE_PLAN: get_PROPOSE_PLAN_args,
     ActionType.GENERATE: get_generate_args
 }
 
@@ -70,6 +70,12 @@ def is_stash_action_next(action_list: list[Action]) -> bool:
     if not action_list:
         return False
     return action_list[0]["type"] == ActionType.STASH
+
+def is_human_action_next(action_list: list[Action]) -> bool:
+    """Check if the next action is a HumanAction"""
+    if not action_list:
+        return False
+    return action_list[0]["type"] == ActionType.HUMAN_INPUT
 
 def add_stash_action(action_list: list[Action]) -> None:
     """Add a StashAction to the START of the action list."""
