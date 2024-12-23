@@ -8,10 +8,6 @@ class AgentState(TypedDict):
     
     Attributes:
         config: Global configuration
-        messages: Conversation history
-        response_count: Number of agent responses
-        active_chain: Currently executing chain
-        tool_choice: Selected tool for execution
         user_input: Latest user input
         mock_inputs: Test inputs for simulation
         task_dict: Active tasks by ID
@@ -21,6 +17,7 @@ class AgentState(TypedDict):
     user_input: Optional[str]
     mock_inputs: list[str]
     task_dict: dict[str, Task]
+    action_count: int
 
 class GraphState(TypedDict):
     """Overall graph execution state.
@@ -40,14 +37,10 @@ class ChatTaskState(TypedDict):
     
     Attributes:
         messages: Conversation history
-        response_count: Number of agent responses
         active_chain: Currently executing chain
         tool_choice: Selected tool for execution
-        user_input: Latest user input
-        mock_inputs: Test inputs for simulation
     """
     messages: list[dict]
-    response_count: int
     active_chain: Optional[object]
     tool_choice: Optional[str]
 

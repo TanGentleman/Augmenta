@@ -1,36 +1,17 @@
 """
-Node functions for the Agentic workflow graph.
+Processing node implementations for the workflow graph.
 
-Each node represents a discrete processing step in the workflow.
+Contains the core node functions that process GraphState and implement the workflow logic.
+Each node takes a GraphState as input and returns an updated state. These functions are
+meant to be used as StateGraph nodes and should not be called directly.
 
-Node Types:
-- start_node: Initializes graph state and configuration
-- agent_node: Coordinates agent state and decisions 
-- task_manager_node: Manages task lifecycle (start/complete/fail)
-- human_node: Processes user input
-- processor_node: Routes input to handlers
-- execute_command_node: Processes system commands
-- action_node: Executes task-specific actions
-
-Each node:
-1. Takes a GraphState containing current state
-2. Processes according to its responsibility 
-3. Returns updated GraphState with modifications
-
-The nodes are used by StateGraph to construct the workflow and should not be called directly.
-
-Dependencies:
-    GraphState - State container
-    Action - Action execution
-    Command - System commands
-    Task utilities
+See tan_graph.py for the complete workflow architecture and node descriptions.
 """
 
 from typing import Literal
 from langchain_core.messages import HumanMessage, AIMessage
 import logging
 
-from tangents.template import INITIAL_STATE_DICT, PLANNING_STATE_DICT
 from tangents.utils.chains import get_summary_chain, get_llm
 from tangents.utils.task_utils import get_task, save_completed_tasks, save_failed_tasks, save_stashed_tasks, start_next_task, stash_task
 from augmenta.utils import read_sample
@@ -47,7 +28,6 @@ from .utils.execute_action import execute_action
 # Constants
 MAX_MUTATIONS = 50
 MAX_ACTIONS = 5
-DEFAULT_STATE_DICT = INITIAL_STATE_DICT
 
 def validate_state(state: GraphState) -> GraphState:
     """Validate required fields in state dictionary."""
@@ -72,13 +52,15 @@ def agent_node(state: GraphState) -> GraphState:
     """Manages agent state and decision making."""
     state_dict = state["keys"]
     task_dict = state_dict["task_dict"]
+    current_task = get_task(task_dict, status=Status.IN_PROGRESS)
     
-    # Check failure conditions
-    if state["mutation_count"] > MAX_MUTATIONS:
-        logging.warning("Mutation count exceeded max mutations!")
-        current_task = get_task(task_dict, status=Status.IN_PROGRESS)
-        if current_task:
-            logging.error("Task is still in progress, marking as failed")
+    if current_task:
+        # Check failure conditions
+        if state_dict["action_count"] > MAX_ACTIONS:
+            logging.error("Action count exceeded max actions, marking task as failed")
+            current_task["status"] = Status.FAILED
+        elif state["mutation_count"] > MAX_MUTATIONS:
+            logging.error("Mutation count exceeded, marking task as failed")
             current_task["status"] = Status.FAILED
 
     return {
@@ -343,10 +325,6 @@ def action_node(state: GraphState) -> GraphState:
         else:
             if action_type == PlanActionType.REVISE_PLAN:
                 action["args"]["revision_count"] += 1
-
-            if state_dict["action_count"] > MAX_ACTIONS and current_task["status"] == Status.IN_PROGRESS:
-                logging.error("Action count exceeded max actions, marking action as failed")
-                action["status"] = Status.FAILED
             
     if action["status"] == Status.FAILED:
         logging.error("Action failed, marking task as failed")
