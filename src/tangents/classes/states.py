@@ -3,7 +3,7 @@ from typing_extensions import TypedDict
 from tangents.classes.settings import Config
 from tangents.classes.tasks import Task
 
-class AgentState(TypedDict, total=True):
+class AgentState(TypedDict):
     """Core agent runtime state.
     
     Attributes:
@@ -17,10 +17,12 @@ class AgentState(TypedDict, total=True):
         task_dict: Active tasks by ID
     """
     config: Config
-    messages: list[dict]
-    response_count: int
-    active_chain: Optional[object]
-    tool_choice: Optional[str]
+    # Config includes global settings - side effects impacted by these.
+    # Config can include overrides, like FORCE_LOCAL_MODELS.
+    messages: list[dict] # ? Move to chat_task_state ?
+    response_count: int # move to chat_task_state
+    active_chain: Optional[object] # move to chat_task_state
+    tool_choice: Optional[str] # move to chat_task_state
     user_input: Optional[str]
     mock_inputs: list[str]
     task_dict: dict[str, Task]
@@ -36,6 +38,23 @@ class GraphState(TypedDict):
     keys: AgentState
     mutation_count: int
     is_done: bool
+
+# Should task states be an instance of TaskState in tasks.py?
+class ChatTaskState(TypedDict):
+    """Task-specific state for chat tasks.
+    
+    Attributes:
+        messages: Conversation history
+        response_count: Number of agent responses
+        active_chain: Currently executing chain
+        tool_choice: Selected tool for execution
+        user_input: Latest user input
+        mock_inputs: Test inputs for simulation
+    """
+    messages: list[dict]
+    response_count: int
+    active_chain: Optional[object]
+    tool_choice: Optional[str]
 
 class PlanState(TypedDict):
     """Arguments for planning actions.

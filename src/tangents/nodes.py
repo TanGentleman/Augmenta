@@ -35,21 +35,21 @@ import logging
 
 from tangents.template import INITIAL_STATE_DICT, PLANNING_STATE_DICT
 from tangents.utils.chains import get_summary_chain, get_llm
-from tangents.utils.task_utils import get_task, save_completed_tasks, save_failed_tasks, start_next_task
+from tangents.utils.task_utils import get_task, save_completed_tasks, save_failed_tasks, save_stashed_tasks, start_next_task, stash_task
 from augmenta.utils import read_sample
 
 from .classes.tasks import Task, TaskType
 from .classes.actions import Action, PlanActionType, Status, ActionType
 from .classes.commands import Command, CommandType
-from .classes.states import GraphState, PlanState
+from .classes.states import GraphState
 
 from .utils.message_utils import insert_system_message, remove_last_message, clear_messages
-from .utils.action_utils import execute_action, save_action_data, create_action
+from .utils.action_utils import execute_action, is_stash_action_next, save_action_data, create_action
 
 # Constants
 MAX_MUTATIONS = 50
 MAX_ACTIONS = 5
-DEFAULT_STATE_DICT = INITIAL_STATE_DICT
+DEFAULT_STATE_DICT = PLANNING_STATE_DICT
 
 def start_node(state: GraphState) -> GraphState:
     """Initialize the graph state with configuration and default task"""
@@ -123,6 +123,7 @@ def task_manager_node(state: GraphState) -> GraphState:
             del task_dict[task_name]
     
     is_running = start_next_task(task_dict)
+
     # Check task completion
     if not is_running:
         logging.info("No tasks remaining!")
@@ -132,7 +133,23 @@ def task_manager_node(state: GraphState) -> GraphState:
             "mutation_count": state["mutation_count"] + 1,
             "is_done": True
         }
-
+    
+    current_task = get_task(task_dict, status=Status.IN_PROGRESS)
+    if not current_task:
+        raise ValueError("Expected in-progress task but none found")
+    
+    if is_stash_action_next(current_task["actions"]):
+        stashed_task_names = save_stashed_tasks(task_dict)
+        if stashed_task_names:
+            logging.info(f"Stashed tasks: {stashed_task_names}")
+            for task_name in stashed_task_names:
+                del task_dict[task_name]
+        return {
+            "keys": state_dict,
+            "mutation_count": state["mutation_count"] + 1,
+            "is_done": False
+        }
+    
     return {
         "keys": state_dict,
         "mutation_count": state["mutation_count"] + 1,
@@ -240,15 +257,14 @@ def action_node(state: GraphState) -> GraphState:
     if not current_task["actions"]:
         raise ValueError("No actions found for in-progress task.")
     
-
     # Get next action and execute it
     action = current_task["actions"][0]
     action_type = action["type"]
+    assert action_type != ActionType.STASH, "Stash action should be handled in task manager"
     if action["status"] == Status.NOT_STARTED:
         action["status"] = Status.IN_PROGRESS
     assert action["status"] == Status.IN_PROGRESS
 
-    ### Load required state variables into action args ###
 
     logging.info(f"Executing action: {action}")
     result = execute_action(action, state_dict)
@@ -256,6 +272,7 @@ def action_node(state: GraphState) -> GraphState:
     
     if result["success"]:
         logging.info(f"Action succeeded: {result['data']}")
+        # NOTE: Is action_count officially a state variable?
         state_dict["action_count"] += 1
         action["status"] = Status.DONE
 
@@ -427,7 +444,11 @@ def decide_from_agent(state: GraphState) -> Literal["human_node", "task_manager"
     current_task = get_task(task_dict, status=Status.IN_PROGRESS)
     if current_task:
         if current_task["actions"]:
-            return "action_node"
+            # If action is stash, we need to get to the task manager
+            if is_stash_action_next(current_task["actions"]):
+                return "task_manager"
+            else:
+                return "action_node"
         else:
             return "human_node"
     

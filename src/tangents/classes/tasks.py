@@ -15,6 +15,11 @@ class TaskType(Enum):
     RAG = "rag"
     PLANNING = "planning"
 
+# NOTE: Not sure if states.py is the right place for this
+class TaskState(TypedDict):
+    """Abstract base class for task-specific state."""
+    pass
+
 class Task(TypedDict):
     """Task definition and execution state.
     
@@ -23,8 +28,10 @@ class Task(TypedDict):
         status: Current execution status
         conditions: Optional execution prerequisites
         actions: Ordered list of actions to execute
+        state: Task-specific state
     """
     type: TaskType
     status: Status
     conditions: Optional[dict]
     actions: list[Action]
+    state: Optional[TaskState]

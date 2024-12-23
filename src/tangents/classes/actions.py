@@ -41,6 +41,7 @@ class ActionType(Enum):
     WEB_SEARCH = "web_search"
     SAVE_DATA = "save_data"
     TOOL_CALL = "tool_call"
+    STASH = "stash"
 
 class ActionArgs(TypedDict):
     """Base class for action arguments."""

@@ -1,5 +1,5 @@
 import logging
-from typing import Dict, Any
+from typing import Any
 
 from tangents.classes.actions import Action, ActionArgs, ActionType, ActionResult, PlanActionType, Status
 
@@ -62,10 +62,12 @@ def create_action(action_type: ActionType | PlanActionType, args: ActionArgs = {
     )
 
 
-def execute_action(action: Action, state_dict: Dict[str, Any]) -> ActionResult:
+def execute_action(action: Action, state_dict: dict[str, Any]) -> ActionResult:
     """Execute a specific action and return the result."""
     # TODO: Eventually reduce dependency on state_dict
     # Everything should fit as args to the action
+
+    # TODO: Replace state_dict with task_state
     action_type = action["type"]
     action_args = action["args"]
 
@@ -221,3 +223,8 @@ def save_action_data(action: Action) -> bool:
     logging.info(f"Saving action data: {action}")
     return True
 
+def is_stash_action_next(action_list: list[Action]) -> bool:
+    """Check if the next action is a StashAction"""
+    if not action_list:
+        return False
+    return action_list[0]["type"] == ActionType.STASH
