@@ -7,10 +7,11 @@ meant to be used as StateGraph nodes and should not be called directly.
 
 See tan_graph.py for the complete workflow architecture and node descriptions.
 """
-
+import logging
 from typing import Literal
 from langchain_core.messages import HumanMessage, AIMessage
-import logging
+from langgraph.types import interrupt
+
 
 from tangents.utils.chains import get_summary_chain, get_llm
 from tangents.utils.task_utils import get_task, save_completed_tasks, save_failed_tasks, save_stashed_tasks, start_next_task, stash_task
@@ -176,7 +177,6 @@ def task_manager_node(state: GraphState) -> GraphState:
 
 def human_node(state: GraphState) -> GraphState:
     """Handles human input."""
-    # TODO: Implement Interrupt for HITL tasks
     # https://langchain-ai.github.io/langgraph/concepts/human_in_the_loop/#interrupt
     state_dict = state["keys"]
     mock_inputs = state_dict["mock_inputs"]
@@ -184,12 +184,19 @@ def human_node(state: GraphState) -> GraphState:
         print(f"Mock inputs: {mock_inputs}")
         user_input = mock_inputs.pop(0)
     else:
-        user_input = input("Enter your message: ").strip()
-        if not user_input:
-            print("No input provided, click enter again to quit...")
-            user_input = input().strip()
-            if not user_input:
-                user_input = "/quit"
+        # Get current task info for interrupt context
+        task_dict = state_dict["task_dict"]
+        current_task = get_task(task_dict, status=Status.IN_PROGRESS)
+        assert current_task is not None, "No in-progress task found"
+        
+        # Use interrupt to pause graph and get input
+        interrupt_context = {
+            # "task_type": current_task["type"].value,
+            # "task_state": current_task["state"],
+            "prompt": "Enter your message (or /help for commands):"
+        }
+        
+        user_input = interrupt(interrupt_context)
     
     state_dict["user_input"] = user_input
     
@@ -279,9 +286,9 @@ def action_node(state: GraphState) -> GraphState:
     logging.info(f"Executing action: {action}")
     result = execute_action(action, current_task)
     logging.info(result)
-    
+
+    task_state = current_task["state"]
     if result["success"]:
-        task_state = current_task["state"]
         logging.info(f"Action succeeded: {result['data']}")
         state_dict["action_count"] += 1
         action["status"] = Status.DONE

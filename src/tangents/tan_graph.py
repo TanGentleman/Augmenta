@@ -33,6 +33,8 @@ import logging
 from uuid import uuid4
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.state import CompiledStateGraph
+from langgraph.checkpoint.memory import MemorySaver
+from langgraph.types import Command as ResumeCommand
 
 from tangents.template import INITIAL_GRAPH_STATE, INITIAL_STATE_DICT, PLANNING_STATE_DICT
 from .classes.states import GraphState
@@ -44,7 +46,7 @@ from .nodes import (
 
 # Maximum recursion depth for graph traversal
 RECURSION_LIMIT = 50
-DEFAULT_AGENT_STATE = PLANNING_STATE_DICT
+DEFAULT_AGENT_STATE = INITIAL_STATE_DICT
 
 def create_workflow() -> CompiledStateGraph:
     """Create and compile the conversation workflow graph.
@@ -101,7 +103,9 @@ def create_workflow() -> CompiledStateGraph:
     workflow.add_edge("action_node", "agent_node")
     workflow.add_edge("task_manager", "agent_node")
     
-    return workflow.compile()
+    return workflow.compile(
+        checkpointer=MemorySaver()
+    )
 
 def main():
     """Run the workflow with initial state and configuration."""
@@ -119,24 +123,53 @@ def main():
     graph_state["keys"] = DEFAULT_AGENT_STATE
 
     # Configure app settings
+    unique_thread = {"thread_id": uuid4()}
+    thread_config = {
+        "configurable": unique_thread
+    }
     app_config = {
         "recursion_limit": RECURSION_LIMIT,
-        "configurable": {"thread_id": uuid4()}
+        "configurable": unique_thread
     }
     
-    # Process and display workflow outputs
-    for output in app.stream(graph_state, app_config):
+    def process_output(output, app_config):
         for key, value in output.items():
-            print(f"\nNode: {key}")
-            print(f"Mutations: {value['mutation_count']}")
+            if key == "__interrupt__":
+                # print("interrupt received!")
+                interrupt_value = value[0].value
+                interrupt_prompt = ""
+                if "prompt" in interrupt_value:
+                    interrupt_prompt = interrupt_value["prompt"]
+                else:
+                    # TODO: Handle other interrupt cases
+                    raise ValueError("Unhandled interrupt case")
+                # current_state = app.get_state(thread_config)
+                # print(f"Current state: {current_state.values}")
+                # print(f"Current tasks: {current_state.tasks}")
+                user_input = input(f"{interrupt_prompt}\n").strip()
+                if not user_input:
+                    print("No input provided, click enter again to quit...")
+                    user_input = input().strip()
+                    if not user_input:
+                        user_input = "/quit"
+
+                for interrupt_output in app.stream(ResumeCommand(resume=user_input), app_config):
+                    process_output(interrupt_output, app_config)
+                return
             
+            print(f"\nNode: {key}")
+            print(f"Hops: {value['mutation_count']}")
+                
             if 'task_dict' in value['keys']:
-                print("\nTask Status:")
                 for task_name, task in value['keys']['task_dict'].items():
-                    print(f"{task_name}: {task['status']}")
+                    print(f"{task_name}: {task['status'].name}")
                     break
         
         print("\n---\n")
+
+    # Process and display workflow outputs 
+    for output in app.stream(graph_state, app_config):
+        process_output(output, app_config)
     
     print("Workflow completed.")
 
