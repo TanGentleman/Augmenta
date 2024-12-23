@@ -16,13 +16,8 @@ class AgentState(TypedDict):
         mock_inputs: Test inputs for simulation
         task_dict: Active tasks by ID
     """
-    config: Config
-    # Config includes global settings - side effects impacted by these.
     # Config can include overrides, like FORCE_LOCAL_MODELS.
-    messages: list[dict] # ? Move to chat_task_state ?
-    response_count: int # move to chat_task_state
-    active_chain: Optional[object] # move to chat_task_state
-    tool_choice: Optional[str] # move to chat_task_state
+    config: Config
     user_input: Optional[str]
     mock_inputs: list[str]
     task_dict: dict[str, Task]
