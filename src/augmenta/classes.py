@@ -554,7 +554,7 @@ class ChatSettings:
     @stream.setter
     def stream(self, value):
         if not isinstance(value, bool):
-            raise ValueError("Stream must be a vool")
+            raise ValueError("Stream must be a bool")
         self.__stream = value
 
     def to_dict(self):

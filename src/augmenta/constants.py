@@ -115,8 +115,11 @@ MODEL_CODES = {
     "llama-nemotron": "together/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF",
     "qwen": "Qwen/Qwen2.5-72B-Instruct-Turbo",
     "sonnet": "anthropic/claude-3.5-sonnet",
+    "free": "open/meta-llama/llama-3.1-70b-instruct:free",
+    "samba": "sambanova/Meta-Llama-3.3-70B-Instruct",
     # "ollama": "ollama_llama3",
     "flash": "gemini-flash-1.5",
+    "fast": "sambanova/Meta-Llama-3.2-3B-Instruct",
 }
 
 SYSTEM_MESSAGE_CODES = {
