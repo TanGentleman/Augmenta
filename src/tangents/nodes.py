@@ -16,7 +16,7 @@ from tangents.classes.settings import Config
 from tangents.utils.chains import get_summary_chain, fast_get_llm
 from tangents.utils.task_utils import (
     get_task, save_completed_tasks, save_failed_tasks,
-    save_stashed_tasks, start_next_task, stash_task
+    save_stashed_tasks
 )
 from augmenta.utils import read_sample
 
@@ -26,12 +26,12 @@ from .classes.commands import Command, CommandType
 from .classes.states import GraphState
 
 from .utils.message_utils import insert_system_message, remove_last_message, clear_messages
-from .utils.action_utils import is_stash_action_next, save_action_data, create_action
+from .utils.action_utils import add_stash_action, is_stash_action_next, save_action_data, create_action
 from .utils.execute_action import execute_action
 
 # Constants
 MAX_MUTATIONS = 50  # Maximum state mutations before failing
-MAX_ACTIONS = 1     # Maximum actions per task before failing
+MAX_ACTIONS = 5     # Maximum actions per task before failing
 
 def validate_state(state: GraphState) -> GraphState:
     """Validate fields in state dictionary."""
@@ -250,6 +250,7 @@ def processor_node(state: GraphState) -> GraphState:
                     }
                 )
                 # current_task["actions"].append(create_action(ActionType.STASH))
+                # NOTE: Should this always be appended?
                 current_task["actions"].append(generate_action)
 
             case TaskType.RAG:
@@ -405,7 +406,7 @@ def execute_command_node(state: GraphState) -> GraphState:
                 current_task["status"] = Status.DONE
             else:
                 logging.warning("Found in-progress task with actions, stashing task")
-                current_task["actions"].insert(0, create_action(ActionType.STASH))
+                add_stash_action(current_task["actions"])
         
         case CommandType.HELP:
             print("\nAvailable Commands:")
@@ -423,10 +424,16 @@ def execute_command_node(state: GraphState) -> GraphState:
             print(config)
             
         case CommandType.SAVE:
+            # add args for file path
             if current_task["type"] == TaskType.CHAT:
                 print("\nMessages:")
                 for msg in task_state["messages"]:
-                    prefix = "Human:" if isinstance(msg, HumanMessage) else "AI:"
+                    if isinstance(msg, HumanMessage):
+                        prefix = "Human:"
+                    elif isinstance(msg, AIMessage): 
+                        prefix = "AI:"
+                    else:
+                        prefix = "System:" # Handle system/tool messages
                     print(f"{prefix} {msg.content}")
             else:
                 logging.error("Save command only supported in chat tasks.")
@@ -470,6 +477,10 @@ def execute_command_node(state: GraphState) -> GraphState:
             else:
                 print("No text found in file!")
                 
+        case CommandType.STASH:
+            print("Stashing current state...")
+            add_stash_action(current_task["actions"])
+            
         case _:
             print(f"Command not implemented: {command.command}")
 

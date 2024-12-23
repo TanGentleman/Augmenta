@@ -77,18 +77,3 @@ def save_stashed_tasks(task_dict: dict[str, Task]) -> list[str]:
 
     return stashed_tasks
 
-# NOTE: Implementation may change with task_dict adjustments
-def start_next_task(task_dict: dict[str, Task]) -> bool:
-    """Start the next task in the task dictionary. Returns True if a task is in progress."""
-    current_task = get_task(task_dict, status=Status.IN_PROGRESS)
-    if current_task:
-        # Warning?
-        print("Task is already in progress!")
-        return True
-    
-    next_task = get_task(task_dict, status=Status.NOT_STARTED)
-    if next_task:
-        next_task["status"] = Status.IN_PROGRESS
-        return True
-    return False
-

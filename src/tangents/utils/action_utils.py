@@ -70,3 +70,10 @@ def is_stash_action_next(action_list: list[Action]) -> bool:
     if not action_list:
         return False
     return action_list[0]["type"] == ActionType.STASH
+
+def add_stash_action(action_list: list[Action]) -> None:
+    """Add a StashAction to the START of the action list."""
+    # check if first action is a StashAction
+    if action_list and action_list[0]["type"] == ActionType.STASH:
+        return
+    action_list.insert(0, create_action(ActionType.STASH))

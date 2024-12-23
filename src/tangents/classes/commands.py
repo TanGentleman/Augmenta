@@ -15,6 +15,7 @@ class CommandType(Enum):
         UNDO: Revert last action
         MODE: Change operation mode
         READ: Load external content
+        STASH: Save current state
     """
     QUIT = "quit"
     HELP = "help"
@@ -26,6 +27,7 @@ class CommandType(Enum):
     UNDO = "undo"
     MODE = "mode"
     READ = "read"
+    STASH = "stash"
 
 class Command:
     """System command parser and validator.
