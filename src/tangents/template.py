@@ -44,26 +44,20 @@ class MOCK_INPUTS:
     DEFAULT = ["What's the capital of France?", "/quit"]
     EMPTY = []
 
-STASH_ACTION = create_action(ActionType.STASH)
 READ_EMAIL_ACTION = create_action(PlanActionType.FETCH,
     args = {
         "source": "example-email.txt",
         "method": "get_email_content"
     }
 )
-CREATE_PLAN_ACTION = create_action(PlanActionType.CREATE_PLAN)
-REVISE_PLAN_ACTION = create_action(PlanActionType.REVISE_PLAN,
-    args = {
-        "revision_count": 0,
-        "max_revisions": 3,
-    }
-)
+PROPOSE_PLAN_ACTION = create_action(PlanActionType.PROPOSE_PLAN)
+REVISE_PLAN_ACTION = create_action(PlanActionType.REVISE_PLAN,)
 
 EXAMPLE_PLANNING_TASK = Task(
     type=TaskType.PLANNING,
     status=Status.NOT_STARTED,
     conditions=None,
-    actions=[READ_EMAIL_ACTION, CREATE_PLAN_ACTION, REVISE_PLAN_ACTION],
+    actions=[READ_EMAIL_ACTION, PROPOSE_PLAN_ACTION, REVISE_PLAN_ACTION],
     state=None
 )
 
@@ -72,7 +66,7 @@ INITIAL_STATE_DICT: AgentState = {
     "action_count": 0,
     "task_dict": {"chat_task": DEFAULT_TASK},
     "user_input": None,
-    "mock_inputs": MOCK_INPUTS.EMPTY
+    "mock_inputs": MOCK_INPUTS.DEFAULT
 }
 
 PLANNING_STATE_DICT = {

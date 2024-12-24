@@ -1,7 +1,7 @@
 from typing import Any, Optional
 from typing_extensions import TypedDict
 from enum import Enum
-
+from langchain_core.messages import BaseMessage
 class Status(Enum):
     """Task and action status indicators.
     
@@ -42,6 +42,7 @@ class ActionType(Enum):
     SAVE_DATA = "save_data"
     TOOL_CALL = "tool_call"
     STASH = "stash"
+    HUMAN_INPUT = "human_input"
 
 class ActionArgs(TypedDict):
     """Base class for action arguments."""
@@ -66,11 +67,11 @@ class PlanActionType(Enum):
     
     Values:
         FETCH: Retrieve planning context
-        CREATE_PLAN: Generate new plan
+        PROPOSE_PLAN: Generate new plan
         REVISE_PLAN: Modify existing plan
     """
     FETCH = "fetch"
-    CREATE_PLAN = "create_plan" 
+    PROPOSE_PLAN = "propose_plan" 
     REVISE_PLAN = "revise_plan"
 
 class GenerateActionArgs(ActionArgs):
@@ -83,5 +84,5 @@ class GenerateActionArgs(ActionArgs):
     """
     stream: Optional[bool]
     chain: Optional[Any]
-    messages: Optional[list[dict]]
+    messages: Optional[list[BaseMessage]]
     # hyperparameters: Optional[dict]

@@ -5,16 +5,13 @@ from tangents.classes.actions import Action, ActionArgs, ActionType, PlanActionT
 
 def get_revise_plan_args(args: ActionArgs) -> ActionArgs:
     """Get default arguments for revise plan action."""
-    DEFAULT_MAX_REVISIONS = 3
-    if "max_revisions" not in args:
-        args["max_revisions"] = DEFAULT_MAX_REVISIONS
-    if "revision_count" not in args:
-        args["revision_count"] = 0
     if "proposed_plan" not in args:
         args["proposed_plan"] = None
+    if "revision_context" not in args:
+        args["revision_context"] = None
     return args
 
-def get_PROPOSE_PLAN_args(args: ActionArgs) -> ActionArgs:
+def get_propose_plan_args(args: ActionArgs) -> ActionArgs:
     """Get default arguments for create plan action."""
     if "plan_context" not in args:
         args["plan_context"] = None
@@ -30,7 +27,7 @@ def get_generate_args(args: ActionArgs) -> ActionArgs:
 
 ACTION_ARG_HANDLERS = {
     PlanActionType.REVISE_PLAN: get_revise_plan_args,
-    PlanActionType.PROPOSE_PLAN: get_PROPOSE_PLAN_args,
+    PlanActionType.PROPOSE_PLAN: get_propose_plan_args,
     ActionType.GENERATE: get_generate_args
 }
 

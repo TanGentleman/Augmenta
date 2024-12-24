@@ -317,8 +317,6 @@ def start_action(action: Action, task: Task) -> Action:
     elif action["type"] == PlanActionType.REVISE_PLAN:
         if action_args.get("proposed_plan") is None:
             action_args["proposed_plan"] = task_state["proposed_plan"]
-        if action_args.get("revision_count") is None:
-            action_args["revision_count"] = 0
 
     return action
 
@@ -398,8 +396,16 @@ def action_node(state: GraphState) -> GraphState:
             logging.error(f"Action failed: {result['error']}")
             action["status"] = Status.FAILED
         else:
+            # This means the action did not succeed or run into an error.
             if action_type == PlanActionType.REVISE_PLAN:
-                action["args"]["revision_count"] += 1
+                task_state["revision_count"] += 1
+                action["args"]["revision_context"] = f"Revision {task_state['revision_count']}"
+                
+                # get confirmation from user
+                # TODO: Implement conditions when abstractions are clearer
+                if task_state["revision_count"] >= 3:
+                    print("Hit max revisions!")
+                    action["args"]["is_done"] = True
             
     if action["status"] == Status.FAILED:
         logging.error("Action failed, marking task as failed")

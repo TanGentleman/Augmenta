@@ -101,36 +101,18 @@ def execute_action(action: Action) -> ActionResult:
         elif action_type == PlanActionType.REVISE_PLAN:
             # Load state variables into action args
             proposed_plan = action_args["proposed_plan"]
-            revision_count = action_args["revision_count"]
-            
-            if action_args.get("max_revisions") is None:
-                raise ValueError('Set "max_revisions" in REVISE_PLAN action args!')
-
-            # If is_done is True, submit the plan
-            revision_count = action_args["revision_count"]
-            max_revisions = action_args["max_revisions"]
+            revision_context = action_args["revision_context"]
             if action_args.get("is_done", False):
                 # Submit the plan
                 return {
                     "success": True,
-                    "data": f"Final draft ({revision_count} revisions).",
+                    "data": f"Final draft submitted. ({revision_context})",
                     "error": None
-                }
-            
-            # If max_revisions is reached, submit the plan
-            if revision_count >= max_revisions:
-                # Submit the plan
-                logging.warning("Hit max revisions!")
-                return {
-                    "success": True,
-                    "data": f"Final draft ({revision_count} revisions [max]).",
-                    "error": None
-                }
-            
+                }            
             # If max_revisions is not reached, revise the plan
             return {
                 "success": False,
-                "data": f"Plan revision {action_args['revision_count']}.",
+                "data": f"Revised plan. ({revision_context})",
                 "error": None
             }
             
