@@ -30,7 +30,12 @@ Configuration:
 - MAX_ACTIONS: Maximum actions per task (default: 5)
 """
 import logging
+logging.basicConfig(level=logging.WARNING)
 from uuid import uuid4
+import asyncio
+import argparse
+from typing import AsyncIterator, Dict, Any
+
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.state import CompiledStateGraph
 from langgraph.checkpoint.memory import MemorySaver
@@ -43,23 +48,16 @@ from .nodes import (
     processor_node, execute_command_node, action_node,
     decide_from_agent, decide_from_processor
 )
+from .output_handlers import OutputProcessor
+from .input_handlers import InterruptHandler
 
-# Maximum recursion depth for graph traversal
+# Configuration
 RECURSION_LIMIT = 50
-DEFAULT_AGENT_STATE = INITIAL_STATE_DICT
+DEV_MODE = False
+DEFAULT_AGENT_STATE = INITIAL_STATE_DICT if not DEV_MODE else PLANNING_STATE_DICT
 
 def create_workflow() -> CompiledStateGraph:
-    """Create and compile the conversation workflow graph.
-    
-    Constructs a directed graph with nodes for processing different aspects of the conversation:
-    - State initialization and configuration
-    - Agent coordination and decision making
-    - Task and action management
-    - User interaction and input processing
-    
-    Returns:
-        CompiledStateGraph: Executable workflow graph
-    """
+    """Create and compile the async conversation workflow graph."""
     workflow = StateGraph(GraphState)
     
     # Add core processing nodes
@@ -81,8 +79,8 @@ def create_workflow() -> CompiledStateGraph:
         decide_from_agent,
         {
             "human_node": "human_node",
-            "task_manager": "task_manager",
-            "action_node": "action_node", 
+            "task_manager": "task_manager", 
+            "action_node": "action_node",
             "end_node": END
         }
     )
@@ -103,85 +101,93 @@ def create_workflow() -> CompiledStateGraph:
     workflow.add_edge("action_node", "agent_node")
     workflow.add_edge("task_manager", "agent_node")
     
-    return workflow.compile(
-        checkpointer=MemorySaver()
-    )
+    return workflow.compile(checkpointer=MemorySaver())
 
-def main():
-    """Run the workflow with initial state and configuration."""
+async def process_interrupt(interrupt_value: dict) -> str:
+    """Handle workflow interrupts and get user input asynchronously."""
+    if "prompt" not in interrupt_value:
+        raise ValueError("Unhandled interrupt case - missing prompt")
+    
+    loop = asyncio.get_running_loop()
+    user_input = await loop.run_in_executor(None, input, f"{interrupt_value['prompt']}\n")
+    user_input = user_input.strip()
+    
+    if not user_input:
+        print("No input provided, click enter again to quit...")
+        user_input = await loop.run_in_executor(None, input)
+        user_input = user_input.strip() or "/quit"
+            
+    return user_input
+
+async def process_workflow_output_streaming(output: Dict[str, Any], app, app_config: dict, stream_mode: str = "updates"):
+    """Process streaming output from workflow execution."""
+    output_processor = OutputProcessor()
+    interrupt_handler = InterruptHandler()
+
+    async def handle_interrupt_stream(interrupt_value, depth=0):
+        """Handle nested interrupt streams recursively."""
+        if depth > app_config.get("recursion_limit", RECURSION_LIMIT):
+            raise RecursionError("Maximum interrupt depth exceeded")
+            
+        user_input = await interrupt_handler.process_interrupt(interrupt_value)
+        
+        # Process resumed workflow with streaming
+        async for chunk in app.astream(
+            ResumeCommand(resume=user_input),
+            app_config,
+            stream_mode=stream_mode
+        ):
+            for node, updates in chunk.items():
+                if node == "__interrupt__":
+                    await handle_interrupt_stream(updates[0].value, depth + 1)
+                else:
+                    output_processor.process_updates(node, updates)
+
+    if stream_mode == "updates":
+        for key, value in output.items():
+            if key == "__interrupt__":
+                await handle_interrupt_stream(value[0].value)
+            else:
+                output_processor.process_updates(key, value)
+    else:
+        raise ValueError("Stream mode not supported")
+        output_processor.process_values(output)
+
+async def main_async(stream_mode: str = "updates"):
+    """Run the async workflow with streaming support."""
     app = create_workflow()
     
     # Initialize graph state
-    initial_graph_state: GraphState = {
-        "keys": {},
-        "mutation_count": 0,
-        "is_done": False
-    }
-    assert initial_graph_state == INITIAL_GRAPH_STATE
-    
-    graph_state = initial_graph_state
+    graph_state = INITIAL_GRAPH_STATE.copy()
     graph_state["keys"] = DEFAULT_AGENT_STATE
 
     # Configure app settings
-    unique_thread = {"thread_id": uuid4()}
-    thread_config = {
-        "configurable": unique_thread
-    }
     app_config = {
         "recursion_limit": RECURSION_LIMIT,
-        "configurable": unique_thread
+        "configurable": {"thread_id": uuid4()}
     }
-    
-    def process_output(output, app_config):
-        for key, value in output.items():
-            if key == "__interrupt__":
-                # print("interrupt received!")
-                interrupt_value = value[0].value
-                interrupt_prompt = ""
-                if "prompt" in interrupt_value:
-                    interrupt_prompt = interrupt_value["prompt"]
-                else:
-                    # TODO: Handle other interrupt cases
-                    raise ValueError("Unhandled interrupt case")
-                # current_state = app.get_state(thread_config)
-                # print(f"Current state: {current_state.values}")
-                # print(f"Current tasks: {current_state.tasks}")
-                user_input = input(f"{interrupt_prompt}\n").strip()
-                if not user_input:
-                    print("No input provided, click enter again to quit...")
-                    user_input = input().strip()
-                    if not user_input:
-                        user_input = "/quit"
 
-                for interrupt_output in app.stream(ResumeCommand(resume=user_input), app_config):
-                    process_output(interrupt_output, app_config)
-                return
-            
-            print(f"\nNode: {key}")
-            print(f"Hops: {value['mutation_count']}")
-                
-            if 'task_dict' in value['keys']:
-                for task_name, task in value['keys']['task_dict'].items():
-                    print(f"{task_name}: {task['status'].name}")
-                    break
-        
-        print("\n---\n")
-
-    # Process and display workflow outputs 
-    for output in app.stream(graph_state, app_config):
-        process_output(output, app_config)
+    # Process workflow outputs with streaming
+    async for output in app.astream(graph_state, app_config, stream_mode=stream_mode):
+        await process_workflow_output_streaming(output, app, app_config, stream_mode)
     
     print("Workflow completed.")
 
-def set_env_vars():
-    """Load required environment variables from .env file.
+def main():
+    """Run the workflow with command line configuration."""
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--stream-mode",
+        choices=["values", "updates"],
+        default="updates",
+        help="Streaming mode for workflow output"
+    )
+    args = parser.parse_args()
     
-    Required variables:
-    - LANGCHAIN_TRACING_V2: Tracing configuration
-    - LANGCHAIN_API_KEY: LangChain API credentials
-    - LANGCHAIN_PROJECT: Project identifier
-    - LITELLM_API_KEY: LiteLLM API credentials
-    """
+    asyncio.run(main_async(args.stream_mode))
+
+def set_env_vars():
+    """Load required environment variables from .env file."""
     from dotenv import load_dotenv
     load_dotenv()
 
