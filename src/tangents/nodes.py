@@ -21,7 +21,7 @@ from tangents.utils.task_utils import (
 from augmenta.utils import read_sample
 
 from .classes.tasks import Task, TaskType
-from .classes.actions import Action, PlanActionType, Status, ActionType  
+from .classes.actions import Action, ActionResult, PlanActionType, Status, ActionType  
 from .classes.commands import Command, CommandType
 from .classes.states import GraphState
 
@@ -195,21 +195,24 @@ def human_node(state: GraphState) -> GraphState:
     current_task = get_task(state_dict["task_dict"], status=Status.IN_PROGRESS)
     assert current_task is not None, "No in-progress task found"
 
-    if is_human_action_next(current_task["actions"]):
-        # TODO: Handle interrupt_context based on task
-        pass
-
+    
+    # Handle mock inputs for testing, otherwise get real user input
     if mock_inputs:
         print(f"Mock inputs: {mock_inputs}")
         user_input = mock_inputs.pop(0)
     else:
-        # TODO: Handle interrupt_context based on task
-        # NOTE: Three different cases: 1. Get user input string, 2. Validate with bool, 3. Updates to state
+        # Initialize default interrupt context
         interrupt_context = {
-            # "task_type": current_task["type"].value,
-            # "task_state": current_task["state"],
             "prompt": "Enter your message (or /help for commands):"
         }
+        
+        # If next action is human input, get context from action
+        if is_human_action_next(current_task["actions"]):
+            custom_interrupt_prompt = current_task["actions"][0]["args"].get("prompt")
+            if custom_interrupt_prompt:
+                interrupt_context["prompt"] = custom_interrupt_prompt
+        
+        # Get user input via interrupt
         user_input = interrupt(interrupt_context)
     
     state_dict["user_input"] = user_input
@@ -238,7 +241,8 @@ def processor_node(state: GraphState) -> GraphState:
     # TODO: HITL behavior is set by ActionType.HUMAN_INPUT
     if is_human_action_next(current_task["actions"]):
         # TODO: Handle interrupt_context based on task
-        current_task["actions"].pop(0)
+        human_action = current_task["actions"].pop(0)
+        
 
     user_input = state_dict["user_input"]
     if not user_input.startswith('/'):
@@ -276,9 +280,10 @@ def processor_node(state: GraphState) -> GraphState:
                     
             case TaskType.PLANNING:
                 # Handle cases during PLANNING task
-                if task_state["proposed_plan"]:
-                    if task_state["plan"] is not None:
-                        raise ValueError("Plan is already created!")
+                if user_input == "y":
+                    print("Plan is confirmed!")
+                    current_task["actions"][0]["args"]["is_done"] = True
+                else:
                     print("Using your revision!")
                     
             case _:
@@ -320,15 +325,62 @@ def start_action(action: Action, task: Task) -> Action:
 
     return action
 
-def action_node(state: GraphState) -> GraphState:
-    """
-    Execute and manage task actions.
+def handle_action_result(task: Task, action_result: ActionResult) -> Task:
+    """Handle the result of an action based on task and action types."""
+    action = task["actions"][0]
+    task_state = task["state"]
+
+    if action_result["success"]:
+        action["status"] = Status.DONE
+        
+        match (task["type"], action["type"]):
+            case (TaskType.CHAT, ActionType.GENERATE):
+                task_state["messages"].append(AIMessage(content=action_result["data"]))
+                
+            case (TaskType.PLANNING, PlanActionType.FETCH):
+                task_state["context"] = action_result["data"]
+                
+            case (TaskType.PLANNING, PlanActionType.PROPOSE_PLAN):
+                task_state["proposed_plan"] = action_result["data"]
+                
+            case (TaskType.PLANNING, PlanActionType.REVISE_PLAN):
+                task_state["plan"] = action_result["data"]
+                task["status"] = Status.DONE
+                
+            case _:
+                raise ValueError(f"Unsupported task/action combination: {task['type']}/{action['type']}")
     
-    Handles:
-    - Action execution and status tracking
-    - Result processing based on action type
-    - Error handling and task failure conditions
-    """
+    elif action_result["error"]:
+        action["status"] = Status.FAILED
+        # Handle error cleanup
+        match (task["type"], action["type"]):
+            case (TaskType.CHAT, ActionType.GENERATE):
+                if isinstance(task_state["messages"][-1], HumanMessage):
+                    task_state["messages"].pop()
+            case _:
+                pass  # Other types may not need cleanup
+        
+    else:
+        # Retry cases
+        match (task["type"], action["type"]):
+            case (TaskType.PLANNING, PlanActionType.REVISE_PLAN):
+                task_state["revision_count"] += 1
+                action["args"]["revision_context"] = f"Revision {task_state['revision_count']}"
+                # TODO: Move this value to current_task["conditions"]
+                if task_state["revision_count"] >= 3:
+                    action["args"]["is_done"] = True
+                else:
+                    # TODO: Make this logic maintainable
+                    task["actions"].insert(0, create_action(ActionType.HUMAN_INPUT, args={
+                        "prompt": "Plan:\n" + task_state["proposed_plan"] + "\n\nType 'y' to confirm this plan, or type any suggestions for revision:",
+                    }))
+            case _:
+                pass
+
+    return task
+
+def action_node(state: GraphState) -> GraphState:
+    """Execute and manage task actions."""
     state_dict = state["keys"]
     task_dict = state_dict["task_dict"]
     
@@ -342,80 +394,33 @@ def action_node(state: GraphState) -> GraphState:
         raise ValueError("No actions found for in-progress task.")
     
     action = current_task["actions"][0]
-    action_type = action["type"]
-    assert action_type != ActionType.STASH, "Stash action should be handled in task manager"
+    assert action["type"] != ActionType.STASH, "Stash action should be handled in task manager"
     
+    # Initialize action if needed
     if action["status"] == Status.NOT_STARTED:
-        action["status"] = Status.IN_PROGRESS
+        action = start_action(action, current_task)
     assert action["status"] == Status.IN_PROGRESS
 
-    action = start_action(action, current_task)
+    # Execute action and process result
     logging.info(f"Executing action: {action}")
     result = execute_action(action)
     logging.info(result)
 
-    task_state = current_task["state"]
+    # Update state based on result
+    current_task = handle_action_result(current_task, result)
     if result["success"]:
-        logging.info(f"Action succeeded: {result['data']}")
         state_dict["action_count"] += 1
-        action["status"] = Status.DONE
 
-        match action_type:
-            case ActionType.GENERATE:
-                response_string = result["data"]
-                if current_task["type"] == TaskType.CHAT:
-                    task_state["messages"].append(AIMessage(content=response_string))
-                else:
-                    raise ValueError("Task type not supported for generate action")
-
-            case PlanActionType.FETCH:
-                print("Fetching data from the source...")
-                task_state["context"] = result["data"]
-
-            case PlanActionType.PROPOSE_PLAN:
-                print("Proposing a plan...")
-                task_state["proposed_plan"] = result["data"]
-            
-            case PlanActionType.REVISE_PLAN:
-                # NOTE: Consider moving to revision subgraph flow
-                task_state["plan"] = result["data"]
-                print("Finalized plan!")
-                print(f"Plan: {task_state['plan']}")
-                current_task["status"] = Status.DONE
-        
-    else:
-        if result["error"]:
-            if action_type == ActionType.GENERATE:
-                if current_task["type"] == TaskType.CHAT:
-                    print("Popping human message")
-                    task_messages = task_state["messages"]
-                    assert isinstance(task_messages[-1], HumanMessage)
-                    task_messages.pop()
-                else:
-                    raise ValueError("Task type not supported for generate action")
-            logging.error(f"Action failed: {result['error']}")
-            action["status"] = Status.FAILED
-        else:
-            # This means the action did not succeed or run into an error.
-            if action_type == PlanActionType.REVISE_PLAN:
-                task_state["revision_count"] += 1
-                action["args"]["revision_context"] = f"Revision {task_state['revision_count']}"
-                
-                # get confirmation from user
-                # TODO: Implement conditions when abstractions are clearer
-                if task_state["revision_count"] >= 3:
-                    print("Hit max revisions!")
-                    action["args"]["is_done"] = True
-            
-    if action["status"] == Status.FAILED:
-        logging.error("Action failed, marking task as failed")
-        current_task["status"] = Status.FAILED
-
+    # Handle action completion
     if action["status"] in [Status.DONE, Status.FAILED]:
         completed_action = current_task["actions"].pop(0)
         save_action_data(completed_action)
+        
+        # Mark task as failed if action failed
+        if action["status"] == Status.FAILED:
+            logging.error("Action failed, marking task as failed")
+            current_task["status"] = Status.FAILED
     else:
-        assert action["status"] == Status.IN_PROGRESS
         logging.warning("Action is still in progress!")
     
     return {
