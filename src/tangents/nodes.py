@@ -26,7 +26,7 @@ from .classes.commands import Command, CommandType
 from .classes.states import GraphState
 
 from .utils.message_utils import insert_system_message, remove_last_message, clear_messages
-from .utils.action_utils import add_stash_action, is_human_action_next, is_stash_action_next, save_action_data, create_action
+from .utils.action_utils import add_human_action, add_stash_action, is_human_action_next, is_stash_action_next, save_action_data, create_action
 from .utils.execute_action import execute_action
 
 # Constants
@@ -206,7 +206,6 @@ def human_node(state: GraphState) -> GraphState:
             "prompt": "Enter your message (or /help for commands):"
         }
         
-        # If next action is human input, get context from action
         if is_human_action_next(current_task["actions"]):
             custom_interrupt_prompt = current_task["actions"][0]["args"].get("prompt")
             if custom_interrupt_prompt:
@@ -237,14 +236,21 @@ def processor_node(state: GraphState) -> GraphState:
     config = state_dict["config"]
     current_task = get_task(task_dict, status=Status.IN_PROGRESS)
     assert current_task is not None, "No in-progress task found"
-    
-    # TODO: HITL behavior is set by ActionType.HUMAN_INPUT
-    if is_human_action_next(current_task["actions"]):
-        # TODO: Handle interrupt_context based on task
-        human_action = current_task["actions"].pop(0)
-        
-
     user_input = state_dict["user_input"]
+
+
+    def handle_human_input(user_input: str, task: Task) -> None:
+        assert is_human_action_next(task["actions"]), "Human action should be next!"
+        human_action = task["actions"].pop(0)
+        # TODO: Handle cases where verification is "y"
+        return None
+
+    # Logic should go here
+    if is_human_action_next(current_task["actions"]):
+        handle_human_input(user_input, current_task)
+    
+
+    
     if not user_input.startswith('/'):
         if not current_task:
             raise ValueError("No in-progress task found")
@@ -289,6 +295,7 @@ def processor_node(state: GraphState) -> GraphState:
             case _:
                 raise ValueError("Invalid task type")
     
+    # NOTE: This will be removed as logic is put in place for complex human input handling
     assert not is_human_action_next(current_task["actions"]), "Human action should be removed by the end of the node!"
     return {
         "keys": state_dict,
@@ -370,10 +377,7 @@ def handle_action_result(task: Task, action_result: ActionResult) -> Task:
                 if task_state["revision_count"] >= 3:
                     action["args"]["is_done"] = True
                 else:
-                    # TODO: Make this logic maintainable
-                    task["actions"].insert(0, create_action(ActionType.HUMAN_INPUT, args={
-                        "prompt": "Plan:\n" + task_state["proposed_plan"] + "\n\nType 'y' to confirm this plan, or type any suggestions for revision:",
-                    }))
+                    add_human_action(task["actions"])
             case _:
                 pass
 
@@ -460,6 +464,7 @@ def execute_command_node(state: GraphState) -> GraphState:
     assert current_task, "No in-progress task found"
     task_state = current_task["state"]
     
+    # TODO: Make a better interface for commands with custom logic for task state
     match command.type:
         case CommandType.QUIT:
             if not current_task["actions"]:
@@ -472,7 +477,8 @@ def execute_command_node(state: GraphState) -> GraphState:
             print("\nAvailable Commands:")
             for cmd in CommandType:
                 print(f"/{cmd.value}")
-                
+        
+        # NOTE: Logic is based on task type/state
         case CommandType.CLEAR:
             if current_task["type"] == TaskType.CHAT:
                 clear_messages(task_state["messages"])
@@ -483,6 +489,7 @@ def execute_command_node(state: GraphState) -> GraphState:
             print("\nCurrent Settings:")
             print(config)
             
+        # NOTE: Logic is based on task type/state
         case CommandType.SAVE:
             # add args for file path
             if current_task["type"] == TaskType.CHAT:
@@ -507,11 +514,13 @@ def execute_command_node(state: GraphState) -> GraphState:
                 print(f"Message Count: {len(task_state['messages'])}")
             print(f"Tasks: {state_dict['task_dict']}")
             
+        # NOTE: Logic is based on task type/state
         case CommandType.UNDO:
             if current_task["type"] == TaskType.CHAT:
                 remove_last_message(task_state["messages"])
             else:
                 logging.error("Undo command only supported in chat tasks.")
+
 
         case CommandType.MODE:
             if current_task["type"] == TaskType.CHAT:
@@ -559,17 +568,16 @@ def decide_from_agent(state: GraphState) -> Literal["human_node", "task_manager"
     task_dict = state_dict["task_dict"]
     
     current_task = get_task(task_dict, status=Status.IN_PROGRESS)
-    if current_task:
-        if current_task["actions"]:
-            if is_stash_action_next(current_task["actions"]):
-                return "task_manager"
-            elif is_human_action_next(current_task["actions"]):
-                return "human_node"
-            else:
-                return "action_node"
+    if not current_task:
+        return "task_manager"
+    if not current_task["actions"]:
         return "human_node"
-    
-    return "task_manager"
+    if is_stash_action_next(current_task["actions"]):
+        return "task_manager"
+    elif is_human_action_next(current_task["actions"]):
+        return "human_node"
+    else:
+        return "action_node"
 
 def decide_from_processor(state: GraphState) -> Literal["execute_command", "agent_node"]:
     """Route from processor based on input type (command vs message)."""
