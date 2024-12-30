@@ -2,13 +2,16 @@ import logging
 
 from tangents.classes.actions import Action, ActionArgs, ActionType, PlanActionType, Status
 
-
 def get_revise_plan_args(args: ActionArgs) -> ActionArgs:
     """Get default arguments for revise plan action."""
+    DEFAULT_MAX_REVISIONS = 3
+
     if "proposed_plan" not in args:
         args["proposed_plan"] = None
     if "revision_context" not in args:
         args["revision_context"] = None
+    if "max_revisions" not in args:
+        args["max_revisions"] = DEFAULT_MAX_REVISIONS
     return args
 
 def get_propose_plan_args(args: ActionArgs) -> ActionArgs:
@@ -80,3 +83,15 @@ def add_stash_action(action_list: list[Action]) -> None:
     if action_list and action_list[0]["type"] == ActionType.STASH:
         return
     action_list.insert(0, create_action(ActionType.STASH))
+
+def add_human_action(action_list: list[Action], prompt: str = None) -> None:
+    """Add a HumanAction to the START of the action list."""
+    if action_list and action_list[0]["type"] == ActionType.HUMAN_INPUT:
+        logging.warning("Duplicate human action detected; adding another.")
+    
+    if prompt:
+        # NOTE: Can add assertions here
+        args = {"prompt": prompt}
+    else:
+        args = {}
+    action_list.insert(0, create_action(ActionType.HUMAN_INPUT, args))

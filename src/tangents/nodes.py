@@ -295,7 +295,7 @@ def processor_node(state: GraphState) -> GraphState:
             case _:
                 raise ValueError("Invalid task type")
     
-    # NOTE: This will be removed as logic is put in place for complex human input handling
+    # NOTE: This will be removed as logic is put in place for repeated human input handling
     assert not is_human_action_next(current_task["actions"]), "Human action should be removed by the end of the node!"
     return {
         "keys": state_dict,
@@ -371,13 +371,18 @@ def handle_action_result(task: Task, action_result: ActionResult) -> Task:
         # Retry cases
         match (task["type"], action["type"]):
             case (TaskType.PLANNING, PlanActionType.REVISE_PLAN):
+                if "revision_count" not in task_state:
+                    task_state["revision_count"] = 0
                 task_state["revision_count"] += 1
                 action["args"]["revision_context"] = f"Revision {task_state['revision_count']}"
+
+                DEFAULT_MAX_REVISIONS = 3
+                max_revisions = action["args"].get("max_revisions", DEFAULT_MAX_REVISIONS)
                 # TODO: Move this value to current_task["conditions"]
-                if task_state["revision_count"] >= 3:
+                if task_state["revision_count"] >= max_revisions:
                     action["args"]["is_done"] = True
                 else:
-                    add_human_action(task["actions"])
+                    add_human_action(task["actions"], prompt=f"Review revision #{task_state['revision_count']}. Enter 'y' to finalize or any other input to revise again.")
             case _:
                 pass
 
@@ -585,14 +590,4 @@ def decide_from_processor(state: GraphState) -> Literal["execute_command", "agen
     user_input = state_dict["user_input"]
     return "execute_command" if user_input.startswith('/') else "agent_node"
 
-"""
-Future Improvements:
-1. Move chain initialization to processor_node for better separation of concerns
-2. Add support for pre-set task states in PLANNING tasks
-3. Implement revision subgraph flow for plan revisions
-4. Add file path argument support for READ command
-5. Add logic for HITL tasks that shouldn't append messages
-6. Consider breaking out task type handlers into separate modules
-7. Add more robust error handling and recovery mechanisms
-8. Implement proper state persistence for SAVE/LOAD commands
-"""
+
