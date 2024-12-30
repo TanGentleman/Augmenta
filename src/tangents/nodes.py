@@ -18,7 +18,7 @@ from tangents.utils.task_utils import (
     get_task, save_completed_tasks, save_failed_tasks,
     save_stashed_tasks
 )
-from augmenta.utils import read_sample
+from tangents.utils.command_utils import read_sample
 
 from .classes.tasks import Task, TaskType
 from .classes.actions import Action, ActionResult, PlanActionType, Status, ActionType  
@@ -388,7 +388,7 @@ def handle_action_result(task: Task, action_result: ActionResult) -> Task:
 
     return task
 
-def action_node(state: GraphState) -> GraphState:
+async def action_node(state: GraphState) -> GraphState:
     """Execute and manage task actions."""
     state_dict = state["keys"]
     task_dict = state_dict["task_dict"]
@@ -412,7 +412,7 @@ def action_node(state: GraphState) -> GraphState:
 
     # Execute action and process result
     logging.info(f"Executing action: {action}")
-    result = execute_action(action)
+    result = await execute_action(action)
     logging.info(result)
 
     # Update state based on result
@@ -438,7 +438,7 @@ def action_node(state: GraphState) -> GraphState:
         "is_done": False
     }
 
-def execute_command_node(state: GraphState) -> GraphState:
+async def execute_command_node(state: GraphState) -> GraphState:
     """
     Process command input and update state.
     
@@ -531,11 +531,7 @@ def execute_command_node(state: GraphState) -> GraphState:
             if current_task["type"] == TaskType.CHAT:
                 if command.args == "summary":
                     print("CHANGING TO SUMMARY MODE")
-                    new_chain = get_summary_chain(config.chat_settings.primary_model)
-                    if new_chain is not None:
-                        task_state["active_chain"] = new_chain
-                    else:
-                        raise ValueError("Summary chain not initialized!")
+                    # TODO: Implement a change in active chain system message and messages context
                 else:
                     print("\nCurrent Mode:")
                     print(current_task["type"])
@@ -545,7 +541,7 @@ def execute_command_node(state: GraphState) -> GraphState:
         case CommandType.READ:
             # NOTE: Add file path argument support
             print("Reading from file...")
-            user_input = read_sample()
+            user_input = await read_sample()
             if user_input:
                 state_dict["mock_inputs"].insert(0, user_input)
             else:
@@ -589,5 +585,3 @@ def decide_from_processor(state: GraphState) -> Literal["execute_command", "agen
     state_dict = state["keys"]
     user_input = state_dict["user_input"]
     return "execute_command" if user_input.startswith('/') else "agent_node"
-
-
