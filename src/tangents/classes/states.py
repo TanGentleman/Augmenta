@@ -1,7 +1,8 @@
-from typing import Any, Optional
+from typing import Optional
 from typing_extensions import TypedDict
 from tangents.classes.settings import Config
 from tangents.classes.tasks import Task
+from langchain_core.messages import BaseMessage
 
 class AgentState(TypedDict):
     """Core agent runtime state.
@@ -40,7 +41,7 @@ class ChatTaskState(TypedDict):
         active_chain: Currently executing chain
         tool_choice: Selected tool for execution
     """
-    messages: list[dict]
+    messages: list[BaseMessage]
     active_chain: Optional[object]
     tool_choice: Optional[str]
 

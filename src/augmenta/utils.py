@@ -7,17 +7,12 @@ from uuid import uuid4
 from langchain_core.documents import Document
 from datetime import datetime
 
-from .constants import CHROMA_FOLDER, FAISS_FOLDER, VECTOR_DB_SUFFIX
-
 from pathlib import Path
 # Get the root path of the repository
 from paths import (
     CONFIG_DIR,
     CHROMA_FOLDER_PATH,
     FAISS_FOLDER_PATH,
-    DOCUMENTS_DIR,
-    DATA_DIR,
-    LLM_OUTPUTS_PATH,
     LLM_RESPONSE_PATH,
     TEXT_FILE_DIR,
     MANIFEST_FILEPATH,

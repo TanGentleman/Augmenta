@@ -9,7 +9,8 @@ from chromadb.config import Settings
 from langchain_community.document_loaders import PyPDFLoader, ArxivLoader
 
 from .config.config import EXPERIMENTAL_UNSTRUCTURED, METADATA_MAP
-from .utils import CHROMA_FOLDER_PATH, DOCUMENTS_DIR, FAISS_FOLDER_PATH, clean_docs, database_exists, save_string_as_text_file
+from .utils import clean_docs, database_exists, save_string_as_text_file
+from paths import CHROMA_FOLDER_PATH, DOCUMENTS_DIR, FAISS_FOLDER_PATH
 
 
 def loader_from_arxiv_url(url: str) -> ArxivLoader:
