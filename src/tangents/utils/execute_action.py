@@ -1,16 +1,30 @@
 import logging
 from tangents.classes.actions import Action, ActionType, ActionResult, PlanActionType
-from tangents.classes.tasks import Task, TaskType
 
-def execute_action(action: Action) -> ActionResult:
-    """Execute a specific action and return the result."""
-    # TODO: Eventually reduce dependency on state_dict
-    # Everything should fit as args to the action
+async def execute_action(action: Action) -> ActionResult:
+    """
+    Execute a specific action and return the result.
+    
+    This function handles different action types and executes them appropriately:
+    - GENERATE: Generates text using an LLM chain, with optional streaming
+    - WEB_SEARCH: Performs web searches (placeholder)
+    - SAVE_DATA: Saves data to storage (placeholder) 
+    - TOOL_CALL: Makes external tool calls (placeholder)
+    - FETCH: Retrieves data from specified sources
+    - PROPOSE_PLAN: Creates initial task plans
+    - REVISE_PLAN: Handles plan revisions and submissions
 
-    # TODO: Replace state_dict with task_state
+    Args:
+        action (Action): The action to execute, containing type and arguments
+
+    Returns:
+        ActionResult: Result object with:
+            - success (bool): Whether action completed successfully
+            - data (Union[str, None]): Output data if successful
+            - error (Union[str, None]): Error message if failed
+    """
     action_type = action["type"]
     action_args = action["args"]
-
 
     try:
         if action_type == ActionType.GENERATE:
@@ -21,14 +35,14 @@ def execute_action(action: Action) -> ActionResult:
             try:
                 if stream:
                     response_string = ""
-                    for chunk in chain.stream(messages):
+                    async for chunk in chain.astream(messages):
                         print(chunk.content, end="", flush=True)
                         response_string += chunk.content
                     print()
                     if not response_string:
                         raise ValueError('No response generated')
                 else:
-                    response = chain.invoke(messages)
+                    response = await chain.ainvoke(messages)
                     print(response.content)
                     response_string = response.content
                 return {
@@ -73,8 +87,6 @@ def execute_action(action: Action) -> ActionResult:
             }
         
         elif action_type == PlanActionType.FETCH:
-            # Load state variables into action args
-            
             source = action_args["source"]
             method = action_args["method"]
             result_string = "Fetched data."
@@ -87,11 +99,9 @@ def execute_action(action: Action) -> ActionResult:
             }
         
         elif action_type == PlanActionType.PROPOSE_PLAN:
-            # Load state variables into action args
             context = action_args["plan_context"]
             create_plan_fn = lambda x: "This is a plan."
             plan = create_plan_fn(context)
-            # Add a plan to the task state
             return {
                 "success": True,
                 "data": f"Proposed plan: {plan}",
@@ -99,17 +109,15 @@ def execute_action(action: Action) -> ActionResult:
             }
         
         elif action_type == PlanActionType.REVISE_PLAN:
-            # Load state variables into action args
             proposed_plan = action_args["proposed_plan"]
+            assert proposed_plan, "No proposed plan found"
             revision_context = action_args["revision_context"]
             if action_args.get("is_done", False):
-                # Submit the plan
                 return {
                     "success": True,
                     "data": f"Final draft submitted. ({revision_context})",
                     "error": None
                 }            
-            # If max_revisions is not reached, revise the plan
             return {
                 "success": False,
                 "data": f"Revised plan. ({revision_context})",
