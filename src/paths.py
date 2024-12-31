@@ -31,6 +31,14 @@ MANIFEST_FILEPATH = DATA_DIR / "manifest.json"
 
 INITIAL_MANIFEST_CONTENTS = '{"databases": []}'
 
+
+### Shadows Data
+
+SHADOWS_DATA_DIR = DATA_DIR / "shadows-data"
+
+SHADOWS_EMAIL_DIR = SHADOWS_DATA_DIR / "emails"
+
+
 def ensure_valid_framework():
     """
     Validate and create necessary folders and files for the project structure.
