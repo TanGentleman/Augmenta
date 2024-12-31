@@ -1,66 +1,127 @@
-from augmenta.utils import read_text_file
-async def read_sample() -> str:
-    """Legacy function to read sample.txt file."""
-    return read_text_file("sample.txt")
+from typing import Callable
+import logging
+from langchain_core.messages import HumanMessage, AIMessage
 
-# NOTE: We support batch reading operations for certain tasks
+from paths import TEXT_FILE_DIR
+from tangents.classes.actions import Status
+from tangents.classes.commands import Command, CommandType
+from tangents.classes.tasks import Task, TaskType
+from tangents.utils.message_utils import clear_messages, remove_last_message
+from tangents.utils.action_utils import add_stash_action
+from tangents.utils.file_utils import read_text_file
 
-# import aiofiles
-# import asyncio
-# from pathlib import Path
-# from typing import List, Optional
-# # Synchronous file operations
-# def read_text_file(filepath: Path) -> str:
-#     """
-#     Read a text file synchronously and return its contents.
-    
-#     Args:
-#         filepath: Path to the file to read
+async def execute_command(command: Command, current_task: Task, state_dict: dict) -> None:
+    """Execute a command and update state accordingly."""
+    if not command.is_valid:
+        logging.warning(f"Invalid command: {command.command}")
+        return
+
+    handlers = {
+        # Handlers that need task only
+        CommandType.QUIT: lambda: _handle_quit_command(current_task),
+        CommandType.STASH: lambda: _handle_stash_command(current_task),
+        CommandType.HELP: _print_help_command,
         
-#     Returns:
-#         Contents of the file as a string
-#     """
-#     try:
-#         with open(filepath, "r") as f:
-#             return f.read()
-#     except FileNotFoundError:
-#         print(f"File not found: {filepath}")
-#         return ""
-#     except Exception as e:
-#         print(f"Error reading file {filepath}: {e}")
-#         return ""
-
-# # Async file operations        
-# async def read_text_file_async(filepath: Path) -> str:
-#     """
-#     Read a text file asynchronously and return its contents.
-    
-#     Args:
-#         filepath: Path to the file to read
+        # Handlers that need task + state_dict
+        CommandType.CLEAR: lambda: _handle_clear_command(current_task, state_dict),
+        CommandType.SAVE: lambda: _handle_save_command(current_task, state_dict),
+        CommandType.UNDO: lambda: _handle_undo_command(current_task, state_dict),
+        CommandType.MODE: lambda: _handle_mode_command(current_task, command.args),
+        CommandType.DEBUG: lambda: _print_debug_info(current_task, state_dict),
         
-#     Returns:
-#         Contents of the file as a string
-#     """
-#     try:
-#         async with aiofiles.open(filepath, "r") as f:
-#             return await f.read()
-#     except FileNotFoundError:
-#         print(f"File not found: {filepath}")
-#         return ""
-#     except Exception as e:
-#         print(f"Error reading file {filepath}: {e}")
-#         return ""
-
-# async def read_multiple_files(filepaths: List[Path]) -> List[str]:
-#     """
-#     Read multiple text files concurrently and return their contents.
-    
-#     Args:
-#         filepaths: List of paths to files to read
+        # Handlers that need state_dict only
+        CommandType.SETTINGS: lambda: print("\nCurrent Settings:", state_dict["config"]),
+        CommandType.READ: lambda: _handle_read_command(state_dict, command.args),
         
-#     Returns:
-#         List of file contents as strings
-#     """
-#     tasks = [read_text_file_async(fp) for fp in filepaths]
-#     return await asyncio.gather(*tasks)
+        # Handlers that need nothing
+        CommandType.LOAD: lambda: print("Loading state..."),
+    }
+    
+    handler = handlers.get(command.type)
+    if handler:
+        result = handler()
+        if _is_async_handler(result):
+            await result
+        else:
+            result
+    else:
+        print(f"Command not implemented: {command.command}")
 
+def _is_async_handler(handler: Callable) -> bool:
+    """Check if a handler is async."""
+    return hasattr(handler, '__await__')
+
+def _handle_quit_command(task: Task) -> None:
+    """Handle quit command logic."""
+    if not task["actions"]:
+        task["status"] = Status.DONE
+    else:
+        logging.warning("Found in-progress task with actions, stashing task")
+        add_stash_action(task["actions"])
+
+def _print_help_command() -> None:
+    """Print available commands."""
+    print("\nAvailable Commands:")
+    for cmd in CommandType:
+        print(f"/{cmd.value}")
+
+def _handle_clear_command(task: Task, state_dict: dict) -> None:
+    """Handle clearing messages in chat tasks."""
+    if task["type"] == TaskType.CHAT:
+        clear_messages(task["state"]["messages"])
+    else:
+        logging.error("Clear command only supported in chat tasks.")
+
+def _handle_save_command(task: Task, state_dict: dict) -> None:
+    """Handle saving chat messages."""
+    if task["type"] == TaskType.CHAT:
+        print("\nMessages:")
+        for msg in task["state"]["messages"]:
+            prefix = "Human:" if isinstance(msg, HumanMessage) else "AI:" if isinstance(msg, AIMessage) else "System:"
+            print(f"{prefix} {msg.content}")
+    else:
+        logging.error("Save command only supported in chat tasks.")
+
+def _handle_undo_command(task: Task, state_dict: dict) -> None:
+    """Handle undoing last message in chat tasks."""
+    if task["type"] == TaskType.CHAT:
+        remove_last_message(task["state"]["messages"])
+    else:
+        logging.error("Undo command only supported in chat tasks.")
+
+def _print_debug_info(task: Task, state_dict: dict) -> None:
+    """Print debug information."""
+    print("\nCurrent State:")
+    if task["type"] == TaskType.CHAT:
+        print(f"Message Count: {len(task['state']['messages'])}")
+    print(f"Tasks: {state_dict['task_dict']}")
+
+def _handle_mode_command(task: Task, mode_arg: str) -> None:
+    """Handle mode switching command."""
+    if task["type"] == TaskType.CHAT:
+        if mode_arg == "summary":
+            print("CHANGING TO SUMMARY MODE")
+        else:
+            print("\nCurrent Mode:")
+            print(task["type"])
+    else:
+        logging.error("Mode command only supported in chat tasks.")
+
+def _handle_read_command(state_dict: dict, filename_arg: str) -> None:
+    """Handle file reading command."""
+    if not filename_arg:
+        filename_arg = "sample.txt"
+    print(f"Reading from file: {filename_arg}")
+    filepath = TEXT_FILE_DIR / filename_arg
+    user_input = read_text_file(filepath)
+    if user_input:
+        state_dict["mock_inputs"].insert(0, user_input)
+    else:
+        print("No text found in file!")
+    
+def _handle_stash_command(task: Task) -> None:
+    """Handle stashing a task."""
+    if task["status"] == Status.IN_PROGRESS:
+        add_stash_action(task["actions"])
+    else:
+        logging.error("Stash command only supported for in-progress tasks.")

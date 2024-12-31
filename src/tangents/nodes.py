@@ -17,15 +17,14 @@ from tangents.utils.task_utils import (
     get_task, save_completed_tasks, save_failed_tasks,
     save_stashed_tasks, start_task
 )
-from tangents.utils.command_utils import read_sample
+from tangents.utils.command_utils import execute_command
 
 from .classes.tasks import Task, TaskType
 from .classes.actions import Action, ActionResult, PlanActionType, Status, ActionType  
-from .classes.commands import Command, CommandType
+from .classes.commands import Command
 from .classes.states import GraphState
 
-from .utils.message_utils import remove_last_message, clear_messages
-from .utils.action_utils import add_human_action, add_stash_action, is_human_action_next, is_stash_action_next, save_action_data, create_action
+from .utils.action_utils import add_human_action, is_human_action_next, is_stash_action_next, save_action_data, create_action
 from .utils.execute_action import execute_action
 
 # Constants
@@ -372,7 +371,8 @@ async def action_node(state: GraphState) -> GraphState:
     assert action["status"] == Status.IN_PROGRESS
 
     # Execute action and process result
-    logging.info(f"Executing action: {action}")
+    # NOTE: This should not include the dump from the active chain
+    logging.info(f"Executing action: {action['type']}")
     result = await execute_action(action)
     logging.info(result)
 
@@ -408,118 +408,42 @@ async def execute_command_node(state: GraphState) -> GraphState:
     - UI commands (help, clear, debug)
     - Mode switching and settings
     """
-    state_dict = state["keys"]
-    config = state_dict["config"]
-    
-    user_input = state_dict["user_input"]
-    if not user_input:
-        raise ValueError("No user command to execute!")
-    command = Command(user_input)
-    state_dict["user_input"] = None
-    
-    if not command.is_valid:
-        logging.warning(f"Invalid command: {command.command}")
+
+    try:
+        state_dict = state["keys"]
+        
+        # Validate input exists
+        user_input = state_dict.get("user_input")
+        if not user_input:
+            raise ValueError("No user command to execute!")
+            
+        # Parse and validate command
+        command = Command(user_input)
+        if not command.is_valid:
+            raise ValueError(f"Invalid command: {command.command}")
+        
+        state_dict["user_input"] = None  
+        # NOTE: In cases where input is needed downstream, it should be added to task_state
+        
+        # Get current task
+        current_task = get_task(state_dict["task_dict"], status=Status.IN_PROGRESS)
+        if not current_task:
+            raise ValueError("No in-progress task found")
+            
+        # Execute command
+        await execute_command(command, current_task, state_dict)
+        
+    except Exception as e:
+        logging.error(f"Command execution failed: {str(e)}")
+        logging.critical(f"This should never happen!")
+        
+    finally:
+        # Always return updated state
         return {
-            "keys": state_dict,
+            "keys": state["keys"],
             "mutation_count": state["mutation_count"] + 1,
             "is_done": False
         }
-    
-    task_dict = state_dict["task_dict"]
-    current_task = get_task(task_dict, status=Status.IN_PROGRESS)
-    assert current_task, "No in-progress task found"
-    task_state = current_task["state"]
-    
-    # TODO: Make a better interface for commands with custom logic for task state
-    match command.type:
-        case CommandType.QUIT:
-            if not current_task["actions"]:
-                current_task["status"] = Status.DONE
-            else:
-                logging.warning("Found in-progress task with actions, stashing task")
-                add_stash_action(current_task["actions"])
-        
-        case CommandType.HELP:
-            print("\nAvailable Commands:")
-            for cmd in CommandType:
-                print(f"/{cmd.value}")
-        
-        # NOTE: Logic is based on task type/state
-        case CommandType.CLEAR:
-            if current_task["type"] == TaskType.CHAT:
-                clear_messages(task_state["messages"])
-            else:
-                logging.error("Clear command only supported in chat tasks.")
-            
-        case CommandType.SETTINGS:
-            print("\nCurrent Settings:")
-            print(config)
-            
-        # NOTE: Logic is based on task type/state
-        case CommandType.SAVE:
-            # add args for file path
-            if current_task["type"] == TaskType.CHAT:
-                print("\nMessages:")
-                for msg in task_state["messages"]:
-                    if isinstance(msg, HumanMessage):
-                        prefix = "Human:"
-                    elif isinstance(msg, AIMessage): 
-                        prefix = "AI:"
-                    else:
-                        prefix = "System:" # Handle system/tool messages
-                    print(f"{prefix} {msg.content}")
-            else:
-                logging.error("Save command only supported in chat tasks.")
-            
-        case CommandType.LOAD:
-            print("Loading state...")
-            
-        case CommandType.DEBUG:
-            print("\nCurrent State:")
-            if current_task["type"] == TaskType.CHAT:
-                print(f"Message Count: {len(task_state['messages'])}")
-            print(f"Tasks: {state_dict['task_dict']}")
-            
-        # NOTE: Logic is based on task type/state
-        case CommandType.UNDO:
-            if current_task["type"] == TaskType.CHAT:
-                remove_last_message(task_state["messages"])
-            else:
-                logging.error("Undo command only supported in chat tasks.")
-
-
-        case CommandType.MODE:
-            if current_task["type"] == TaskType.CHAT:
-                if command.args == "summary":
-                    print("CHANGING TO SUMMARY MODE")
-                    # TODO: Implement a change in active chain system message and messages context
-                else:
-                    print("\nCurrent Mode:")
-                    print(current_task["type"])
-            else:
-                logging.error("Mode command only supported in chat tasks.")
-
-        case CommandType.READ:
-            # NOTE: Add file path argument support
-            print("Reading from file...")
-            user_input = await read_sample()
-            if user_input:
-                state_dict["mock_inputs"].insert(0, user_input)
-            else:
-                print("No text found in file!")
-                
-        case CommandType.STASH:
-            print("Stashing current state...")
-            add_stash_action(current_task["actions"])
-            
-        case _:
-            print(f"Command not implemented: {command.command}")
-
-    return {
-        "keys": state_dict,
-        "mutation_count": state["mutation_count"] + 1,
-        "is_done": False
-    }
 
 def decide_from_agent(state: GraphState) -> Literal["human_node", "task_manager", "action_node", "end_node"]:
     """Route from agent node based on state conditions."""
