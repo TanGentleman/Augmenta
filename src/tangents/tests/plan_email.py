@@ -13,17 +13,18 @@ Example:
     
     await plan_email(
         fetch_params={"source": "email.txt", "method": "get_email_content"},
-        plan_params={"max_revisions": 2}
+        plan_params={"max_revisions": 2},
+        extra_params={"system_message": "Custom instructions"}
     )
 """
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Optional
 from uuid import uuid4
 import logging
 import asyncio
 
 from tangents.classes.states import AgentState
-from tangents.template import DEFAULT_CONFIG, INITIAL_GRAPH_STATE
+from tangents.template import get_default_config, get_initial_graph_state
 from tangents.tan_graph import create_workflow, process_workflow_output_streaming
 from tangents.classes.tasks import Task, Status, TaskType
 from tangents.classes.actions import PlanActionType
@@ -41,10 +42,18 @@ class PlanParams:
     """Plan generation configuration."""
     max_revisions: int = 3  # Maximum revision cycles
 
+@dataclass
+class ExtraParams:
+    """Additional configuration parameters."""
+    system_message: Optional[str] = None  # Custom system instructions
+    mock_inputs: list[str] = field(default_factory=list)  # Test inputs for workflow 
+    task_name: str = "plan_from_email_task"  # Custom task identifier
+
 # Constants
 RECURSION_LIMIT = 50
 DEFAULT_FETCH = FetchParams(source="example-email.txt")
 DEFAULT_PLAN = PlanParams()
+DEFAULT_EXTRA = ExtraParams()
 
 def create_planning_task(fetch: FetchParams, plan: Optional[PlanParams] = None) -> Optional[Task]:
     """Create email planning task with sequential actions.
@@ -76,33 +85,37 @@ def create_planning_task(fetch: FetchParams, plan: Optional[PlanParams] = None) 
         state=None
     )
 
-def get_initial_state(task: Task, mock_inputs: list[str] = []) -> AgentState:
+def get_initial_state(task: Task, extra: ExtraParams = DEFAULT_EXTRA) -> AgentState:
     """Initialize workflow state.
     
     Args:
         task: Planning task to execute
-        mock_inputs: Test inputs if needed
+        extra: Additional configuration parameters
     
     Returns:
         Initial agent state
     """
+    config = get_default_config()
+    if extra.system_message:
+        config.chat_settings.system_message = extra.system_message
+
     return {
-        "config": DEFAULT_CONFIG.copy(),
+        "config": config,
         "action_count": 0,
-        "task_dict": {"plan_from_email_task": task},
+        "task_dict": {extra.task_name: task},
         "user_input": None,
-        "mock_inputs": mock_inputs
+        "mock_inputs": extra.mock_inputs
     }
 
-async def execute_workflow(task: Task) -> None:
+async def execute_workflow(task: Task, extra: ExtraParams = DEFAULT_EXTRA) -> None:
     """Run the email planning workflow.
     
     Handles workflow initialization and output processing with fallback modes.
     """
     app = create_workflow()
     
-    graph_state = INITIAL_GRAPH_STATE.copy()
-    graph_state["keys"] = get_initial_state(task)
+    graph_state = get_initial_graph_state()
+    graph_state["keys"] = get_initial_state(task, extra)
 
     app_config = {
         "recursion_limit": RECURSION_LIMIT,
@@ -125,17 +138,19 @@ async def execute_workflow(task: Task) -> None:
 
 async def plan_email(
     fetch_params: FetchParams,
-    plan_params: Optional[PlanParams] = None
+    plan_params: Optional[PlanParams] = None,
+    extra_params: Optional[ExtraParams] = None
 ) -> None:
     """Plan an email response.
     
     Args:
         fetch_params: Email content fetch configuration
         plan_params: Optional planning parameters
+        extra_params: Additional configuration parameters
     """
     task = create_planning_task(fetch_params, plan_params)
     if task:
-        await execute_workflow(task)
+        await execute_workflow(task, extra_params or DEFAULT_EXTRA)
     else:
         logging.error("Failed to create planning task")
 
