@@ -1,3 +1,31 @@
+"""
+Email Planning Script
+
+A script that uses a task-based workflow system to plan email responses. It:
+1. Fetches email content from a source
+2. Generates an initial response plan
+3. Iteratively revises the plan
+
+Configuration Options:
+- fetch_params: Source and method for email content
+- plan_params: Number of revision cycles
+- stream_mode: "updates" or "values" output mode
+
+Usage:
+    python -m tangents.tests.plan-email
+
+    # With custom parameters:
+    asyncio.run(plan_email(
+        fetch_params={
+            "source": "example-email.txt",
+            "method": "get_email_content"
+        },
+        plan_params={
+            "max_revisions": 2
+        }
+    ))
+"""
+
 from uuid import uuid4
 import logging
 import asyncio
@@ -9,16 +37,20 @@ from tangents.classes.tasks import Task, Status, TaskType
 from tangents.classes.actions import PlanActionType
 from tangents.utils.action_utils import create_action
 
+# Type definitions for configuration parameters
 class FetchParams(TypedDict):
-    source: str
-    method: str
+    """Parameters for email content fetching."""
+    source: str  # Path or identifier of email source
+    method: str  # Method to use for fetching content
 
 class PlanParams(TypedDict):
-    max_revisions: int
+    """Parameters for plan generation and revision."""
+    max_revisions: int  # Maximum number of plan revision cycles
 
-# Use same configuration constants
+# Configuration constants
 RECURSION_LIMIT = 50
-# Default parameters for email planning tasks
+
+# Default task parameters
 DEFAULT_FETCH_PARAMS: FetchParams = {
     "source": "example-email.txt",
     "method": "get_email_content"
@@ -45,9 +77,9 @@ def create_email_planning_task(
         logging.error("No source provided, failed to create email planning task.")
         return None
 
-    # Build list of actions for the task
+    # Build sequential action pipeline
     actions = [
-        # Fetch email content
+        # 1. Fetch email content
         create_action(
             PlanActionType.FETCH,
             args={
@@ -55,9 +87,9 @@ def create_email_planning_task(
                 "method": fetch_params.get('method', DEFAULT_FETCH_PARAMS['method'])
             }
         ),
-        # Generate initial plan
+        # 2. Generate initial plan
         create_action(PlanActionType.PROPOSE_PLAN),
-        # Revise plan with configured max revisions
+        # 3. Revise plan iteratively
         create_action(
             PlanActionType.REVISE_PLAN,
             args={
@@ -75,7 +107,15 @@ def create_email_planning_task(
     )
 
 def get_state_dict(task: Task, mock_inputs: list[str] = []) -> AgentState:
-    """Get the state dictionary for the email planning workflow."""
+    """Initialize workflow state with task and configuration.
+    
+    Args:
+        task: The email planning task to execute
+        mock_inputs: Optional list of predefined inputs for testing
+    
+    Returns:
+        Initial agent state dictionary
+    """
     config = DEFAULT_CONFIG
     # TODO: Fix aliasing of config
     # TODO: Support adjustments to config
@@ -89,7 +129,11 @@ def get_state_dict(task: Task, mock_inputs: list[str] = []) -> AgentState:
     }
 
 async def main_async(task: Task):
-    """Run the async workflow with streaming support for email planning."""
+    """Execute the email planning workflow asynchronously.
+    
+    Handles workflow initialization, streaming output processing,
+    and fallback to updates mode if needed.
+    """
     app = create_workflow()
     
     # Initialize graph state with email context
@@ -102,7 +146,6 @@ async def main_async(task: Task):
 
     state_dict = get_state_dict(task)
     graph_state["keys"] = state_dict
-
 
     # Configure app settings
     app_config = {
@@ -119,6 +162,7 @@ async def main_async(task: Task):
     async for output in app.astream(graph_state, app_config, stream_mode=stream_mode):
         await process_workflow_output_streaming(output, app, app_config, stream_mode=stream_mode)
     
+    # Handle fallback to updates mode if human input needed
     if stream_mode == "values":
         next_node = app.get_state(app_config).next
         if next_node:
@@ -133,20 +177,17 @@ async def main_async(task: Task):
                 async for output in app.astream(graph_state, app_config, stream_mode=stream_mode):
                     await process_workflow_output_streaming(output, app, app_config, stream_mode=stream_mode)
     
-    
     print("Email planning workflow completed.")
 
 async def plan_email(
     fetch_params: FetchParams,
     plan_params: PlanParams | None = None,
 ):
-    """
-    Plan an email using structured parameter dictionaries.
+    """Plan an email response using the workflow system.
     
     Args:
         fetch_params: Configuration for source content fetching
-        plan_params: Email planning parameters and context
-        stream_mode: Stream output mode ("updates" or "values")
+        plan_params: Optional email planning parameters
     """
     email_task = create_email_planning_task(fetch_params, plan_params)
     if not email_task:
