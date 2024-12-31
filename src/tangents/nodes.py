@@ -12,11 +12,10 @@ from typing import Literal
 from langchain_core.messages import HumanMessage, AIMessage
 from langgraph.types import interrupt
 
-from tangents.classes.settings import Config
-from tangents.utils.chains import get_summary_chain, fast_get_llm
+from tangents.utils.chains import fast_get_llm
 from tangents.utils.task_utils import (
     get_task, save_completed_tasks, save_failed_tasks,
-    save_stashed_tasks
+    save_stashed_tasks, start_task
 )
 from tangents.utils.command_utils import read_sample
 
@@ -25,7 +24,7 @@ from .classes.actions import Action, ActionResult, PlanActionType, Status, Actio
 from .classes.commands import Command, CommandType
 from .classes.states import GraphState
 
-from .utils.message_utils import insert_system_message, remove_last_message, clear_messages
+from .utils.message_utils import remove_last_message, clear_messages
 from .utils.action_utils import add_human_action, add_stash_action, is_human_action_next, is_stash_action_next, save_action_data, create_action
 from .utils.execute_action import execute_action
 
@@ -77,47 +76,6 @@ def agent_node(state: GraphState) -> GraphState:
         "mutation_count": state["mutation_count"] + 1,
         "is_done": is_done
     }
-
-def start_task(task: Task, config: Config) -> Task:
-    """Initialize a new task with proper state based on task type."""
-    if task["status"] != Status.NOT_STARTED:
-        raise ValueError("Task must have NOT_STARTED status to start!")
-    
-    task_type = task["type"]
-    task_state = task["state"]
-    match task_type:
-        case TaskType.CHAT:
-            if task_state is None:
-                task["state"] = {
-                    "messages": [],
-                    "active_chain": None,
-                    "stream": config.chat_settings.stream
-                }
-            if not config.chat_settings.disable_system_message:
-                insert_system_message(
-                    task["state"]["messages"],
-                    config.chat_settings.system_message
-                )
-        
-        case TaskType.RAG:
-            if not config.rag_settings.enabled:
-                raise ValueError("RAG task is disabled!")
-        
-        case TaskType.PLANNING:
-            if task_state is None:
-                task["state"] = {
-                    "context": None,
-                    "proposed_plan": None,
-                    "plan": None,
-                    "revision_count": 0
-                }
-        
-        case _:
-            raise ValueError("Invalid task type!")
-    
-    task["status"] = Status.IN_PROGRESS
-    print(f"Started task: {task['type']}")
-    return task
 
 def task_manager_node(state: GraphState) -> GraphState:
     """
@@ -233,16 +191,20 @@ def processor_node(state: GraphState) -> GraphState:
     """
     state_dict = state["keys"]
     task_dict = state_dict["task_dict"]
-    config = state_dict["config"]
     current_task = get_task(task_dict, status=Status.IN_PROGRESS)
-    assert current_task is not None, "No in-progress task found"
     user_input = state_dict["user_input"]
+
+    assert current_task is not None, "No in-progress task found"
+    assert user_input is not None, "No user input found"
+
+    config = state_dict["config"]
 
 
     def handle_human_input(user_input: str, task: Task) -> None:
         assert is_human_action_next(task["actions"]), "Human action should be next!"
         human_action = task["actions"].pop(0)
-        # TODO: Handle cases where verification is "y"
+        # TODO: Handle cases with custom interrupt logic
+        # Example: Update task state + tweak the interrupt prompt string
         return None
 
     # Logic should go here
@@ -250,7 +212,6 @@ def processor_node(state: GraphState) -> GraphState:
         handle_human_input(user_input, current_task)
     
 
-    
     if not user_input.startswith('/'):
         if not current_task:
             raise ValueError("No in-progress task found")

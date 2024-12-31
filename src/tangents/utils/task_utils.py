@@ -1,8 +1,10 @@
 
 import logging
 from typing import Optional
-from tangents.classes.tasks import Task, Status
+from tangents.classes.settings import Config
+from tangents.classes.tasks import Task, Status, TaskType
 from tangents.utils.action_utils import is_stash_action_next
+from tangents.utils.message_utils import insert_system_message
 
 def get_task(task_dict: dict[str, Task], task_name: Optional[str] = None, status: Optional[Status] = Status.IN_PROGRESS) -> Task | None:
     """Get a task from the task dictionary"""
@@ -77,3 +79,44 @@ def save_stashed_tasks(task_dict: dict[str, Task]) -> list[str]:
 
     return stashed_tasks
 
+
+def start_task(task: Task, config: Config) -> Task:
+    """Initialize a new task with proper state based on task type and return the task."""
+    if task["status"] != Status.NOT_STARTED:
+        raise ValueError("Task must have NOT_STARTED status to start!")
+    
+    task_type = task["type"]
+    task_state = task["state"]
+    match task_type:
+        case TaskType.CHAT:
+            if task_state is None:
+                task["state"] = {
+                    "messages": [],
+                    "active_chain": None,
+                    "stream": config.chat_settings.stream
+                }
+            if not config.chat_settings.disable_system_message:
+                insert_system_message(
+                    task["state"]["messages"],
+                    config.chat_settings.system_message
+                )
+        
+        case TaskType.RAG:
+            if not config.rag_settings.enabled:
+                raise ValueError("RAG task is disabled!")
+        
+        case TaskType.PLANNING:
+            if task_state is None:
+                task["state"] = {
+                    "context": None,
+                    "proposed_plan": None,
+                    "plan": None,
+                    "revision_count": 0
+                }
+        
+        case _:
+            raise ValueError("Invalid task type!")
+    
+    task["status"] = Status.IN_PROGRESS
+    print(f"Started task: {task['type']}")
+    return task
