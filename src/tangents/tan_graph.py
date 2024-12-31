@@ -43,9 +43,9 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import Command as ResumeCommand
 
 from tangents.template import (
-    INITIAL_GRAPH_STATE,
-    INITIAL_STATE_DICT,
-    PLANNING_STATE_DICT
+    get_initial_graph_state,
+    get_default_state_dict,
+    get_planning_state_dict
 )
 from .classes.states import GraphState
 from .nodes import (
@@ -63,12 +63,13 @@ from .output_handlers import OutputProcessor
 from .input_handlers import InterruptHandler
 
 # Configure logging
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.INFO)
 
 # System configuration
 RECURSION_LIMIT = 50
-DEV_MODE = False
-DEFAULT_AGENT_STATE = PLANNING_STATE_DICT if DEV_MODE else INITIAL_STATE_DICT
+DEV_MODE = True
+if DEV_MODE:
+    print("Dev mode enabled. Using planning state dict.")
 
 def create_workflow() -> CompiledStateGraph:
     """
@@ -182,6 +183,7 @@ async def process_workflow_output_streaming(
             
         user_input = await interrupt_handler.process_interrupt(interrupt_value)
         
+        # NOTE: Stream mode is forced to be updates
         async for chunk in app.astream(
             ResumeCommand(resume=user_input),
             app_config,
@@ -212,8 +214,8 @@ async def main_async(stream_mode: str = "updates") -> None:
     app = create_workflow()
     
     # Initialize workflow state
-    graph_state = INITIAL_GRAPH_STATE.copy()
-    graph_state["keys"] = DEFAULT_AGENT_STATE
+    graph_state = get_initial_graph_state()
+    graph_state["keys"] = get_default_state_dict() if not DEV_MODE else get_planning_state_dict()
 
     # Configure runtime settings
     app_config = {

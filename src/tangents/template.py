@@ -4,75 +4,84 @@ from tangents.classes.actions import ActionType, PlanActionType, Status
 from tangents.classes.settings import Config, ChatSettings, RAGSettings
 
 from tangents.utils.action_utils import create_action
-INITIAL_GRAPH_STATE = {
-    "keys": {},
-    "mutation_count": 0,
-    "is_done": False
-}
 
-DEFAULT_TASK: Task = {
-    "type": TaskType.CHAT,
-    "status": Status.NOT_STARTED,
-    "conditions": None,
-    "actions": [],
-    "state": None
-}
+def get_initial_graph_state():
+    return {
+        "keys": {},
+        "mutation_count": 0,
+        "is_done": False
+    }
 
-RAG_TASK: Task = {
-    "type": TaskType.RAG,
-    "status": Status.IN_PROGRESS,
-    "conditions": None,
-    "actions": [],
-    "state": None
-}
+def get_default_task() -> Task:
+    return {
+        "type": TaskType.CHAT,
+        "status": Status.NOT_STARTED,
+        "conditions": None,
+        "actions": [],
+        "state": None
+    }
 
-DEFAULT_CONFIG = Config(
-    chat_settings=ChatSettings(
-        primary_model="open/google/gemini-flash-1.5-8b",
-        stream=True,
-        system_message="Speak with lots of emojis",
-        disable_system_message=False
-    ),
-    rag_settings=RAGSettings(
-        enabled=True
+def get_rag_task() -> Task:
+    return {
+        "type": TaskType.RAG,
+        "status": Status.IN_PROGRESS,
+        "conditions": None,
+        "actions": [],
+        "state": None
+    }
+
+def get_default_config() -> Config:
+    return Config(
+        chat_settings=ChatSettings(
+            primary_model="lmstudio/llama-3.2-3b-instruct",
+            stream=True,
+            system_message="Speak with lots of emojis",
+            disable_system_message=False
+        ),
+        rag_settings=RAGSettings(
+            enabled=True
+        )
     )
-)
 
-
-class MOCK_INPUTS:
+class MockInputs:
     SUMMARY = ["/mode summary", "/read", "/quit"]
     DEFAULT = ["What's the capital of France?", "/quit"]
     EMPTY = []
 
-READ_EMAIL_ACTION = create_action(PlanActionType.FETCH,
-    args = {
-        "source": "example-email.txt",
-        "method": "get_email_content"
+def get_planning_actions():
+    read_email_action = create_action(PlanActionType.FETCH,
+        args = {
+            "source": "example-email.txt",
+            "method": "get_email_content"
+        }
+    )
+    propose_plan_action = create_action(PlanActionType.PROPOSE_PLAN)
+    revise_plan_action = create_action(PlanActionType.REVISE_PLAN)
+    return [read_email_action, propose_plan_action, revise_plan_action]
+
+def get_example_planning_task() -> Task:
+    return Task(
+        type=TaskType.PLANNING,
+        status=Status.NOT_STARTED,
+        conditions=None,
+        actions=get_planning_actions(),
+        state=None
+    )
+
+def get_default_state_dict() -> AgentState:
+    return {
+        "config": get_default_config(),
+        "action_count": 0,
+        "task_dict": {"chat_task": get_default_task()},
+        "user_input": None,
+        "mock_inputs": MockInputs.EMPTY
     }
-)
-PROPOSE_PLAN_ACTION = create_action(PlanActionType.PROPOSE_PLAN)
-REVISE_PLAN_ACTION = create_action(PlanActionType.REVISE_PLAN,)
 
-EXAMPLE_PLANNING_TASK = Task(
-    type=TaskType.PLANNING,
-    status=Status.NOT_STARTED,
-    conditions=None,
-    actions=[READ_EMAIL_ACTION, PROPOSE_PLAN_ACTION, REVISE_PLAN_ACTION],
-    state=None
-)
-
-INITIAL_STATE_DICT: AgentState = {
-    "config": DEFAULT_CONFIG,
-    "action_count": 0,
-    "task_dict": {"chat_task": DEFAULT_TASK},
-    "user_input": None,
-    "mock_inputs": MOCK_INPUTS.DEFAULT
-}
-
-PLANNING_STATE_DICT = {
-    "config": DEFAULT_CONFIG,
-    "action_count": 0,
-    "user_input": None,
-    "task_dict": {"plan_from_email_task": EXAMPLE_PLANNING_TASK},
-    "mock_inputs": MOCK_INPUTS.EMPTY,
-}
+def get_planning_state_dict() -> AgentState:
+    return {
+        "config": get_default_config(),
+        "action_count": 0,
+        "user_input": None,
+        "task_dict": {"plan_from_email_task": get_example_planning_task()},
+        "mock_inputs": MockInputs.EMPTY,
+    }
