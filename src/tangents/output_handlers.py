@@ -9,14 +9,14 @@ class TaskOutputFormatter:
     """Handles formatting and display of task-related output."""
     
     @staticmethod
-    def format_task_status(task_dict: Dict) -> str:
+    def format_task_status(task_dict: dict) -> str:
         """Format the status of the first task in task_dict."""
         if not task_dict:
-            return ""
+            return "None"
             
         for task_name, task in task_dict.items():
             return f"{task_name}: {task['status'].name}"
-        return ""
+        raise ValueError("Unhandled task status.")
 
     @staticmethod
     def format_node_info(node: str, updates: dict) -> str:
@@ -33,12 +33,9 @@ class OutputProcessor:
     def process_values(self, graph_state: GraphState) -> None:
         """Process and display full graph state output."""
         task_dict = graph_state["keys"].get("task_dict")
-        if not task_dict:
-            return
-            
         status = self.formatter.format_task_status(task_dict)
         if status:
-            print(status)
+            print("Task:", status)
             print("\n---\n")
 
     def process_updates(self, node: str, updates: dict) -> None:

@@ -30,11 +30,12 @@ Configuration:
 - MAX_ACTIONS: Maximum actions per task (default: 5)
 """
 import logging
+
 logging.basicConfig(level=logging.WARNING)
 from uuid import uuid4
 import asyncio
 import argparse
-from typing import AsyncIterator, Dict, Any
+from typing import Dict, Any
 
 from langgraph.graph import StateGraph, START, END
 from langgraph.graph.state import CompiledStateGraph
@@ -119,7 +120,8 @@ async def process_interrupt(interrupt_value: dict) -> str:
             
     return user_input
 
-async def process_workflow_output_streaming(output: Dict[str, Any], app, app_config: dict, stream_mode: str = "updates"):
+# TODO: Add a way to check interrupt_type and handle it accordingly
+async def process_workflow_output_streaming(output: Dict[str, Any], app: CompiledStateGraph, app_config: dict, stream_mode: str = "updates"):
     """Process streaming output from workflow execution."""
     output_processor = OutputProcessor()
     interrupt_handler = InterruptHandler()
@@ -135,10 +137,11 @@ async def process_workflow_output_streaming(output: Dict[str, Any], app, app_con
         async for chunk in app.astream(
             ResumeCommand(resume=user_input),
             app_config,
-            stream_mode=stream_mode
+            stream_mode="updates"
         ):
             for node, updates in chunk.items():
                 if node == "__interrupt__":
+                    # TODO: Double check if this is correct
                     await handle_interrupt_stream(updates[0].value, depth + 1)
                 else:
                     output_processor.process_updates(node, updates)
@@ -150,7 +153,7 @@ async def process_workflow_output_streaming(output: Dict[str, Any], app, app_con
             else:
                 output_processor.process_updates(key, value)
     else:
-        raise ValueError("Stream mode not supported")
+        # if task dict is non-empty, and current task is in progress, process values
         output_processor.process_values(output)
 
 async def main_async(stream_mode: str = "updates"):

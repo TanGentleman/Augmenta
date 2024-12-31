@@ -113,8 +113,20 @@ async def main_async(task: Task):
     }
 
     # Process workflow outputs with streaming
-    async for output in app.astream(graph_state, app_config):
-        await process_workflow_output_streaming(output, app, app_config)
+    stream_mode = "values"
+    assert stream_mode in ["updates", "values"]
+    
+    async for output in app.astream(graph_state, app_config, stream_mode=stream_mode):
+        await process_workflow_output_streaming(output, app, app_config, stream_mode=stream_mode)
+    
+    if stream_mode == "values":
+        next_node = app.get_state(app_config).next
+        if next_node:
+            next_node = next_node[0]
+            # print("Node: ", str(next_node))
+            if next_node == "human_node":
+                raise SystemExit("Exit: TODO: Handle interruption in values mode.")
+    
     
     print("Email planning workflow completed.")
 
