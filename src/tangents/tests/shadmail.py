@@ -7,17 +7,25 @@ Provides a simplified interface to the email planning functionality.
 
 import asyncio
 from pathlib import Path
+from typing import Optional
 
-from tangents.tests.plan_email import plan_email, FetchParams, PlanParams
+from tangents.tests.plan_email import (
+    plan_email,
+    FetchParams,
+    PlanParams,
+    ExtraParams
+)
 from paths import SHADOWS_EMAIL_DIR
 
 # Constants
 DEFAULT_EMAIL_PATH = SHADOWS_EMAIL_DIR / "scenario-1-email.txt"
-DEFAULT_MAX_REVISIONS = 1
+DEFAULT_MAX_REVISIONS = 2
+CUSTOM_SYSTEM_MESSAGE = "Create 3 actionable tasks based on the email content."
 
 async def process_email(
     email_path: Path = DEFAULT_EMAIL_PATH,
-    max_revisions: int = DEFAULT_MAX_REVISIONS
+    max_revisions: int = DEFAULT_MAX_REVISIONS,
+    system_message: Optional[str] = CUSTOM_SYSTEM_MESSAGE
 ) -> None:
     """
     Process an email file and generate a response plan.
@@ -25,6 +33,7 @@ async def process_email(
     Args:
         email_path: Path to the email file to process
         max_revisions: Maximum number of plan revision cycles
+        system_message: Custom system message for the planner
     
     Raises:
         FileNotFoundError: If the email file doesn't exist
@@ -41,9 +50,14 @@ async def process_email(
         max_revisions=max_revisions
     )
 
+    extra_params = ExtraParams(
+        system_message=system_message
+    )
+
     await plan_email(
         fetch_params=fetch_params,
-        plan_params=plan_params
+        plan_params=plan_params,
+        extra_params=extra_params
     )
 
 def main() -> None:
