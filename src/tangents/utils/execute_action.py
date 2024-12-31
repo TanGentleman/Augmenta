@@ -89,9 +89,11 @@ async def execute_action(action: Action) -> ActionResult:
         elif action_type == PlanActionType.FETCH:
             source = action_args["source"]
             method = action_args["method"]
-            result_string = "Fetched data."
+            print(f"Fetched data from {source}.")
             if method == "get_email_content":
                 result_string = "This is an example email. Assign a task to Himanshu to review the updated docs."
+            else:
+                result_string = f"TODO: Implement method: {method}."
             return {
                 "success": True,
                 "data": result_string,
@@ -100,7 +102,11 @@ async def execute_action(action: Action) -> ActionResult:
         
         elif action_type == PlanActionType.PROPOSE_PLAN:
             context = action_args["plan_context"]
-            create_plan_fn = lambda x: "This is a plan."
+            def create_plan_fn(context: str) -> str:
+                if not context:
+                    return "This is a failed plan."
+                else:
+                    return "Aha! I've proposed a plan."
             plan = create_plan_fn(context)
             return {
                 "success": True,

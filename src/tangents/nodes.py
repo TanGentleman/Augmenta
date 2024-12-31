@@ -203,6 +203,8 @@ def processor_node(state: GraphState) -> GraphState:
         assert is_human_action_next(task["actions"]), "Human action should be next!"
         human_action = task["actions"].pop(0)
         # TODO: Handle cases with custom interrupt logic
+        if human_action["args"].get("is_persistant"):
+            print("TODO: Implement persistent loops grounded in task state!")
         # Example: Update task state + tweak the interrupt prompt string
         return None
 
@@ -435,7 +437,7 @@ async def execute_command_node(state: GraphState) -> GraphState:
         
     except Exception as e:
         logging.error(f"Command execution failed: {str(e)}")
-        logging.critical(f"This should never happen!")
+        logging.critical("This should never happen!")
         
     finally:
         # Always return updated state
