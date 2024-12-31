@@ -12,7 +12,7 @@ class TaskOutputFormatter:
     def format_task_status(task_dict: dict) -> str:
         """Format the status of the first task in task_dict."""
         if not task_dict:
-            return "None"
+            return ""
             
         for task_name, task in task_dict.items():
             return f"{task_name}: {task['status'].name}"
@@ -35,7 +35,7 @@ class OutputProcessor:
         task_dict = graph_state["keys"].get("task_dict")
         status = self.formatter.format_task_status(task_dict)
         if status:
-            print("Task:", status)
+            print(status or "Task: None")
             print("\n---\n")
 
     def process_updates(self, node: str, updates: dict) -> None:
@@ -45,5 +45,5 @@ class OutputProcessor:
         if 'task_dict' in updates.get('keys', {}):
             status = self.formatter.format_task_status(updates['keys']['task_dict'])
             if status:
-                print(status)
+                print(status or "Task: None")
         print("\n---\n") 

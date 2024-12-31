@@ -125,7 +125,13 @@ async def main_async(task: Task):
             next_node = next_node[0]
             # print("Node: ", str(next_node))
             if next_node == "human_node":
-                raise SystemExit("Exit: TODO: Handle interruption in values mode.")
+                FALLBACK_MODE = True
+                if not FALLBACK_MODE:
+                    raise SystemExit("Exit: TODO: Handle interruption in values mode.")
+                print("Switching to updates mode...")
+                stream_mode = "updates"
+                async for output in app.astream(graph_state, app_config, stream_mode=stream_mode):
+                    await process_workflow_output_streaming(output, app, app_config, stream_mode=stream_mode)
     
     
     print("Email planning workflow completed.")
