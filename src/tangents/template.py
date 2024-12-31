@@ -5,6 +5,11 @@ from tangents.classes.settings import Config, ChatSettings, RAGSettings
 
 from tangents.utils.action_utils import create_action
 
+class MockInputs:
+    SUMMARY = ["/mode summary", "/read", "/quit"]
+    DEFAULT = ["What's the capital of France?", "/quit"]
+    EMPTY = []
+
 def get_initial_graph_state():
     return {
         "keys": {},
@@ -42,11 +47,6 @@ def get_default_config() -> Config:
             enabled=True
         )
     )
-
-class MockInputs:
-    SUMMARY = ["/mode summary", "/read", "/quit"]
-    DEFAULT = ["What's the capital of France?", "/quit"]
-    EMPTY = []
 
 def get_planning_actions():
     read_email_action = create_action(PlanActionType.FETCH,

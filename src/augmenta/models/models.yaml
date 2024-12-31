@@ -40,6 +40,7 @@ valid_litellm_models:
   - google/gemini-2.0-flash-exp
   - together/nvidia/Llama-3.1-Nemotron-70B-Instruct-HF
   - sambanova/Llama-3.3-70B-Instruct
+  - deepseek-v3
 
   - open/google/gemini-flash-1.5-8b
   - open/openai/gpt-4o-mini

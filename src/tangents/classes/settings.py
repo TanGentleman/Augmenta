@@ -1,7 +1,4 @@
-from typing import Any, Optional
-from typing_extensions import TypedDict
 from pydantic import BaseModel
-from enum import Enum
 
 class ChatSettings(BaseModel):
     """Configuration settings for chat interactions.

@@ -34,3 +34,7 @@ src/flash/data/
 # *.pdf
 # *.png
 # *.txt
+src/tangents/checkpoints.db
+src/tangents/agent_sandbox.ipynb
+src/tangents/agent-service-toolkit/
+src/tangents/graph_mermaids/

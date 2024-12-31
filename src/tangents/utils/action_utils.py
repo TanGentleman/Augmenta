@@ -62,7 +62,8 @@ def create_action(action_type: ActionType | PlanActionType, args: ActionArgs = {
 
     
 def save_action_data(action: Action) -> bool:
-    logging.info(f"Saving action data: {action}")
+    """Save action data to a file."""
+    logging.info(f"Saved action: {action['type']}")
     return True
 
 def is_stash_action_next(action_list: list[Action]) -> bool:

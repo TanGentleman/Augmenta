@@ -24,8 +24,8 @@ async def execute_command(command: Command, current_task: Task, state_dict: dict
         
         # Handlers that need task + state_dict
         CommandType.CLEAR: lambda: _handle_clear_command(current_task, state_dict),
-        CommandType.SAVE: lambda: _handle_save_command(current_task, state_dict),
-        CommandType.UNDO: lambda: _handle_undo_command(current_task, state_dict),
+        CommandType.SAVE: lambda: _handle_save_command(current_task),
+        CommandType.UNDO: lambda: _handle_undo_command(current_task),
         CommandType.MODE: lambda: _handle_mode_command(current_task, command.args),
         CommandType.DEBUG: lambda: _print_debug_info(current_task, state_dict),
         
@@ -72,7 +72,7 @@ def _handle_clear_command(task: Task, state_dict: dict) -> None:
     else:
         logging.error("Clear command only supported in chat tasks.")
 
-def _handle_save_command(task: Task, state_dict: dict) -> None:
+def _handle_save_command(task: Task) -> None:
     """Handle saving chat messages."""
     if task["type"] == TaskType.CHAT:
         print("\nMessages:")
@@ -82,7 +82,7 @@ def _handle_save_command(task: Task, state_dict: dict) -> None:
     else:
         logging.error("Save command only supported in chat tasks.")
 
-def _handle_undo_command(task: Task, state_dict: dict) -> None:
+def _handle_undo_command(task: Task) -> None:
     """Handle undoing last message in chat tasks."""
     if task["type"] == TaskType.CHAT:
         remove_last_message(task["state"]["messages"])
@@ -111,13 +111,13 @@ def _handle_read_command(state_dict: dict, filename_arg: str) -> None:
     """Handle file reading command."""
     if not filename_arg:
         filename_arg = "sample.txt"
-    print(f"Reading from file: {filename_arg}")
     filepath = TEXT_FILE_DIR / filename_arg
     user_input = read_text_file(filepath)
     if user_input:
         state_dict["mock_inputs"].insert(0, user_input)
+        print(f"Successfully read {filepath}!")
     else:
-        print("No text found in file!")
+        print(f"No text found in file {filepath}!")
     
 def _handle_stash_command(task: Task) -> None:
     """Handle stashing a task."""
