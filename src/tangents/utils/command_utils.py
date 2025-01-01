@@ -85,6 +85,8 @@ def _handle_save_command(task: Task) -> None:
 def _handle_undo_command(task: Task) -> None:
     """Handle undoing last message in chat tasks."""
     if task["type"] == TaskType.CHAT:
+        # Remove both AI and human messages
+        remove_last_message(task["state"]["messages"])
         remove_last_message(task["state"]["messages"])
     else:
         logging.error("Undo command only supported in chat tasks.")
