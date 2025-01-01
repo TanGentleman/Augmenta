@@ -283,6 +283,13 @@ def start_action(action: Action, task: Task) -> Action:
                 action_args["stream"] = task_state["stream"]
         else:
             raise ValueError("Missing support in start_action for ActionType.GENERATE!")
+        
+    elif action["type"] == ActionType.HEALTHCHECK:
+        if action_args.get("endpoint") is None:
+            # NOTE: Assuming LiteLLM is running locally
+            print("Warning: Healthcheck endpoint is fixed to port 4000 proxy!")
+            base_url = "http://localhost:4000"
+            action_args["endpoint"] = f"{base_url}/health/liveness"
 
     elif action["type"] == PlanActionType.PROPOSE_PLAN:
         if action_args.get("plan_context") is None:
@@ -303,6 +310,9 @@ def handle_action_result(task: Task, action_result: ActionResult) -> Task:
         action["status"] = Status.DONE
         
         match (task["type"], action["type"]):
+            case (_,  ActionType.HEALTHCHECK):
+                print(f"{action_result['data']}")
+
             case (TaskType.CHAT, ActionType.GENERATE):
                 task_state["messages"].append(AIMessage(content=action_result["data"]))
                 

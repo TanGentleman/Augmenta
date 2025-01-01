@@ -28,10 +28,17 @@ def get_generate_args(args: ActionArgs) -> ActionArgs:
         args["messages"] = []
     return args
 
+def get_healthcheck_args(args: ActionArgs) -> ActionArgs:
+    """Get default arguments for healthcheck action."""
+    if "endpoint" not in args:
+        args["endpoint"] = None
+    return args
+
 ACTION_ARG_HANDLERS = {
     PlanActionType.REVISE_PLAN: get_revise_plan_args,
     PlanActionType.PROPOSE_PLAN: get_propose_plan_args,
-    ActionType.GENERATE: get_generate_args
+    ActionType.GENERATE: get_generate_args,
+    ActionType.HEALTHCHECK: get_healthcheck_args
 }
 
 def create_action(action_type: ActionType | PlanActionType, args: ActionArgs = {}) -> Action:

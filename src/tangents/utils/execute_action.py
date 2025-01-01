@@ -1,5 +1,6 @@
 import logging
 from tangents.classes.actions import Action, ActionType, ActionResult, PlanActionType
+from tangents.utils.experimental import run_healthcheck
 
 async def execute_action(action: Action) -> ActionResult:
     """
@@ -10,6 +11,7 @@ async def execute_action(action: Action) -> ActionResult:
     - WEB_SEARCH: Performs web searches (placeholder)
     - SAVE_DATA: Saves data to storage (placeholder) 
     - TOOL_CALL: Makes external tool calls (placeholder)
+    - HEALTHCHECK: Checks the health of an endpoint
     - FETCH: Retrieves data from specified sources
     - PROPOSE_PLAN: Creates initial task plans
     - REVISE_PLAN: Handles plan revisions and submissions
@@ -85,6 +87,18 @@ async def execute_action(action: Action) -> ActionResult:
                 "data": "Tool called",
                 "error": None
             }
+        
+        elif action_type == ActionType.HEALTHCHECK:
+            endpoint = action_args["endpoint"]
+            if not endpoint:
+                return {
+                    "success": False,
+                    "data": None,
+                    "error": "No endpoint provided"
+                }
+            print(f"Running healthcheck on {endpoint}")
+            result = await run_healthcheck(endpoint)
+            return result
         
         elif action_type == PlanActionType.FETCH:
             source = action_args["source"]

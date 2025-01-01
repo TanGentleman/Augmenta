@@ -43,6 +43,7 @@ class ActionType(Enum):
     TOOL_CALL = "tool_call"
     STASH = "stash"
     HUMAN_INPUT = "human_input"
+    HEALTHCHECK = "healthcheck"
 
 class ActionArgs(TypedDict):
     """Base class for action arguments."""
