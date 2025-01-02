@@ -54,10 +54,9 @@ def agent_node(state: GraphState) -> GraphState:
     Checks action and mutation counts against maximums and fails tasks if exceeded.
     """
     state_dict = state["keys"]
-    current_task = get_task(state_dict["task_dict"], status=Status.IN_PROGRESS)
-    is_done = state["is_done"]
+    current_task = get_task(state_dict["task_dict"])
     if current_task:
-        if is_done:
+        if state["is_done"]:
             logging.error("CRITICAL: Early exit: task is still in progress!")
         elif state_dict["action_count"] > MAX_ACTIONS:
             logging.error("Action count exceeded max actions, marking task as failed")
@@ -69,7 +68,7 @@ def agent_node(state: GraphState) -> GraphState:
     return {
         "keys": state_dict,
         "mutation_count": state["mutation_count"] + 1,
-        "is_done": is_done
+        "is_done": state["is_done"]
     }
 
 def task_manager_node(state: GraphState) -> GraphState:
@@ -91,17 +90,23 @@ def task_manager_node(state: GraphState) -> GraphState:
     # Process completed/failed tasks
     # NOTE: Double check this implementation
     # NOTE: Not yet parallelized.
-    for task_names, save_func in [
-        (save_completed_tasks(task_dict), logging.info),
-        (save_failed_tasks(task_dict), logging.warning)
-    ]:
-        if task_names:
-            save_func(f"Saved tasks: {task_names}")
-            for name in task_names:
-                del task_dict[name]
+    
+    # Process completed tasks
+    completed_task_names = save_completed_tasks(task_dict)
+    if completed_task_names:
+        logging.info(f"Saved done tasks: {completed_task_names}")
+        for name in completed_task_names:
+            del task_dict[name]
+            
+    # Process failed tasks
+    failed_task_names = save_failed_tasks(task_dict)
+    if failed_task_names:
+        logging.warning(f"Saved failed tasks: {failed_task_names}")
+        for name in failed_task_names:
+            del task_dict[name]
     
     # Get/start next task
-    current_task = get_task(task_dict, status=Status.IN_PROGRESS)
+    current_task = get_task(task_dict)
     if not current_task:
         unstarted_task = get_task(task_dict, status=Status.NOT_STARTED)
         
@@ -145,7 +150,7 @@ def human_node(state: GraphState) -> GraphState:
     """
     state_dict = state["keys"]
     mock_inputs = state_dict["mock_inputs"]
-    current_task = get_task(state_dict["task_dict"], status=Status.IN_PROGRESS)
+    current_task = get_task(state_dict["task_dict"])
     assert current_task is not None, "No in-progress task found"
 
     # Handle mock inputs for testing, otherwise get real user input
@@ -186,7 +191,7 @@ def processor_node(state: GraphState) -> GraphState:
     """
     state_dict = state["keys"]
     task_dict = state_dict["task_dict"]
-    current_task = get_task(task_dict, status=Status.IN_PROGRESS)
+    current_task = get_task(task_dict)
     user_input = state_dict["user_input"]
 
     assert current_task is not None, "No in-progress task found"
@@ -220,10 +225,7 @@ async def action_node(state: GraphState) -> GraphState:
     state_dict = state["keys"]
     task_dict = state_dict["task_dict"]
     
-    current_task = next(
-        (task for task in task_dict.values() if task["status"] == Status.IN_PROGRESS),
-        None
-    )
+    current_task = get_task(task_dict)
     if not current_task:
         raise ValueError("No in-progress task found")
     if not current_task["actions"]:
@@ -290,10 +292,7 @@ async def execute_command_node(state: GraphState) -> GraphState:
             raise ValueError(f"Invalid command: {command.command}")
         
         state_dict["user_input"] = None  
-        # NOTE: In cases where input is needed downstream, it should be added to task_state
-        
-        # Get current task
-        current_task = get_task(state_dict["task_dict"], status=Status.IN_PROGRESS)
+        current_task = get_task(state_dict["task_dict"])
         if not current_task:
             raise ValueError("No in-progress task found")
             
@@ -320,7 +319,7 @@ def decide_from_agent(state: GraphState) -> Literal["human_node", "task_manager"
     state_dict = state["keys"]
     task_dict = state_dict["task_dict"]
     
-    current_task = get_task(task_dict, status=Status.IN_PROGRESS)
+    current_task = get_task(task_dict)
     if not current_task:
         return "task_manager"
     if not current_task["actions"]:
