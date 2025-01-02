@@ -80,7 +80,6 @@ def create_planning_task(fetch: FetchParams, plan: Optional[PlanParams] = None) 
     return Task(
         type=TaskType.PLANNING,
         status=Status.NOT_STARTED,
-        conditions=None,
         actions=actions,
         state=None
     )

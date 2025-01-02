@@ -21,7 +21,6 @@ def get_default_task() -> Task:
     return {
         "type": TaskType.CHAT,
         "status": Status.NOT_STARTED,
-        "conditions": None,
         "actions": [],
         "state": None
     }
@@ -30,7 +29,6 @@ def get_rag_task() -> Task:
     return {
         "type": TaskType.RAG,
         "status": Status.IN_PROGRESS,
-        "conditions": None,
         "actions": [],
         "state": None
     }
@@ -38,7 +36,7 @@ def get_rag_task() -> Task:
 def get_default_config() -> Config:
     return Config(
         chat_settings=ChatSettings(
-            primary_model="lmstudio/llama-3.2-3b-instruct",
+            primary_model="deepseek-v3",
             stream=True,
             system_message="Speak with lots of emojis",
             disable_system_message=False
@@ -63,7 +61,6 @@ def get_example_planning_task() -> Task:
     return Task(
         type=TaskType.PLANNING,
         status=Status.NOT_STARTED,
-        conditions=None,
         actions=get_planning_actions(),
         state=None
     )

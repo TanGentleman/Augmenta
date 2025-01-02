@@ -26,12 +26,10 @@ class Task(TypedDict):
     Attributes:
         type: Task category
         status: Current execution status
-        conditions: Optional execution prerequisites
         actions: Ordered list of actions to execute
         state: Task-specific state
     """
     type: TaskType
     status: Status
-    conditions: Optional[dict]
     actions: list[Action]
     state: Optional[TaskState]

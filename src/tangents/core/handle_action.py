@@ -248,7 +248,6 @@ def handle_action_result(task: Task, action_result: ActionResult) -> Task:
 
                 DEFAULT_MAX_REVISIONS = 3
                 max_revisions = action["args"].get("max_revisions", DEFAULT_MAX_REVISIONS)
-                # TODO: Move this value to current_task["conditions"]
                 if task_state["revision_count"] >= max_revisions:
                     action["args"]["is_done"] = True
                 else:
