@@ -11,9 +11,9 @@ class ChatSettings(BaseModel):
         disable_system_message: Override to disable system messages (default: False)
     """
 
-    primary_model: str = "llama"
+    primary_model: str = 'llama'
     stream: bool = True
-    system_message: str = ""
+    system_message: str = ''
     disable_system_message: bool = False
 
 

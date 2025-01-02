@@ -12,7 +12,7 @@ from requests.exceptions import Timeout
 
 from tangents.classes.actions import ActionResult
 
-HEALTHCHECK_ENDPOINT = "http://localhost:4000/health/liveness"
+HEALTHCHECK_ENDPOINT = 'http://localhost:4000/health/liveness'
 REQUEST_TIMEOUT = 2
 
 
@@ -32,25 +32,25 @@ async def run_healthcheck(endpoint: str) -> ActionResult:
 
     try:
         timeout = aiohttp.ClientTimeout(total=REQUEST_TIMEOUT)
-        headers = {"Authorization": f"Bearer {os.getenv('LITELLM_API_KEY')}"}
+        headers = {'Authorization': f"Bearer {os.getenv('LITELLM_API_KEY')}"}
 
         async with aiohttp.ClientSession(timeout=timeout) as session:
             async with session.get(endpoint, headers=headers) as response:
                 success = response.status == 200
                 return {
-                    "success": success,
-                    "data": "Healthcheck passed" if success else None,
-                    "error": None if success else f"Status {response.status}",
+                    'success': success,
+                    'data': 'Healthcheck passed' if success else None,
+                    'error': None if success else f'Status {response.status}',
                 }
 
     except asyncio.TimeoutError:
         return {
-            "success": False,
-            "data": None,
-            "error": f"Request timed out after {REQUEST_TIMEOUT} seconds",
+            'success': False,
+            'data': None,
+            'error': f'Request timed out after {REQUEST_TIMEOUT} seconds',
         }
     except Exception as e:
-        return {"success": False, "data": None, "error": str(e)}
+        return {'success': False, 'data': None, 'error': str(e)}
 
 
 def run_healthcheck_sync(endpoint: str) -> ActionResult:
@@ -68,27 +68,27 @@ def run_healthcheck_sync(endpoint: str) -> ActionResult:
     assert endpoint == HEALTHCHECK_ENDPOINT
 
     try:
-        headers = {"Authorization": f"Bearer {os.getenv('LITELLM_API_KEY')}"}
+        headers = {'Authorization': f"Bearer {os.getenv('LITELLM_API_KEY')}"}
         response = requests.get(endpoint, headers=headers, timeout=REQUEST_TIMEOUT)
         success = response.status_code == 200
         return {
-            "success": success,
-            "data": "Healthcheck passed" if success else None,
-            "error": None if success else f"Status {response.status_code}",
+            'success': success,
+            'data': 'Healthcheck passed' if success else None,
+            'error': None if success else f'Status {response.status_code}',
         }
     except Timeout:
         return {
-            "success": False,
-            "data": None,
-            "error": f"Request timed out after {REQUEST_TIMEOUT} seconds",
+            'success': False,
+            'data': None,
+            'error': f'Request timed out after {REQUEST_TIMEOUT} seconds',
         }
     except Exception as e:
-        return {"success": False, "data": None, "error": str(e)}
+        return {'success': False, 'data': None, 'error': str(e)}
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     from dotenv import load_dotenv
 
     load_dotenv()
-    print("Sync:", run_healthcheck_sync(HEALTHCHECK_ENDPOINT))
+    print('Sync:', run_healthcheck_sync(HEALTHCHECK_ENDPOINT))
     # print("Async:", asyncio.run(run_healthcheck(HEALTHCHECK_ENDPOINT)))

@@ -12,26 +12,26 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableSerializable
 from typing import Any
 
-ALLOWED_MODELS = ["free", "Llama-3.3-70B"]
-LITELLM_BASE_URL = "http://localhost:4000/v1"
+ALLOWED_MODELS = ['free', 'Llama-3.3-70B']
+LITELLM_BASE_URL = 'http://localhost:4000/v1'
 
 
 # TODO: Support callbacks
 def fast_get_llm(model_name: str, config: dict = {}) -> ChatOpenAI | None:
     """Uses LiteLLM endpoint."""
     if model_name not in ALLOWED_MODELS:
-        logging.warning(f"Model {model_name} not in allowed models list")
+        logging.warning(f'Model {model_name} not in allowed models list')
     try:
         # TODO: Unpack config
         # This is for callbacks, hyperparams, etc.
         llm = ChatOpenAI(
             base_url=LITELLM_BASE_URL,
-            api_key=os.getenv("LITELLM_API_KEY"),
+            api_key=os.getenv('LITELLM_API_KEY'),
             model=model_name,
         )
         return llm
     except Exception as e:
-        logging.error(f"Error initializing LLM: {e}")
+        logging.error(f'Error initializing LLM: {e}')
         return None
 
 
@@ -45,7 +45,7 @@ def fast_get_llm(model_name: str, config: dict = {}) -> ChatOpenAI | None:
 
 
 def get_summary_chain(
-    model_name: str, system_prompt: str = "You are a helpful AI."
+    model_name: str, system_prompt: str = 'You are a helpful AI.'
 ) -> RunnableSerializable[Any, str] | None:
     """
     Returns a chain for summarization only.
@@ -56,10 +56,10 @@ def get_summary_chain(
     try:
         llm = fast_get_llm(model_name)
         if llm is None:
-            raise ValueError("LLM not initialized!")
+            raise ValueError('LLM not initialized!')
 
         chain = (
-            {"excerpt": lambda x: get_last_user_message(x)}
+            {'excerpt': lambda x: get_last_user_message(x)}
             | get_summary_template(system_prompt)
             | llm
             | StrOutputParser()
@@ -67,5 +67,5 @@ def get_summary_chain(
         # chain = SimpleChain(raw_chain, description="Summary Chain")
         return chain
     except Exception as e:
-        logging.error(f"Error creating summary chain: {e}")
+        logging.error(f'Error creating summary chain: {e}')
         return None

@@ -14,10 +14,10 @@ class Status(Enum):
         FAILED: Failed to complete
     """
 
-    NOT_STARTED = "not_started"
-    IN_PROGRESS = "in_progress"
-    DONE = "done"
-    FAILED = "failed"
+    NOT_STARTED = 'not_started'
+    IN_PROGRESS = 'in_progress'
+    DONE = 'done'
+    FAILED = 'failed'
 
 
 class ActionResult(TypedDict):
@@ -44,13 +44,13 @@ class ActionType(Enum):
         TOOL_CALL: External tool invocations
     """
 
-    GENERATE = "generate"
-    WEB_SEARCH = "web_search"
-    SAVE_DATA = "save_data"
-    TOOL_CALL = "tool_call"
-    STASH = "stash"
-    HUMAN_INPUT = "human_input"
-    HEALTHCHECK = "healthcheck"
+    GENERATE = 'generate'
+    WEB_SEARCH = 'web_search'
+    SAVE_DATA = 'save_data'
+    TOOL_CALL = 'tool_call'
+    STASH = 'stash'
+    HUMAN_INPUT = 'human_input'
+    HEALTHCHECK = 'healthcheck'
 
 
 class ActionArgs(TypedDict):
@@ -84,9 +84,9 @@ class PlanActionType(Enum):
         REVISE_PLAN: Modify existing plan
     """
 
-    FETCH = "fetch"
-    PROPOSE_PLAN = "propose_plan"
-    REVISE_PLAN = "revise_plan"
+    FETCH = 'fetch'
+    PROPOSE_PLAN = 'propose_plan'
+    REVISE_PLAN = 'revise_plan'
 
 
 class GenerateActionArgs(ActionArgs):

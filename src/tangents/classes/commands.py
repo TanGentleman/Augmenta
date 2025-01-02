@@ -19,17 +19,17 @@ class CommandType(Enum):
         STASH: Save current state
     """
 
-    QUIT = "quit"
-    HELP = "help"
-    CLEAR = "clear"
-    SETTINGS = "settings"
-    SAVE = "save"
-    LOAD = "load"
-    DEBUG = "debug"
-    UNDO = "undo"
-    MODE = "mode"
-    READ = "read"
-    STASH = "stash"
+    QUIT = 'quit'
+    HELP = 'help'
+    CLEAR = 'clear'
+    SETTINGS = 'settings'
+    SAVE = 'save'
+    LOAD = 'load'
+    DEBUG = 'debug'
+    UNDO = 'undo'
+    MODE = 'mode'
+    READ = 'read'
+    STASH = 'stash'
 
 
 class Command:
@@ -48,9 +48,9 @@ class Command:
     """
 
     def __init__(self, raw_input: str):
-        parts = raw_input.lstrip("/").split(" ", 1)
+        parts = raw_input.lstrip('/').split(' ', 1)
         self.command = parts[0].lower()
-        self.args = parts[1] if len(parts) > 1 else ""
+        self.args = parts[1] if len(parts) > 1 else ''
 
     @property
     def is_valid(self) -> bool:

@@ -21,13 +21,13 @@ def read_text_file(filepath: Path) -> Optional[str]:
         Contents of the file as a string, or None if there was an error
     """
     try:
-        with open(filepath, "r", encoding="utf-8") as f:
+        with open(filepath, 'r', encoding='utf-8') as f:
             return f.read()
     except FileNotFoundError:
-        logger.error(f"File not found: {filepath}")
+        logger.error(f'File not found: {filepath}')
         return None
     except Exception as e:
-        logger.error(f"Error reading file {filepath}: {e}")
+        logger.error(f'Error reading file {filepath}: {e}')
         return None
 
 
@@ -55,13 +55,13 @@ async def read_text_file_async(filepath: Path) -> Optional[str]:
         Contents of the file as a string, or None if there was an error
     """
     try:
-        async with aiofiles.open(filepath, "r", encoding="utf-8") as f:
+        async with aiofiles.open(filepath, 'r', encoding='utf-8') as f:
             return await f.read()
     except FileNotFoundError:
-        logger.error(f"File not found: {filepath}")
+        logger.error(f'File not found: {filepath}')
         return None
     except Exception as e:
-        logger.error(f"Error reading file {filepath}: {e}")
+        logger.error(f'Error reading file {filepath}: {e}')
         return None
 
 

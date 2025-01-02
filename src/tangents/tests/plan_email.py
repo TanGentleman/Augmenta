@@ -38,7 +38,7 @@ class FetchParams:
     """Email content fetching configuration."""
 
     source: str  # Source file path or identifier
-    method: str = "get_email_content"  # Fetch method to use
+    method: str = 'get_email_content'  # Fetch method to use
 
 
 @dataclass
@@ -54,19 +54,17 @@ class ExtraParams:
 
     system_message: Optional[str] = None  # Custom system instructions
     mock_inputs: list[str] = field(default_factory=list)  # Test inputs for workflow
-    task_name: str = "plan_from_email_task"  # Custom task identifier
+    task_name: str = 'plan_from_email_task'  # Custom task identifier
 
 
 # Constants
 RECURSION_LIMIT = 50
-DEFAULT_FETCH = FetchParams(source="example-email.txt")
+DEFAULT_FETCH = FetchParams(source='example-email.txt')
 DEFAULT_PLAN = PlanParams()
 DEFAULT_EXTRA = ExtraParams()
 
 
-def create_planning_task(
-    fetch: FetchParams, plan: Optional[PlanParams] = None
-) -> Optional[Task]:
+def create_planning_task(fetch: FetchParams, plan: Optional[PlanParams] = None) -> Optional[Task]:
     """Create email planning task with sequential actions.
 
     Args:
@@ -77,23 +75,19 @@ def create_planning_task(
         Configured Task or None if invalid params
     """
     if not fetch.source:
-        logging.error("Missing source in fetch params")
+        logging.error('Missing source in fetch params')
         return None
 
     actions = [
-        create_action(
-            PlanActionType.FETCH, args={"source": fetch.source, "method": fetch.method}
-        ),
+        create_action(PlanActionType.FETCH, args={'source': fetch.source, 'method': fetch.method}),
         create_action(PlanActionType.PROPOSE_PLAN),
         create_action(
             PlanActionType.REVISE_PLAN,
-            args={"max_revisions": (plan or DEFAULT_PLAN).max_revisions},
+            args={'max_revisions': (plan or DEFAULT_PLAN).max_revisions},
         ),
     ]
 
-    return Task(
-        type=TaskType.PLANNING, status=Status.NOT_STARTED, actions=actions, state=None
-    )
+    return Task(type=TaskType.PLANNING, status=Status.NOT_STARTED, actions=actions, state=None)
 
 
 def get_initial_state(task: Task, extra: ExtraParams = DEFAULT_EXTRA) -> AgentState:
@@ -111,11 +105,11 @@ def get_initial_state(task: Task, extra: ExtraParams = DEFAULT_EXTRA) -> AgentSt
         config.chat_settings.system_message = extra.system_message
 
     return {
-        "config": config,
-        "action_count": 0,
-        "task_dict": {extra.task_name: task},
-        "user_input": None,
-        "mock_inputs": extra.mock_inputs,
+        'config': config,
+        'action_count': 0,
+        'task_dict': {extra.task_name: task},
+        'user_input': None,
+        'mock_inputs': extra.mock_inputs,
     }
 
 
@@ -127,30 +121,26 @@ async def execute_workflow(task: Task, extra: ExtraParams = DEFAULT_EXTRA) -> No
     app = create_workflow()
 
     graph_state = get_initial_graph_state()
-    graph_state["keys"] = get_initial_state(task, extra)
+    graph_state['keys'] = get_initial_state(task, extra)
 
     app_config = {
-        "recursion_limit": RECURSION_LIMIT,
-        "configurable": {"thread_id": uuid4()},
+        'recursion_limit': RECURSION_LIMIT,
+        'configurable': {'thread_id': uuid4()},
     }
 
     # Try values mode first, fallback to updates if needed
-    stream_mode = "values"
+    stream_mode = 'values'
     async for output in app.astream(graph_state, app_config, stream_mode=stream_mode):
         await process_workflow_output_streaming(output, app, app_config, stream_mode)
 
     # Check if human input needed
-    if stream_mode == "values":
+    if stream_mode == 'values':
         next_node = app.get_state(app_config).next
-        if next_node and next_node[0] == "human_node":
-            print("Switching to updates mode for human input...")
-            stream_mode = "updates"
-            async for output in app.astream(
-                graph_state, app_config, stream_mode=stream_mode
-            ):
-                await process_workflow_output_streaming(
-                    output, app, app_config, stream_mode
-                )
+        if next_node and next_node[0] == 'human_node':
+            print('Switching to updates mode for human input...')
+            stream_mode = 'updates'
+            async for output in app.astream(graph_state, app_config, stream_mode=stream_mode):
+                await process_workflow_output_streaming(output, app, app_config, stream_mode)
 
 
 async def plan_email(
@@ -169,8 +159,8 @@ async def plan_email(
     if task:
         await execute_workflow(task, extra_params or DEFAULT_EXTRA)
     else:
-        logging.error("Failed to create planning task")
+        logging.error('Failed to create planning task')
 
 
-if __name__ == "__main__":
+if __name__ == '__main__':
     asyncio.run(plan_email(DEFAULT_FETCH, DEFAULT_PLAN))

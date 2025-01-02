@@ -7,7 +7,7 @@ def insert_system_message(messages: list, system_content: str) -> None:
     if not messages:
         messages.append(SystemMessage(content=system_content))
     elif isinstance(messages[0], SystemMessage):
-        logging.warning("System message already exists, updating")
+        logging.warning('System message already exists, updating')
         messages[0] = SystemMessage(content=system_content)
     else:
         messages.insert(0, SystemMessage(content=system_content))
@@ -45,4 +45,4 @@ def get_last_user_message(messages: list) -> str:
     message = messages[-1]
     if isinstance(message, HumanMessage):
         return str(message.content)
-    raise ValueError("No user message found!")
+    raise ValueError('No user message found!')

@@ -13,21 +13,17 @@ class TaskOutputFormatter:
     def format_task_status(task_dict: dict) -> str:
         """Format the status of the first task in task_dict."""
         if not task_dict:
-            return ""
+            return ''
 
         for task_name, task in task_dict.items():
             return f"{task_name}: {task['status'].name}"
-        raise ValueError("Unhandled task status.")
+        raise ValueError('Unhandled task status.')
 
     @staticmethod
     def format_node_info(node: str, updates: dict) -> str:
         """Format node information including mutation count."""
-        hops = (
-            updates.get("mutation_count", None)
-            if isinstance(updates, dict)
-            else updates
-        )
-        return f"\nNode: {node}\nHops: {hops}"
+        hops = updates.get('mutation_count', None) if isinstance(updates, dict) else updates
+        return f'\nNode: {node}\nHops: {hops}'
 
 
 class OutputProcessor:
@@ -38,18 +34,18 @@ class OutputProcessor:
 
     def process_values(self, graph_state: GraphState) -> None:
         """Process and display full graph state output."""
-        task_dict = graph_state["keys"].get("task_dict")
+        task_dict = graph_state['keys'].get('task_dict')
         status = self.formatter.format_task_status(task_dict)
         if status:
-            print(status or "Task: None")
-            print("\n---\n")
+            print(status or 'Task: None')
+            print('\n---\n')
 
     def process_updates(self, node: str, updates: dict) -> None:
         """Process and display node updates."""
         print(self.formatter.format_node_info(node, updates))
 
-        if "task_dict" in updates.get("keys", {}):
-            status = self.formatter.format_task_status(updates["keys"]["task_dict"])
+        if 'task_dict' in updates.get('keys', {}):
+            status = self.formatter.format_task_status(updates['keys']['task_dict'])
             if status:
-                print(status or "Task: None")
-        print("\n---\n")
+                print(status or 'Task: None')
+        print('\n---\n')

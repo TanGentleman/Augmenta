@@ -7,39 +7,39 @@ from tangents.utils.action_utils import create_action
 
 
 class MockInputs:
-    SUMMARY = ["/mode summary", "/read", "/quit"]
-    DEFAULT = ["What's the capital of France?", "/quit"]
+    SUMMARY = ['/mode summary', '/read', '/quit']
+    DEFAULT = ["What's the capital of France?", '/quit']
     EMPTY = []
 
 
 def get_initial_graph_state():
-    return {"keys": {}, "mutation_count": 0, "is_done": False}
+    return {'keys': {}, 'mutation_count': 0, 'is_done': False}
 
 
 def get_default_task() -> Task:
     return {
-        "type": TaskType.CHAT,
-        "status": Status.NOT_STARTED,
-        "actions": [],
-        "state": None,
+        'type': TaskType.CHAT,
+        'status': Status.NOT_STARTED,
+        'actions': [],
+        'state': None,
     }
 
 
 def get_rag_task() -> Task:
     return {
-        "type": TaskType.RAG,
-        "status": Status.IN_PROGRESS,
-        "actions": [],
-        "state": None,
+        'type': TaskType.RAG,
+        'status': Status.IN_PROGRESS,
+        'actions': [],
+        'state': None,
     }
 
 
 def get_default_config() -> Config:
     return Config(
         chat_settings=ChatSettings(
-            primary_model="deepseek-v3",
+            primary_model='deepseek-v3',
             stream=True,
-            system_message="Speak with lots of emojis",
+            system_message='Speak with lots of emojis',
             disable_system_message=False,
         ),
         rag_settings=RAGSettings(enabled=True),
@@ -49,7 +49,7 @@ def get_default_config() -> Config:
 def get_planning_actions():
     read_email_action = create_action(
         PlanActionType.FETCH,
-        args={"source": "example-email.txt", "method": "get_email_content"},
+        args={'source': 'example-email.txt', 'method': 'get_email_content'},
     )
     propose_plan_action = create_action(PlanActionType.PROPOSE_PLAN)
     revise_plan_action = create_action(PlanActionType.REVISE_PLAN)
@@ -67,19 +67,19 @@ def get_example_planning_task() -> Task:
 
 def get_default_state_dict() -> AgentState:
     return {
-        "config": get_default_config(),
-        "action_count": 0,
-        "task_dict": {"chat_task": get_default_task()},
-        "user_input": None,
-        "mock_inputs": MockInputs.EMPTY,
+        'config': get_default_config(),
+        'action_count': 0,
+        'task_dict': {'chat_task': get_default_task()},
+        'user_input': None,
+        'mock_inputs': MockInputs.EMPTY,
     }
 
 
 def get_planning_state_dict() -> AgentState:
     return {
-        "config": get_default_config(),
-        "action_count": 0,
-        "user_input": None,
-        "task_dict": {"plan_from_email_task": get_example_planning_task()},
-        "mock_inputs": MockInputs.EMPTY,
+        'config': get_default_config(),
+        'action_count': 0,
+        'user_input': None,
+        'task_dict': {'plan_from_email_task': get_example_planning_task()},
+        'mock_inputs': MockInputs.EMPTY,
     }

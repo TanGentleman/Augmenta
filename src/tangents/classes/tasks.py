@@ -13,9 +13,9 @@ class TaskType(Enum):
         PLANNING: Multi-step planning tasks
     """
 
-    CHAT = "chat"
-    RAG = "rag"
-    PLANNING = "planning"
+    CHAT = 'chat'
+    RAG = 'rag'
+    PLANNING = 'planning'
 
 
 # NOTE: Not sure if states.py is the right place for this

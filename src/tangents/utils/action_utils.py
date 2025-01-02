@@ -13,35 +13,35 @@ def get_revise_plan_args(args: ActionArgs) -> ActionArgs:
     """Get default arguments for revise plan action."""
     DEFAULT_MAX_REVISIONS = 3
 
-    if "proposed_plan" not in args:
-        args["proposed_plan"] = None
-    if "revision_context" not in args:
-        args["revision_context"] = None
-    if "max_revisions" not in args:
-        args["max_revisions"] = DEFAULT_MAX_REVISIONS
+    if 'proposed_plan' not in args:
+        args['proposed_plan'] = None
+    if 'revision_context' not in args:
+        args['revision_context'] = None
+    if 'max_revisions' not in args:
+        args['max_revisions'] = DEFAULT_MAX_REVISIONS
     return args
 
 
 def get_propose_plan_args(args: ActionArgs) -> ActionArgs:
     """Get default arguments for create plan action."""
-    if "plan_context" not in args:
-        args["plan_context"] = None
+    if 'plan_context' not in args:
+        args['plan_context'] = None
     return args
 
 
 def get_generate_args(args: ActionArgs) -> ActionArgs:
     """Get default arguments for generate action."""
-    if "chain" not in args:
-        args["chain"] = None
-    if "messages" not in args:
-        args["messages"] = []
+    if 'chain' not in args:
+        args['chain'] = None
+    if 'messages' not in args:
+        args['messages'] = []
     return args
 
 
 def get_healthcheck_args(args: ActionArgs) -> ActionArgs:
     """Get default arguments for healthcheck action."""
-    if "endpoint" not in args:
-        args["endpoint"] = None
+    if 'endpoint' not in args:
+        args['endpoint'] = None
     return args
 
 
@@ -53,9 +53,7 @@ ACTION_ARG_HANDLERS = {
 }
 
 
-def create_action(
-    action_type: ActionType | PlanActionType, args: ActionArgs = {}
-) -> Action:
+def create_action(action_type: ActionType | PlanActionType, args: ActionArgs = {}) -> Action:
     """Create a new action with default configuration.
 
     Args:
@@ -87,32 +85,32 @@ def is_stash_action_next(action_list: list[Action]) -> bool:
     """Check if the next action is a StashAction"""
     if not action_list:
         return False
-    return action_list[0]["type"] == ActionType.STASH
+    return action_list[0]['type'] == ActionType.STASH
 
 
 def is_human_action_next(action_list: list[Action]) -> bool:
     """Check if the next action is a HumanAction"""
     if not action_list:
         return False
-    return action_list[0]["type"] == ActionType.HUMAN_INPUT
+    return action_list[0]['type'] == ActionType.HUMAN_INPUT
 
 
 def add_stash_action(action_list: list[Action]) -> None:
     """Add a StashAction to the START of the action list."""
     # check if first action is a StashAction
-    if action_list and action_list[0]["type"] == ActionType.STASH:
+    if action_list and action_list[0]['type'] == ActionType.STASH:
         return
     action_list.insert(0, create_action(ActionType.STASH))
 
 
 def add_human_action(action_list: list[Action], prompt: str = None) -> None:
     """Add a HumanAction to the START of the action list."""
-    if action_list and action_list[0]["type"] == ActionType.HUMAN_INPUT:
-        logging.warning("Duplicate human action detected; adding another.")
+    if action_list and action_list[0]['type'] == ActionType.HUMAN_INPUT:
+        logging.warning('Duplicate human action detected; adding another.')
 
     if prompt:
         # NOTE: Can add assertions here
-        args = {"prompt": prompt}
+        args = {'prompt': prompt}
     else:
         args = {}
     action_list.insert(0, create_action(ActionType.HUMAN_INPUT, args))
