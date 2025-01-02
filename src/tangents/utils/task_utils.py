@@ -1,7 +1,8 @@
 import logging
 from typing import Optional
+
 from tangents.classes.settings import Config
-from tangents.classes.tasks import Task, Status, TaskType
+from tangents.classes.tasks import Status, Task, TaskType
 from tangents.utils.action_utils import is_stash_action_next
 from tangents.utils.chains import fast_get_llm
 from tangents.utils.message_utils import insert_system_message

@@ -4,9 +4,10 @@ Provides both async and sync healthcheck functions that verify endpoint liveness
 Requires LITELLM_API_KEY environment variable for authentication.
 """
 
-import os
-import aiohttp
 import asyncio
+import os
+
+import aiohttp
 import requests
 from requests.exceptions import Timeout
 

@@ -1,8 +1,10 @@
 from typing import Optional
+
+from langchain_core.messages import BaseMessage
 from typing_extensions import TypedDict
+
 from tangents.classes.settings import Config
 from tangents.classes.tasks import Task
-from langchain_core.messages import BaseMessage
 
 
 class AgentState(TypedDict):

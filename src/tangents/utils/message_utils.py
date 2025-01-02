@@ -1,5 +1,6 @@
 import logging
-from langchain_core.messages import SystemMessage, HumanMessage
+
+from langchain_core.messages import HumanMessage, SystemMessage
 
 
 def insert_system_message(messages: list, system_content: str) -> None:

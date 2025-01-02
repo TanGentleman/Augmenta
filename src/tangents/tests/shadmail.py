@@ -9,8 +9,8 @@ import asyncio
 from pathlib import Path
 from typing import Optional
 
-from tangents.tests.plan_email import plan_email, FetchParams, PlanParams, ExtraParams
 from paths import SHADOWS_EMAIL_DIR
+from tangents.tests.plan_email import ExtraParams, FetchParams, PlanParams, plan_email
 
 # Constants
 DEFAULT_EMAIL_PATH = SHADOWS_EMAIL_DIR / 'scenario-1-email.txt'

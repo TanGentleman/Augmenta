@@ -1,19 +1,17 @@
 import logging
 from typing import Callable
 
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
 from paths import TEXT_FILE_DIR
-
 from tangents.classes.actions import ActionType, PlanActionType, Status
+from tangents.classes.commands import Command, CommandType
 from tangents.classes.settings import Config
 from tangents.classes.tasks import Task, TaskType
-from tangents.utils.action_utils import create_action, is_stash_action_next
+from tangents.utils.action_utils import add_stash_action, create_action, is_stash_action_next
 from tangents.utils.chains import fast_get_llm
-from tangents.classes.commands import Command, CommandType
-from tangents.utils.message_utils import clear_messages, remove_last_message
-from tangents.utils.action_utils import add_stash_action
 from tangents.utils.file_utils import read_text_file
+from tangents.utils.message_utils import clear_messages, remove_last_message
 
 
 def handle_user_message(user_input: str, current_task: Task, config: Config) -> None:

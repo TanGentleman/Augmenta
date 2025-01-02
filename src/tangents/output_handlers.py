@@ -1,6 +1,7 @@
 """Module for handling workflow output processing and display."""
 
 import logging
+
 from .classes.states import GraphState
 
 logger = logging.getLogger(__name__)

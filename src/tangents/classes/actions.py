@@ -1,7 +1,8 @@
-from typing import Any, Optional
-from typing_extensions import TypedDict
 from enum import Enum
+from typing import Any, Optional
+
 from langchain_core.messages import BaseMessage
+from typing_extensions import TypedDict
 
 
 class Status(Enum):

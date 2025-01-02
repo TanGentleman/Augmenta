@@ -1,16 +1,15 @@
 import logging
 import os
-
-from langchain_openai import ChatOpenAI
-from tangents.utils.message_utils import get_last_user_message
-
-# from augmenta.chains import SimpleChain
-from augmenta.constants import get_summary_template
+from typing import Any
 
 # from augmenta.models.models import LLM, LLM_FN
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableSerializable
-from typing import Any
+from langchain_openai import ChatOpenAI
+
+# from augmenta.chains import SimpleChain
+from augmenta.constants import get_summary_template
+from tangents.utils.message_utils import get_last_user_message
 
 ALLOWED_MODELS = ['free', 'Llama-3.3-70B']
 LITELLM_BASE_URL = 'http://localhost:4000/v1'

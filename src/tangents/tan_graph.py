@@ -32,36 +32,37 @@ Usage:
     python -m tangents.tan_graph --stream-mode updates
 """
 
-import logging
-import asyncio
 import argparse
+import asyncio
+import logging
+from typing import Any, Dict
 from uuid import uuid4
-from typing import Dict, Any
 
-from langgraph.graph import StateGraph, START, END
-from langgraph.graph.state import CompiledStateGraph
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.graph import END, START, StateGraph
+from langgraph.graph.state import CompiledStateGraph
 from langgraph.types import Command as ResumeCommand
 
 from tangents.template import (
-    get_initial_graph_state,
     get_default_state_dict,
+    get_initial_graph_state,
     get_planning_state_dict,
 )
+
 from .classes.states import GraphState
+from .input_handlers import InterruptHandler
 from .nodes import (
-    start_node,
-    agent_node,
-    task_manager_node,
-    human_node,
-    processor_node,
-    execute_command_node,
     action_node,
+    agent_node,
     decide_from_agent,
     decide_from_processor,
+    execute_command_node,
+    human_node,
+    processor_node,
+    start_node,
+    task_manager_node,
 )
 from .output_handlers import OutputProcessor
-from .input_handlers import InterruptHandler
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

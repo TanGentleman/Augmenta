@@ -1,7 +1,9 @@
-from typing import Optional
-from typing_extensions import TypedDict
 from enum import Enum
-from tangents.classes.actions import Status, Action
+from typing import Optional
+
+from typing_extensions import TypedDict
+
+from tangents.classes.actions import Action, Status
 
 
 class TaskType(Enum):

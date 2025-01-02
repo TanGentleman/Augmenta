@@ -1,8 +1,7 @@
+from tangents.classes.actions import PlanActionType, Status
+from tangents.classes.settings import ChatSettings, Config, RAGSettings
 from tangents.classes.states import AgentState
 from tangents.classes.tasks import Task, TaskType
-from tangents.classes.actions import PlanActionType, Status
-from tangents.classes.settings import Config, ChatSettings, RAGSettings
-
 from tangents.utils.action_utils import create_action
 
 
