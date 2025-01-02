@@ -4,6 +4,7 @@ from typing import Optional
 from tangents.classes.settings import Config
 from tangents.classes.tasks import Task, Status, TaskType
 from tangents.utils.action_utils import is_stash_action_next
+from tangents.utils.chains import fast_get_llm
 from tangents.utils.message_utils import insert_system_message
 
 def get_task(task_dict: dict[str, Task], task_name: Optional[str] = None, status: Optional[Status] = Status.IN_PROGRESS) -> Task | None:
@@ -87,6 +88,8 @@ def start_task(task: Task, config: Config) -> Task:
     
     task_type = task["type"]
     task_state = task["state"]
+
+    # TODO: Implement assertions about actions list
     match task_type:
         case TaskType.CHAT:
             if task_state is None:
@@ -100,6 +103,14 @@ def start_task(task: Task, config: Config) -> Task:
                     task["state"]["messages"],
                     config.chat_settings.system_message
                 )
+            
+            model_name = config.chat_settings.primary_model
+            if task["state"]["active_chain"] is None:
+                logging.info(f"Initializing chain with model {model_name}!")
+                llm = fast_get_llm(model_name)
+                if llm is None:
+                    raise ValueError("Chain not initialized!")
+                task["state"]["active_chain"] = llm
         
         case TaskType.RAG:
             if not config.rag_settings.enabled:
