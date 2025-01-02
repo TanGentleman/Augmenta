@@ -1,11 +1,9 @@
 import logging
-
-from langchain_core.messages import AIMessage, HumanMessage
-
+from langchain_core.messages import HumanMessage, AIMessage
 from tangents.classes.actions import (
     Action,
-    ActionResult,
     ActionType,
+    ActionResult,
     PlanActionType,
     Status,
 )
@@ -22,31 +20,33 @@ def start_action(action: Action, task: Task) -> Action:
     task_state = task['state']
     action_args = action['args']
 
-    if action['type'] == ActionType.GENERATE:
-        if task['type'] == TaskType.CHAT:
-            if action_args.get('active_chain') is None:
-                action_args['active_chain'] = task_state['active_chain']
-            if action_args.get('messages') is None:
-                action_args['messages'] = task_state['messages']
-            if action_args.get('stream') is None:
-                action_args['stream'] = task_state['stream']
-        else:
-            raise ValueError('Missing support in start_action for ActionType.GENERATE!')
+    match action['type']:
+        case ActionType.GENERATE:
+            match task['type']:
+                case TaskType.CHAT:
+                    if action_args.get('active_chain') is None:
+                        action_args['active_chain'] = task_state['active_chain']
+                    if action_args.get('messages') is None:
+                        action_args['messages'] = task_state['messages']
+                    if action_args.get('stream') is None:
+                        action_args['stream'] = task_state['stream']
+                case _:
+                    raise ValueError('Missing support in start_action for ActionType.GENERATE!')
 
-    elif action['type'] == ActionType.HEALTHCHECK:
-        if action_args.get('endpoint') is None:
-            # NOTE: Assuming LiteLLM is running locally
-            print('Warning: Healthcheck endpoint is fixed to port 4000 proxy!')
-            base_url = 'http://localhost:4000'
-            action_args['endpoint'] = f'{base_url}/health/liveness'
+        case ActionType.HEALTHCHECK:
+            if action_args.get('endpoint') is None:
+                # NOTE: Assuming LiteLLM is running locally
+                print('Warning: Healthcheck endpoint is fixed to port 4000 proxy!')
+                base_url = 'http://localhost:4000'
+                action_args['endpoint'] = f'{base_url}/health/liveness'
 
-    elif action['type'] == PlanActionType.PROPOSE_PLAN:
-        if action_args.get('plan_context') is None:
-            action_args['plan_context'] = task_state['context']
+        case PlanActionType.PROPOSE_PLAN:
+            if action_args.get('plan_context') is None:
+                action_args['plan_context'] = task_state['context']
 
-    elif action['type'] == PlanActionType.REVISE_PLAN:
-        if action_args.get('proposed_plan') is None:
-            action_args['proposed_plan'] = task_state['proposed_plan']
+        case PlanActionType.REVISE_PLAN:
+            if action_args.get('proposed_plan') is None:
+                action_args['proposed_plan'] = task_state['proposed_plan']
 
     return action
 
@@ -78,97 +78,96 @@ async def execute_action(action: Action) -> ActionResult:
     action_args = action['args']
 
     try:
-        if action_type == ActionType.GENERATE:
-            stream = action_args['stream']
-            chain = action_args['active_chain']
-            messages = action_args['messages']
+        match action_type:
+            case ActionType.GENERATE:
+                stream = action_args['stream']
+                chain = action_args['active_chain']
+                messages = action_args['messages']
 
-            try:
-                if stream:
-                    response_string = ''
-                    async for chunk in chain.astream(messages):
-                        print(chunk.content, end='', flush=True)
-                        response_string += chunk.content
-                    print()
-                    if not response_string:
-                        raise ValueError('No response generated')
-                else:
-                    response = await chain.ainvoke(messages)
-                    print(response.content)
-                    response_string = response.content
-                return {'success': True, 'data': response_string, 'error': None}
+                try:
+                    if stream:
+                        response_string = ''
+                        async for chunk in chain.astream(messages):
+                            print(chunk.content, end='', flush=True)
+                            response_string += chunk.content
+                        print()
+                        if not response_string:
+                            raise ValueError('No response generated')
+                    else:
+                        response = await chain.ainvoke(messages)
+                        print(response.content)
+                        response_string = response.content
+                    return {'success': True, 'data': response_string, 'error': None}
 
-            except KeyboardInterrupt:
-                print('Keyboard interrupt, aborting generation.')
+                except KeyboardInterrupt:
+                    print('Keyboard interrupt, aborting generation.')
+                    return {
+                        'success': False,
+                        'data': None,
+                        'error': 'Generation interrupted',
+                    }
+                except Exception as e:
+                    return {'success': False, 'data': None, 'error': str(e)}
+
+            case ActionType.WEB_SEARCH:
+                return {'success': True, 'data': 'Search results', 'error': None}
+
+            case ActionType.SAVE_DATA:
+                return {'success': True, 'data': 'Data saved', 'error': None}
+
+            case ActionType.TOOL_CALL:
+                return {'success': True, 'data': 'Tool called', 'error': None}
+
+            case ActionType.HEALTHCHECK:
+                endpoint = action_args['endpoint']
+                if not endpoint:
+                    return {'success': False, 'data': None, 'error': 'No endpoint provided'}
+                print(f'Running healthcheck on {endpoint}')
+                result = await run_healthcheck(endpoint)
+                return result
+
+            case PlanActionType.FETCH:
+                source = action_args['source']
+                method = action_args['method']
+                print(f'Fetched data from {source}.')
+                match method:
+                    case 'get_email_content':
+                        result_string = 'This is an example email. Assign a task to Himanshu to review the updated docs.'
+                    case _:
+                        result_string = f'TODO: Implement method: {method}.'
+                return {'success': True, 'data': result_string, 'error': None}
+
+            case PlanActionType.PROPOSE_PLAN:
+                context = action_args['plan_context']
+
+                def create_plan_fn(context: str) -> str:
+                    return 'This is a failed plan.' if not context else "Aha! I've proposed a plan."
+
+                plan = create_plan_fn(context)
+                return {'success': True, 'data': f'Proposed plan: {plan}', 'error': None}
+
+            case PlanActionType.REVISE_PLAN:
+                proposed_plan = action_args['proposed_plan']
+                assert proposed_plan, 'No proposed plan found'
+                revision_context = action_args['revision_context']
+                if action_args.get('is_done', False):
+                    return {
+                        'success': True,
+                        'data': f'Final draft submitted. ({revision_context})',
+                        'error': None,
+                    }
+                return {
+                    'success': False,
+                    'data': f'Revised plan. ({revision_context})',
+                    'error': None,
+                }
+
+            case _:
                 return {
                     'success': False,
                     'data': None,
-                    'error': 'Generation interrupted',
+                    'error': f'Unknown action type: {action_type}',
                 }
-            except Exception as e:
-                return {'success': False, 'data': None, 'error': str(e)}
-
-        elif action_type == ActionType.WEB_SEARCH:
-            return {'success': True, 'data': 'Search results', 'error': None}
-
-        elif action_type == ActionType.SAVE_DATA:
-            return {'success': True, 'data': 'Data saved', 'error': None}
-
-        elif action_type == ActionType.TOOL_CALL:
-            return {'success': True, 'data': 'Tool called', 'error': None}
-
-        elif action_type == ActionType.HEALTHCHECK:
-            endpoint = action_args['endpoint']
-            if not endpoint:
-                return {'success': False, 'data': None, 'error': 'No endpoint provided'}
-            print(f'Running healthcheck on {endpoint}')
-            result = await run_healthcheck(endpoint)
-            return result
-
-        elif action_type == PlanActionType.FETCH:
-            source = action_args['source']
-            method = action_args['method']
-            print(f'Fetched data from {source}.')
-            if method == 'get_email_content':
-                result_string = 'This is an example email. Assign a task to Himanshu to review the updated docs.'
-            else:
-                result_string = f'TODO: Implement method: {method}.'
-            return {'success': True, 'data': result_string, 'error': None}
-
-        elif action_type == PlanActionType.PROPOSE_PLAN:
-            context = action_args['plan_context']
-
-            def create_plan_fn(context: str) -> str:
-                if not context:
-                    return 'This is a failed plan.'
-                else:
-                    return "Aha! I've proposed a plan."
-
-            plan = create_plan_fn(context)
-            return {'success': True, 'data': f'Proposed plan: {plan}', 'error': None}
-
-        elif action_type == PlanActionType.REVISE_PLAN:
-            proposed_plan = action_args['proposed_plan']
-            assert proposed_plan, 'No proposed plan found'
-            revision_context = action_args['revision_context']
-            if action_args.get('is_done', False):
-                return {
-                    'success': True,
-                    'data': f'Final draft submitted. ({revision_context})',
-                    'error': None,
-                }
-            return {
-                'success': False,
-                'data': f'Revised plan. ({revision_context})',
-                'error': None,
-            }
-
-        else:
-            return {
-                'success': False,
-                'data': None,
-                'error': f'Unknown action type: {action_type}',
-            }
 
     except Exception as e:
         logging.error(f'Action execution failed: {str(e)}')
