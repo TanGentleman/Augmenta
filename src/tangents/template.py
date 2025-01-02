@@ -5,33 +5,34 @@ from tangents.classes.settings import Config, ChatSettings, RAGSettings
 
 from tangents.utils.action_utils import create_action
 
+
 class MockInputs:
     SUMMARY = ["/mode summary", "/read", "/quit"]
     DEFAULT = ["What's the capital of France?", "/quit"]
     EMPTY = []
 
+
 def get_initial_graph_state():
-    return {
-        "keys": {},
-        "mutation_count": 0,
-        "is_done": False
-    }
+    return {"keys": {}, "mutation_count": 0, "is_done": False}
+
 
 def get_default_task() -> Task:
     return {
         "type": TaskType.CHAT,
         "status": Status.NOT_STARTED,
         "actions": [],
-        "state": None
+        "state": None,
     }
+
 
 def get_rag_task() -> Task:
     return {
         "type": TaskType.RAG,
         "status": Status.IN_PROGRESS,
         "actions": [],
-        "state": None
+        "state": None,
     }
+
 
 def get_default_config() -> Config:
     return Config(
@@ -39,31 +40,30 @@ def get_default_config() -> Config:
             primary_model="deepseek-v3",
             stream=True,
             system_message="Speak with lots of emojis",
-            disable_system_message=False
+            disable_system_message=False,
         ),
-        rag_settings=RAGSettings(
-            enabled=True
-        )
+        rag_settings=RAGSettings(enabled=True),
     )
 
+
 def get_planning_actions():
-    read_email_action = create_action(PlanActionType.FETCH,
-        args = {
-            "source": "example-email.txt",
-            "method": "get_email_content"
-        }
+    read_email_action = create_action(
+        PlanActionType.FETCH,
+        args={"source": "example-email.txt", "method": "get_email_content"},
     )
     propose_plan_action = create_action(PlanActionType.PROPOSE_PLAN)
     revise_plan_action = create_action(PlanActionType.REVISE_PLAN)
     return [read_email_action, propose_plan_action, revise_plan_action]
+
 
 def get_example_planning_task() -> Task:
     return Task(
         type=TaskType.PLANNING,
         status=Status.NOT_STARTED,
         actions=get_planning_actions(),
-        state=None
+        state=None,
     )
+
 
 def get_default_state_dict() -> AgentState:
     return {
@@ -71,8 +71,9 @@ def get_default_state_dict() -> AgentState:
         "action_count": 0,
         "task_dict": {"chat_task": get_default_task()},
         "user_input": None,
-        "mock_inputs": MockInputs.EMPTY
+        "mock_inputs": MockInputs.EMPTY,
     }
+
 
 def get_planning_state_dict() -> AgentState:
     return {

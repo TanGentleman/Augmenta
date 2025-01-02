@@ -3,18 +3,18 @@ import os
 
 from langchain_openai import ChatOpenAI
 from tangents.utils.message_utils import get_last_user_message
+
 # from augmenta.chains import SimpleChain
 from augmenta.constants import get_summary_template
+
 # from augmenta.models.models import LLM, LLM_FN
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableSerializable
 from typing import Any
 
-ALLOWED_MODELS = [
-    "free",
-    "Llama-3.3-70B"
-]
+ALLOWED_MODELS = ["free", "Llama-3.3-70B"]
 LITELLM_BASE_URL = "http://localhost:4000/v1"
+
 
 # TODO: Support callbacks
 def fast_get_llm(model_name: str, config: dict = {}) -> ChatOpenAI | None:
@@ -25,14 +25,15 @@ def fast_get_llm(model_name: str, config: dict = {}) -> ChatOpenAI | None:
         # TODO: Unpack config
         # This is for callbacks, hyperparams, etc.
         llm = ChatOpenAI(
-            base_url = LITELLM_BASE_URL,
-            api_key = os.getenv("LITELLM_API_KEY"),
-            model = model_name
+            base_url=LITELLM_BASE_URL,
+            api_key=os.getenv("LITELLM_API_KEY"),
+            model=model_name,
         )
         return llm
     except Exception as e:
         logging.error(f"Error initializing LLM: {e}")
         return None
+
 
 # def get_llm(model_name: str) -> ChatOpenAI | None:
 #     try:
@@ -42,7 +43,10 @@ def fast_get_llm(model_name: str, config: dict = {}) -> ChatOpenAI | None:
 #         logging.error(f"Error initializing LLM: {e}")
 #         return None
 
-def get_summary_chain(model_name: str, system_prompt: str = 'You are a helpful AI.') -> RunnableSerializable[Any, str] | None:
+
+def get_summary_chain(
+    model_name: str, system_prompt: str = "You are a helpful AI."
+) -> RunnableSerializable[Any, str] | None:
     """
     Returns a chain for summarization only.
 
@@ -53,7 +57,7 @@ def get_summary_chain(model_name: str, system_prompt: str = 'You are a helpful A
         llm = fast_get_llm(model_name)
         if llm is None:
             raise ValueError("LLM not initialized!")
-        
+
         chain = (
             {"excerpt": lambda x: get_last_user_message(x)}
             | get_summary_template(system_prompt)
