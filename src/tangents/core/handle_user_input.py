@@ -1,14 +1,74 @@
-from typing import Callable
 import logging
+from typing import Callable
+
 from langchain_core.messages import HumanMessage, AIMessage
 
 from paths import TEXT_FILE_DIR
-from tangents.classes.actions import Status
-from tangents.classes.commands import Command, CommandType
+
+from tangents.classes.actions import ActionType, PlanActionType, Status
+from tangents.classes.settings import Config
 from tangents.classes.tasks import Task, TaskType
+from tangents.utils.action_utils import create_action, is_stash_action_next
+from tangents.utils.chains import fast_get_llm
+from langchain_core.messages import HumanMessage
+from tangents.classes.commands import Command, CommandType
 from tangents.utils.message_utils import clear_messages, remove_last_message
 from tangents.utils.action_utils import add_stash_action
 from tangents.utils.file_utils import read_text_file
+
+def handle_user_message(user_input: str, current_task: Task, config: Config) -> None:
+    assert not user_input.startswith('/'), "Command should not be passed as human input!"
+    assert current_task["status"] == Status.IN_PROGRESS, "Task is not in progress!"
+    task_state = current_task["state"]
+    
+    match current_task["type"]:
+        case TaskType.CHAT:
+            task_state["messages"].append(HumanMessage(content=user_input))
+            if task_state["active_chain"] is None:
+                logging.warning("No active chain found, initializing new chain!")
+                llm = fast_get_llm(config.chat_settings.primary_model)
+                if llm is None:
+                    raise ValueError("Chain not initialized!")
+                task_state["active_chain"] = llm
+            
+            generate_action = create_action(
+                ActionType.GENERATE,
+                args={
+                    "messages": task_state["messages"],
+                    "chain": task_state["active_chain"],
+                    "stream": task_state["stream"]
+                }
+            )
+            current_task["actions"].append(generate_action)
+            assert len(current_task["actions"]) == 1 or is_stash_action_next(current_task["actions"]), "Only one action should be queued for chat!"
+            # Can stash here if needed
+
+        case TaskType.RAG:
+            if config.rag_settings.enabled:
+                print("RAG task. Doing nothing for now.")
+            else:
+                raise ValueError("RAG task is disabled!")
+                
+        case TaskType.PLANNING:
+            # assert that there is an in-progress revise action queued next
+            action_list = current_task["actions"]
+            if len(action_list) == 0:
+                raise ValueError("No revise action found!")
+            
+            if action_list[0]["type"] != PlanActionType.REVISE_PLAN or action_list[0]["status"] != Status.IN_PROGRESS:
+                raise ValueError("Next action must be an in-progress revise action!")
+            
+            if user_input == "y":
+                print("Plan is confirmed!")
+                current_task["actions"][0]["args"]["is_done"] = True
+            else:
+                print("Using your revision!")
+                # The next human action is added in handle_action.handle_action_result
+                # That logic can alternatively be added here
+        case _:
+            raise ValueError("Invalid task type")
+        
+    return None
 
 async def execute_command(command: Command, current_task: Task, state_dict: dict) -> None:
     """Execute a command and update state accordingly."""

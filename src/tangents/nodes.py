@@ -9,23 +9,19 @@ See tan_graph.py for workflow architecture details.
 """
 import logging
 from typing import Literal
-from langchain_core.messages import HumanMessage
 from langgraph.types import interrupt
 
-from tangents.core.handle_action import handle_action_result, start_action
-from tangents.utils.chains import fast_get_llm
+from tangents.core.handle_action import handle_action_result, start_action, execute_action
+from tangents.core.handle_user_input import handle_user_message, execute_command
 from tangents.utils.task_utils import (
     get_task, save_completed_tasks, save_failed_tasks,
     save_stashed_tasks, start_task
 )
-from tangents.core.execute_command import execute_command
-from tangents.core.handle_action import execute_action
-from .classes.tasks import Task, TaskType
-from .classes.actions import Status, ActionType  
-from .classes.commands import Command
-from .classes.states import GraphState
+from tangents.classes.actions import Status, ActionType  
+from tangents.classes.commands import Command
+from tangents.classes.states import GraphState
 
-from .utils.action_utils import is_human_action_next, is_stash_action_next, save_action_data, create_action
+from tangents.utils.action_utils import is_human_action_next, is_stash_action_next, save_action_data
 
 # Constants
 MAX_MUTATIONS = 50  # Maximum state mutations before failing
@@ -152,7 +148,6 @@ def human_node(state: GraphState) -> GraphState:
     current_task = get_task(state_dict["task_dict"], status=Status.IN_PROGRESS)
     assert current_task is not None, "No in-progress task found"
 
-    
     # Handle mock inputs for testing, otherwise get real user input
     if mock_inputs:
         print(f"Mock inputs: {mock_inputs}")
@@ -199,69 +194,21 @@ def processor_node(state: GraphState) -> GraphState:
 
     config = state_dict["config"]
 
-
-    def handle_human_input(user_input: str, task: Task) -> None:
-        assert is_human_action_next(task["actions"]), "Human action should be next!"
-        human_action = task["actions"].pop(0)
-        # TODO: Handle cases with custom interrupt logic
-        if human_action["args"].get("is_persistant"):
-            print("TODO: Implement persistent loops grounded in task state!")
-        # Example: Update task state + tweak the interrupt prompt string
-        return None
-
-    # Logic should go here
     if is_human_action_next(current_task["actions"]):
-        handle_human_input(user_input, current_task)
-    
+        current_task["actions"].pop(0)
 
-    # TODO: This should be placed in a wrapper function somewhere in tangents/core
-    if not user_input.startswith('/'):
-        if not current_task:
-            raise ValueError("No in-progress task found")
-        
-        task_state = current_task["state"]
-        
-        match current_task["type"]:
-            case TaskType.CHAT:
-                task_state["messages"].append(HumanMessage(content=user_input))
-                if task_state["active_chain"] is None:
-                    logging.warning("No active chain found, initializing new chain!")
-                    llm = fast_get_llm(config.chat_settings.primary_model)
-                    if llm is None:
-                        raise ValueError("Chain not initialized!")
-                    task_state["active_chain"] = llm
-                
-                generate_action = create_action(
-                    ActionType.GENERATE,
-                    args={
-                        "messages": task_state["messages"],
-                        "chain": task_state["active_chain"],
-                        "stream": task_state["stream"]
-                    }
-                )
-                current_task["actions"].append(generate_action)
-                assert len(current_task["actions"]) == 1 or is_stash_action_next(current_task["actions"]), "Only one action should be queued for chat!"
-                # Can stash here if needed
-
-            case TaskType.RAG:
-                if config.rag_settings.enabled:
-                    print("RAG task. Doing nothing for now.")
-                else:
-                    raise ValueError("RAG task is disabled!")
-                    
-            case TaskType.PLANNING:
-                # Handle cases during PLANNING task
-                if user_input == "y":
-                    print("Plan is confirmed!")
-                    current_task["actions"][0]["args"]["is_done"] = True
-                else:
-                    print("Using your revision!")
-                    
-            case _:
-                raise ValueError("Invalid task type")
+    # Catch command input
+    # NOTE: The logic for detecting command may change in the future
+    if user_input.startswith('/'):
+        logging.info("Command detected!")
+        return {
+            "keys": state_dict,
+            "mutation_count": state["mutation_count"] + 1,
+            "is_done": False
+        }
     
-    # NOTE: This will be removed as logic is put in place for repeated human input handling
-    assert not is_human_action_next(current_task["actions"]), "Human action should be removed by the end of the node!"
+    handle_user_message(user_input, current_task, config)
+    
     return {
         "keys": state_dict,
         "mutation_count": state["mutation_count"] + 1,
