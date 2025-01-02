@@ -9,23 +9,23 @@ See tan_graph.py for workflow architecture details.
 """
 import logging
 from typing import Literal
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage
 from langgraph.types import interrupt
 
+from tangents.core.handle_action import handle_action_result, start_action
 from tangents.utils.chains import fast_get_llm
 from tangents.utils.task_utils import (
     get_task, save_completed_tasks, save_failed_tasks,
     save_stashed_tasks, start_task
 )
-from tangents.utils.command_utils import execute_command
-
+from tangents.core.execute_command import execute_command
+from tangents.core.handle_action import execute_action
 from .classes.tasks import Task, TaskType
-from .classes.actions import Action, ActionResult, PlanActionType, Status, ActionType  
+from .classes.actions import Status, ActionType  
 from .classes.commands import Command
 from .classes.states import GraphState
 
-from .utils.action_utils import add_human_action, is_human_action_next, is_stash_action_next, save_action_data, create_action
-from .utils.execute_action import execute_action
+from .utils.action_utils import is_human_action_next, is_stash_action_next, save_action_data, create_action
 
 # Constants
 MAX_MUTATIONS = 50  # Maximum state mutations before failing
@@ -94,7 +94,7 @@ def task_manager_node(state: GraphState) -> GraphState:
     
     # Process completed/failed tasks
     # NOTE: Double check this implementation
-    logging.info("Processing completed/failed tasks. Not yet parallelized.")
+    # NOTE: Not yet parallelized.
     for task_names, save_func in [
         (save_completed_tasks(task_dict), logging.info),
         (save_failed_tasks(task_dict), logging.warning)
@@ -179,6 +179,7 @@ def human_node(state: GraphState) -> GraphState:
         "is_done": False
     }
 
+# TODO: Refactor this for best extensibility
 def processor_node(state: GraphState) -> GraphState:
     """
     Process user input and update task state.
@@ -213,6 +214,7 @@ def processor_node(state: GraphState) -> GraphState:
         handle_human_input(user_input, current_task)
     
 
+    # TODO: This should be placed in a wrapper function somewhere in tangents/core
     if not user_input.startswith('/'):
         if not current_task:
             raise ValueError("No in-progress task found")
@@ -223,6 +225,7 @@ def processor_node(state: GraphState) -> GraphState:
             case TaskType.CHAT:
                 task_state["messages"].append(HumanMessage(content=user_input))
                 if task_state["active_chain"] is None:
+                    logging.warning("No active chain found, initializing new chain!")
                     llm = fast_get_llm(config.chat_settings.primary_model)
                     if llm is None:
                         raise ValueError("Chain not initialized!")
@@ -264,101 +267,6 @@ def processor_node(state: GraphState) -> GraphState:
         "mutation_count": state["mutation_count"] + 1,
         "is_done": False
     }
-
-def start_action(action: Action, task: Task) -> Action:
-    """Initialize an action with required state before execution."""
-    action["status"] = Status.IN_PROGRESS
-    
-    # Initialize action args from task state if needed
-    task_state = task["state"]
-    action_args = action["args"]
-
-    if action["type"] == ActionType.GENERATE:
-        if task["type"] == TaskType.CHAT:
-            if action_args.get("active_chain") is None:
-                action_args["active_chain"] = task_state["active_chain"]
-            if action_args.get("messages") is None:
-                action_args["messages"] = task_state["messages"]
-            if action_args.get("stream") is None:
-                action_args["stream"] = task_state["stream"]
-        else:
-            raise ValueError("Missing support in start_action for ActionType.GENERATE!")
-        
-    elif action["type"] == ActionType.HEALTHCHECK:
-        if action_args.get("endpoint") is None:
-            # NOTE: Assuming LiteLLM is running locally
-            print("Warning: Healthcheck endpoint is fixed to port 4000 proxy!")
-            base_url = "http://localhost:4000"
-            action_args["endpoint"] = f"{base_url}/health/liveness"
-
-    elif action["type"] == PlanActionType.PROPOSE_PLAN:
-        if action_args.get("plan_context") is None:
-            action_args["plan_context"] = task_state["context"]
-
-    elif action["type"] == PlanActionType.REVISE_PLAN:
-        if action_args.get("proposed_plan") is None:
-            action_args["proposed_plan"] = task_state["proposed_plan"]
-
-    return action
-
-def handle_action_result(task: Task, action_result: ActionResult) -> Task:
-    """Handle the result of an action based on task and action types."""
-    action = task["actions"][0]
-    task_state = task["state"]
-
-    if action_result["success"]:
-        action["status"] = Status.DONE
-        
-        match (task["type"], action["type"]):
-            case (_,  ActionType.HEALTHCHECK):
-                print(f"{action_result['data']}")
-
-            case (TaskType.CHAT, ActionType.GENERATE):
-                task_state["messages"].append(AIMessage(content=action_result["data"]))
-                
-            case (TaskType.PLANNING, PlanActionType.FETCH):
-                task_state["context"] = action_result["data"]
-                
-            case (TaskType.PLANNING, PlanActionType.PROPOSE_PLAN):
-                task_state["proposed_plan"] = action_result["data"]
-                
-            case (TaskType.PLANNING, PlanActionType.REVISE_PLAN):
-                task_state["plan"] = action_result["data"]
-                task["status"] = Status.DONE
-                
-            case _:
-                raise ValueError(f"Unsupported task/action combination: {task['type']}/{action['type']}")
-    
-    elif action_result["error"]:
-        action["status"] = Status.FAILED
-        # Handle error cleanup
-        match (task["type"], action["type"]):
-            case (TaskType.CHAT, ActionType.GENERATE):
-                if isinstance(task_state["messages"][-1], HumanMessage):
-                    task_state["messages"].pop()
-            case _:
-                pass  # Other types may not need cleanup
-        
-    else:
-        # Retry cases
-        match (task["type"], action["type"]):
-            case (TaskType.PLANNING, PlanActionType.REVISE_PLAN):
-                if "revision_count" not in task_state:
-                    task_state["revision_count"] = 0
-                task_state["revision_count"] += 1
-                action["args"]["revision_context"] = f"Revision {task_state['revision_count']}"
-
-                DEFAULT_MAX_REVISIONS = 3
-                max_revisions = action["args"].get("max_revisions", DEFAULT_MAX_REVISIONS)
-                # TODO: Move this value to current_task["conditions"]
-                if task_state["revision_count"] >= max_revisions:
-                    action["args"]["is_done"] = True
-                else:
-                    add_human_action(task["actions"], prompt=f"Review revision #{task_state['revision_count']}. Enter 'y' to finalize or any other input to revise again.")
-            case _:
-                pass
-
-    return task
 
 async def action_node(state: GraphState) -> GraphState:
     """Execute and manage task actions."""

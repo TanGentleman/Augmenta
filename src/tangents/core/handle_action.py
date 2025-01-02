@@ -1,6 +1,45 @@
 import logging
-from tangents.classes.actions import Action, ActionType, ActionResult, PlanActionType
+from langchain_core.messages import HumanMessage, AIMessage
+from tangents.classes.actions import Action, ActionType, ActionResult, PlanActionType, Status
+from tangents.classes.tasks import Task, TaskType
+from tangents.utils.action_utils import add_human_action
 from tangents.utils.experimental import run_healthcheck
+
+def start_action(action: Action, task: Task) -> Action:
+    """Initialize an action with required state before execution."""
+    action["status"] = Status.IN_PROGRESS
+    
+    # Initialize action args from task state if needed
+    task_state = task["state"]
+    action_args = action["args"]
+
+    if action["type"] == ActionType.GENERATE:
+        if task["type"] == TaskType.CHAT:
+            if action_args.get("active_chain") is None:
+                action_args["active_chain"] = task_state["active_chain"]
+            if action_args.get("messages") is None:
+                action_args["messages"] = task_state["messages"]
+            if action_args.get("stream") is None:
+                action_args["stream"] = task_state["stream"]
+        else:
+            raise ValueError("Missing support in start_action for ActionType.GENERATE!")
+        
+    elif action["type"] == ActionType.HEALTHCHECK:
+        if action_args.get("endpoint") is None:
+            # NOTE: Assuming LiteLLM is running locally
+            print("Warning: Healthcheck endpoint is fixed to port 4000 proxy!")
+            base_url = "http://localhost:4000"
+            action_args["endpoint"] = f"{base_url}/health/liveness"
+
+    elif action["type"] == PlanActionType.PROPOSE_PLAN:
+        if action_args.get("plan_context") is None:
+            action_args["plan_context"] = task_state["context"]
+
+    elif action["type"] == PlanActionType.REVISE_PLAN:
+        if action_args.get("proposed_plan") is None:
+            action_args["proposed_plan"] = task_state["proposed_plan"]
+
+    return action
 
 async def execute_action(action: Action) -> ActionResult:
     """
@@ -158,3 +197,63 @@ async def execute_action(action: Action) -> ActionResult:
             "data": None,
             "error": str(e)
         }
+    
+
+def handle_action_result(task: Task, action_result: ActionResult) -> Task:
+    """Handle the result of an action based on task and action types."""
+    action = task["actions"][0]
+    task_state = task["state"]
+
+    if action_result["success"]:
+        action["status"] = Status.DONE
+        
+        match (task["type"], action["type"]):
+            case (_,  ActionType.HEALTHCHECK):
+                print(f"{action_result['data']}")
+
+            case (TaskType.CHAT, ActionType.GENERATE):
+                task_state["messages"].append(AIMessage(content=action_result["data"]))
+                
+            case (TaskType.PLANNING, PlanActionType.FETCH):
+                task_state["context"] = action_result["data"]
+                
+            case (TaskType.PLANNING, PlanActionType.PROPOSE_PLAN):
+                task_state["proposed_plan"] = action_result["data"]
+                
+            case (TaskType.PLANNING, PlanActionType.REVISE_PLAN):
+                task_state["plan"] = action_result["data"]
+                task["status"] = Status.DONE
+                
+            case _:
+                raise ValueError(f"Unsupported task/action combination: {task['type']}/{action['type']}")
+    
+    elif action_result["error"]:
+        action["status"] = Status.FAILED
+        # Handle error cleanup
+        match (task["type"], action["type"]):
+            case (TaskType.CHAT, ActionType.GENERATE):
+                if isinstance(task_state["messages"][-1], HumanMessage):
+                    task_state["messages"].pop()
+            case _:
+                pass  # Other types may not need cleanup
+        
+    else:
+        # Retry cases
+        match (task["type"], action["type"]):
+            case (TaskType.PLANNING, PlanActionType.REVISE_PLAN):
+                if "revision_count" not in task_state:
+                    task_state["revision_count"] = 0
+                task_state["revision_count"] += 1
+                action["args"]["revision_context"] = f"Revision {task_state['revision_count']}"
+
+                DEFAULT_MAX_REVISIONS = 3
+                max_revisions = action["args"].get("max_revisions", DEFAULT_MAX_REVISIONS)
+                # TODO: Move this value to current_task["conditions"]
+                if task_state["revision_count"] >= max_revisions:
+                    action["args"]["is_done"] = True
+                else:
+                    add_human_action(task["actions"], prompt=f"Review revision #{task_state['revision_count']}. Enter 'y' to finalize or any other input to revise again.")
+            case _:
+                pass
+
+    return task
