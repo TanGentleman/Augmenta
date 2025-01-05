@@ -50,7 +50,6 @@ from tangents.template import (
 )
 
 from .classes.states import GraphState
-from .input_handlers import InterruptHandler
 from .nodes import (
     action_node,
     agent_node,
@@ -161,16 +160,19 @@ async def process_graph_updates(
     output: Dict[str, Any],
     app: CompiledStateGraph,
     app_config: dict,
-) -> None:
+) -> list[tuple[str, Any]]:
     """
-    Process streaming updates from workflow execution.
+    Process streaming updates from workflow execution and collect them.
 
     Args:
         output: Workflow output data
         app: Compiled workflow graph
         app_config: Application configuration
+
+    Returns:
+        List of tuples containing node and updates.
     """
-    output_processor = OutputProcessor()
+    collected_updates = []
 
     async def handle_interrupt(interrupt_value: dict) -> None:
         """Handle interrupt by getting user input and processing resulting stream."""
@@ -185,13 +187,17 @@ async def process_graph_updates(
                 if node == '__interrupt__':
                     await handle_interrupt(updates[0].value)
                 else:
-                    output_processor.process_updates(node, updates)
+                    OutputProcessor.print_updates(node, updates)
+                    collected_updates.append((node, updates))
 
-    for key, value in output.items():
-        if key == '__interrupt__':
-            await handle_interrupt(value[0].value)
+    for node, updates in output.items():
+        if node == '__interrupt__':
+            await handle_interrupt(updates[0].value)
         else:
-            updates = output_processor.process_updates(key, value)
+            OutputProcessor.print_updates(node, updates)
+            collected_updates.append((node, updates))
+
+    return collected_updates
 
 
 def process_graph_values(output: GraphState) -> None:
@@ -201,8 +207,8 @@ def process_graph_values(output: GraphState) -> None:
     Args:
         output: Complete graph state
     """
-    output_processor = OutputProcessor()
-    output_processor.process_values(output)
+    OutputProcessor.print_values(output)
+    logging.warning("Graph state output complete.")
 
 
 async def main_async(stream_mode: str = 'updates') -> None:
