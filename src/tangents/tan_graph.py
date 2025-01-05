@@ -146,7 +146,8 @@ async def process_interrupt(interrupt_value: dict) -> str:
         raise ValueError('Unhandled interrupt case - missing prompt')
 
     loop = asyncio.get_running_loop()
-    user_input = await loop.run_in_executor(None, input, f"{interrupt_value['prompt']}\n")
+    prompt = interrupt_value.get('prompt', 'User input:')
+    user_input = await loop.run_in_executor(None, input, f"{prompt}\n")
     user_input = user_input.strip()
 
     if not user_input:
@@ -156,53 +157,52 @@ async def process_interrupt(interrupt_value: dict) -> str:
 
     return user_input
 
-
-async def process_workflow_output_streaming(
+async def process_graph_updates(
     output: Dict[str, Any],
     app: CompiledStateGraph,
     app_config: dict,
-    stream_mode: str = 'updates',
 ) -> None:
     """
-    Process streaming output from workflow execution.
-
-    Handles both update-based and value-based streaming modes.
-    Manages interrupt handling and output processing.
+    Process streaming updates from workflow execution.
 
     Args:
         output: Workflow output data
         app: Compiled workflow graph
         app_config: Application configuration
-        stream_mode: Output processing mode ("updates" or "values")
     """
     output_processor = OutputProcessor()
-    interrupt_handler = InterruptHandler()
 
-    async def handle_interrupt_stream(interrupt_value, depth=0):
-        """Handle nested interrupt streams with recursion protection."""
-        if depth > app_config.get('recursion_limit', RECURSION_LIMIT):
-            raise RecursionError('Maximum interrupt depth exceeded')
-
-        user_input = await interrupt_handler.process_interrupt(interrupt_value)
-
-        # NOTE: Stream mode is forced to be updates
+    async def handle_interrupt(interrupt_value: dict) -> None:
+        """Handle interrupt by getting user input and processing resulting stream."""
+        user_input = await process_interrupt(interrupt_value)
+        
         async for chunk in app.astream(
-            ResumeCommand(resume=user_input), app_config, stream_mode='updates'
+            ResumeCommand(resume=user_input), 
+            app_config,
+            stream_mode='updates'
         ):
             for node, updates in chunk.items():
                 if node == '__interrupt__':
-                    await handle_interrupt_stream(updates[0].value, depth + 1)
+                    await handle_interrupt(updates[0].value)
                 else:
                     output_processor.process_updates(node, updates)
 
-    if stream_mode == 'updates':
-        for key, value in output.items():
-            if key == '__interrupt__':
-                await handle_interrupt_stream(value[0].value)
-            else:
-                output_processor.process_updates(key, value)
-    else:
-        output_processor.process_values(output)
+    for key, value in output.items():
+        if key == '__interrupt__':
+            await handle_interrupt(value[0].value)
+        else:
+            updates = output_processor.process_updates(key, value)
+
+
+def process_graph_values(output: GraphState) -> None:
+    """
+    Process complete graph state output.
+
+    Args:
+        output: Complete graph state
+    """
+    output_processor = OutputProcessor()
+    output_processor.process_values(output)
 
 
 async def main_async(stream_mode: str = 'updates') -> None:
@@ -226,7 +226,10 @@ async def main_async(stream_mode: str = 'updates') -> None:
 
     # Process workflow outputs
     async for output in app.astream(graph_state, app_config, stream_mode=stream_mode):
-        await process_workflow_output_streaming(output, app, app_config, stream_mode)
+        if stream_mode == 'updates':
+            await process_graph_updates(output, app, app_config)
+        else:
+            process_graph_values(output)
 
     print('Workflow completed.')
 
