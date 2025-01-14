@@ -18,7 +18,7 @@ Get started with Augmenta in <3 minutes:
 1. Clone the repository: `git clone https://github.com/TanGentleman/Augmenta.git`
 2. Install dependencies: `pip install -e .`
 3. Create a `.env` file with your API keys
-4. Run Augmenta: `cd src && python3 -m augmenta.chat`
+4. Run Augmenta: `cd src && python3 -m chat`
 
 That's it! You're now ready to start exploring Augmenta's features and capabilities.
 

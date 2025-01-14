@@ -236,9 +236,9 @@ def run_experiment():
 
     # Make a copy of the file in the inputs folder
     if copy_file_to_inputs(OUTPUTS_FOLDER / new_filename):
-        print(f"File copied to inputs folder successfully!")
+        print("File copied to inputs folder successfully!")
     else:
-        raise ValueError(f"Error copying file to inputs folder!")
+        raise ValueError("Error copying file to inputs folder!")
 
     # Print the data read from flashcards_converted.jsonl
     loaded_data_jsonl = read_jsonl(new_filename)

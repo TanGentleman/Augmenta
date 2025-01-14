@@ -25,10 +25,14 @@ from langgraph.graph import END, StateGraph, START
 from langgraph.pregel import RetryPolicy
 from langgraph.checkpoint.memory import MemorySaver
 
+from langchain_community.retrievers import WikipediaRetriever
+from langchain_core.runnables import RunnableLambda
+from langchain_core.runnables import chain as as_runnable
 
 from dotenv import load_dotenv
 
-from augmenta.classes import get_llm_fn
+# from augmenta.classes import get_llm_fn
+from tangents.utils.chains import fast_get_llm
 
 load_dotenv()
 
@@ -48,14 +52,17 @@ _set_env("TAVILY_API_KEY")
 ###
 MAX_SEARCH_RESULTS = 10
 
-
+import logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 ### LLMS
 try:
-    gpt_4o_mini = get_llm_fn("gpt4o-mini").get_llm()
-    gpt_4o = get_llm_fn("gpt4o").get_llm()
-    samba = get_llm_fn("samba").get_llm()
-    llama = get_llm_fn("llama").get_llm()
-    gpt_3_5 = get_llm_fn("gpt3.5-turbo").get_llm()
+    gpt_4o_mini = fast_get_llm("gpt-4o-mini")
+    gpt_4o = fast_get_llm("gpt-4o")
+    samba = fast_get_llm("sambanova/Qwen2.5-72B-Instruct")
+    print("WARNING: Using gpt-4o overriding llama-3.3-70B")
+    llama = fast_get_llm("gpt-4o")
+    gpt_3_5 = fast_get_llm("open/openai/gpt-3.5-turbo")
 except Exception as e:
     raise ValueError(f"Error initializing LLMs: {e}")
 
@@ -182,9 +189,7 @@ gen_perspectives_chain = gen_perspectives_prompt | gpt_3_5.with_structured_outpu
 )
 
 ### Wikipedia
-from langchain_community.retrievers import WikipediaRetriever
-from langchain_core.runnables import RunnableLambda
-from langchain_core.runnables import chain as as_runnable
+
 
 wikipedia_retriever = WikipediaRetriever(load_all_available_meta=True, top_k_results=1)
 
@@ -203,6 +208,8 @@ def format_docs(docs):
 @as_runnable
 async def survey_subjects(topic: str):
     related_subjects = await expand_chain.ainvoke({"topic": topic})
+    if related_subjects is None:
+        raise SystemExit("No related subjects found")
     retrieved_docs = await wikipedia_retriever.abatch(
         related_subjects.topics, return_exceptions=True
     )
@@ -339,7 +346,7 @@ Each response must be backed up by a citation from a reliable source, formatted 
     ]
 )
 
-gen_answer_chain = gen_answer_prompt | gpt_4o_mini.with_structured_output(
+gen_answer_chain = gen_answer_prompt | llama.with_structured_output(
     AnswerWithCitations, include_raw=True
 ).with_config(run_name="GenerateAnswer")
 
@@ -352,6 +359,7 @@ import json
 
 from langchain_core.runnables import RunnableConfig
 
+# TODO: Fix BUG!
 
 async def gen_answer(
     state: InterviewState,
@@ -379,12 +387,14 @@ async def gen_answer(
     dumped = json.dumps(all_query_results)[:max_str_len]
     ai_message: AIMessage = queries["raw"]
     tool_call = queries["raw"].tool_calls[0]
-    tool_id = tool_call["id"]
+    tool_id = tool_call["id"][:39]
     tool_message = ToolMessage(tool_call_id=tool_id, content=dumped)
     swapped_state["messages"].extend([ai_message, tool_message])
     # Only update the shared state with the final answer to avoid
     # polluting the dialogue history with intermediate messages
     generated = await gen_answer_chain.ainvoke(swapped_state)
+    if not generated["parsed"]:
+        raise SystemExit("No answer generated")
     cited_urls = set(generated["parsed"].cited_urls)
     # Save the retrieved information to a the shared state for future reference
     cited_references = {k: v for k, v in all_query_results.items() if k in cited_urls}
@@ -518,10 +528,9 @@ class ResearchState(TypedDict):
     # The final sections output
     sections: List[WikiSection]
     article: str
+
 async def main(main_topic: str = "Education Crisis in the US"):
-    import logging
-    logging.basicConfig(level=logging.ERROR)
-    logger = logging.getLogger(__name__)
+
 
 
     # example_topic = "Education Crisis in the US"
@@ -654,8 +663,8 @@ async def main(main_topic: str = "Education Crisis in the US"):
         def __init__(self):
             super().__init__()
             # Add UTF-8 support
-            self.add_font('DejaVu', '', 'DejaVuSansCondensed.ttf', uni=True)
-            self.add_font('DejaVu', 'B', 'DejaVuSansCondensed-Bold.ttf', uni=True)
+            self.add_font('DejaVu', '', 'fonts/DejaVuSansCondensed.ttf', uni=True)
+            self.add_font('DejaVu', 'B', 'fonts/DejaVuSansCondensed-Bold.ttf', uni=True)
             self.set_auto_page_break(auto=True, margin=15)
             
         def markdown_text(self, text, font_size=12):

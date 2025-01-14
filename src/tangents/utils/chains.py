@@ -19,7 +19,7 @@ LITELLM_BASE_URL = 'http://localhost:4000/v1'
 def fast_get_llm(model_name: str, config: dict = {}) -> ChatOpenAI | None:
     """Uses LiteLLM endpoint."""
     if model_name not in ALLOWED_MODELS:
-        logging.warning(f'Model {model_name} not in allowed models list')
+        logging.info(f'Model {model_name} not in allowed models list')
     try:
         # TODO: Unpack config
         # This is for callbacks, hyperparams, etc.

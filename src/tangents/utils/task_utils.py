@@ -77,7 +77,6 @@ def save_stashed_tasks(task_dict: dict[str, Task]) -> list[str]:
         if task['status'] == Status.IN_PROGRESS and is_stash_action_next(task['actions']):
             success = stash_task(task)
             if success:
-                logging.info('Stashed task')
                 stashed_tasks.append(task_name)
             else:
                 logging.error(f'Failed to stash task {task_name}')

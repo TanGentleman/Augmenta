@@ -68,7 +68,7 @@ logging.basicConfig(level=logging.INFO)
 
 # System configuration
 RECURSION_LIMIT = 50
-DEV_MODE = True
+DEV_MODE = False
 if DEV_MODE:
     print('Dev mode enabled. Using planning state dict.')
 
@@ -146,7 +146,7 @@ async def process_interrupt(interrupt_value: dict) -> str:
 
     loop = asyncio.get_running_loop()
     prompt = interrupt_value.get('prompt', 'User input:')
-    user_input = await loop.run_in_executor(None, input, f"{prompt}\n")
+    user_input = await loop.run_in_executor(None, input, f'{prompt}\n')
     user_input = user_input.strip()
 
     if not user_input:
@@ -155,6 +155,7 @@ async def process_interrupt(interrupt_value: dict) -> str:
         user_input = user_input.strip() or '/quit'
 
     return user_input
+
 
 async def process_graph_updates(
     output: Dict[str, Any],
@@ -177,11 +178,9 @@ async def process_graph_updates(
     async def handle_interrupt(interrupt_value: dict) -> None:
         """Handle interrupt by getting user input and processing resulting stream."""
         user_input = await process_interrupt(interrupt_value)
-        
+
         async for chunk in app.astream(
-            ResumeCommand(resume=user_input), 
-            app_config,
-            stream_mode='updates'
+            ResumeCommand(resume=user_input), app_config, stream_mode='updates'
         ):
             for node, updates in chunk.items():
                 if node == '__interrupt__':
@@ -208,7 +207,7 @@ def process_graph_values(output: GraphState) -> None:
         output: Complete graph state
     """
     OutputProcessor.print_values(output)
-    logging.warning("Graph state output complete.")
+    logging.warning('Graph state output complete.')
 
 
 async def main_async(stream_mode: str = 'updates') -> None:

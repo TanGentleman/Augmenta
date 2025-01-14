@@ -1,5 +1,4 @@
 import json
-from pathlib import Path
 import click
 from rich.console import Console
 from rich.panel import Panel
@@ -12,7 +11,7 @@ import random
 import logging
 import shutil
 from typeguard import typechecked
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from typing_extensions import Protocol
 
 from paths import FLASHCARD_FILEPATH
