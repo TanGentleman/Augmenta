@@ -2,6 +2,10 @@ from enum import Enum
 from typing import Optional
 
 
+# Command prefix delimiter used to identify commands
+COMMAND_PREFIX = '/'
+
+
 class CommandType(Enum):
     """System command types.
 
@@ -36,7 +40,7 @@ class Command:
     """System command parser and validator.
 
     Parses raw command strings into structured command objects.
-    Commands must be prefixed with '/' and may include arguments.
+    Commands must be prefixed with COMMAND_PREFIX ('/') and may include arguments.
 
     Attributes:
         command: The base command name
@@ -48,7 +52,7 @@ class Command:
     """
 
     def __init__(self, raw_input: str):
-        parts = raw_input.lstrip('/').split(' ', 1)
+        parts = raw_input.lstrip(COMMAND_PREFIX).split(' ', 1)
         self.command = parts[0].lower()
         self.args = parts[1] if len(parts) > 1 else ''
 

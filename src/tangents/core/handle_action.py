@@ -36,7 +36,7 @@ def start_action(action: Action, task: Task) -> Action:
         case ActionType.HEALTHCHECK:
             if action_args.get('endpoint') is None:
                 # NOTE: Assuming LiteLLM is running locally
-                print('Warning: Healthcheck endpoint is fixed to port 4000 proxy!')
+                logging.warning('Healthcheck endpoint is fixed to port 4000 proxy!')
                 base_url = 'http://localhost:4000'
                 action_args['endpoint'] = f'{base_url}/health/liveness'
 
@@ -122,14 +122,14 @@ async def execute_action(action: Action) -> ActionResult:
                 endpoint = action_args['endpoint']
                 if not endpoint:
                     return {'success': False, 'data': None, 'error': 'No endpoint provided'}
-                print(f'Running healthcheck on {endpoint}')
+                logging.info(f'Running healthcheck on {endpoint}')
                 result = await run_healthcheck(endpoint)
                 return result
 
             case PlanActionType.FETCH:
                 source = action_args['source']
                 method = action_args['method']
-                print(f'Fetched data from {source}.')
+                logging.info(f'Fetched data from {source}.')
                 match method:
                     case 'get_email_content':
                         result_string = 'This is an example email. Assign a task to Himanshu to review the updated docs.'

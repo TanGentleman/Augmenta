@@ -11,11 +11,11 @@ from tangents.classes.tasks import Task, TaskType
 from tangents.utils.action_utils import add_stash_action, create_action, is_stash_action_next
 from tangents.utils.chains import fast_get_llm
 from tangents.utils.file_utils import read_text_file
-from tangents.utils.message_utils import clear_messages, remove_last_message
+from tangents.utils.message_utils import clear_messages, remove_last_message, user_input_is_command
 
 
 def handle_user_message(user_input: str, current_task: Task, config: Config) -> None:
-    assert not user_input.startswith('/'), 'Command should not be passed as human input!'
+    assert not user_input_is_command(user_input), 'Command should not be passed as human input!'
     assert current_task['status'] == Status.IN_PROGRESS, 'Task is not in progress!'
     task_state = current_task['state']
 
