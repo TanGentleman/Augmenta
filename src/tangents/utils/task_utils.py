@@ -64,6 +64,14 @@ def save_failed_tasks(task_dict: dict[str, Task]) -> list[str]:
     return save_tasks_by_status(task_dict, Status.FAILED)
 
 
+def delete_tasks(task_dict: dict[str, Task], task_names: list[str]) -> None:
+    """Delete tasks from the task dictionary."""
+    for task_name in task_names:
+        if task_name not in task_dict:
+            raise ValueError(f'Task not found: {task_name}')
+        del task_dict[task_name]
+
+
 def stash_task(task: Task) -> bool:
     """Stash a task for later processing. (placeholder)"""
     logging.info('Stashed task')

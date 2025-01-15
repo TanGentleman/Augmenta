@@ -47,3 +47,8 @@ def get_last_user_message(messages: list) -> str:
     if isinstance(message, HumanMessage):
         return str(message.content)
     raise ValueError('No user message found!')
+
+
+def user_input_is_command(user_input: str) -> bool:
+    """Check if user input is a command."""
+    return user_input.startswith('/')
