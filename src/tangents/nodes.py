@@ -16,6 +16,7 @@ from langgraph.types import interrupt
 from tangents.classes.actions import ActionType, Status
 from tangents.classes.commands import Command
 from tangents.classes.states import GraphState
+from tangents.classes.tasks import Task
 from tangents.core.handle_action import (
     execute_action,
     handle_action_result,
@@ -27,7 +28,9 @@ from tangents.utils.action_utils import (
     is_stash_action_next,
     save_action_data,
 )
+from tangents.utils.message_utils import user_input_is_command
 from tangents.utils.task_utils import (
+    delete_tasks,
     get_task,
     save_completed_tasks,
     save_failed_tasks,
@@ -40,25 +43,32 @@ MAX_MUTATIONS = 50  # Maximum state mutations before failing
 MAX_ACTIONS = 5  # Maximum actions per task before failing
 
 
-def validate_state(state: GraphState) -> GraphState:
-    """Validate fields in state dictionary."""
-    state_dict = state['keys']
-    if not state_dict['config']:
-        raise ValueError('Config is not set!')
-    if not state_dict['task_dict']:
-        raise ValueError('Agent must have at least one task!')
-    # Assign task_id to each task?
-    return state
-
-
 def start_node(state: GraphState) -> GraphState:
     """Initialize graph state with config and default task."""
-    validate_state(state)
+
+    def validate_start_node(state: GraphState) -> None:
+        """Validate fields in state dictionary."""
+        if state['is_done']:
+            raise ValueError('GraphState is_done must be False before start node!')
+        if state['mutation_count'] > 0:
+            logging.warning(f'Mutation count is {state["mutation_count"]} at start node!')
+
+        state_dict = state['keys']
+        if not state_dict['config']:
+            raise ValueError('Config is not set!')
+        if not state_dict['task_dict']:
+            raise ValueError('Agent must have at least one task!')
+
+        # Add assertions for entering a graph
+        return
+
+    validate_start_node(state)
     state_dict = state['keys']
+
     return {
         'keys': state_dict,
         'mutation_count': state['mutation_count'] + 1,
-        'is_done': state['is_done'],
+        'is_done': False,
     }
 
 
@@ -68,11 +78,12 @@ def agent_node(state: GraphState) -> GraphState:
 
     Checks action and mutation counts against maximums and fails tasks if exceeded.
     """
+    # NOTE: Can add validation function here
     state_dict = state['keys']
     current_task = get_task(state_dict['task_dict'])
     if current_task:
         if state['is_done']:
-            logging.error('CRITICAL: Early exit: task is still in progress!')
+            logging.warning('Early exit: task is still in progress!')
         elif state_dict['action_count'] > MAX_ACTIONS:
             logging.error('Action count exceeded max actions, marking task as failed')
             current_task['status'] = Status.FAILED
@@ -99,6 +110,8 @@ def task_manager_node(state: GraphState) -> GraphState:
 
     Task States: NOT_STARTED -> IN_PROGRESS -> DONE/FAILED
     """
+
+    # NOTE: Can add validation function here
     state_dict = state['keys']
     task_dict = state_dict['task_dict']
     config = state_dict['config']
@@ -111,15 +124,13 @@ def task_manager_node(state: GraphState) -> GraphState:
     completed_task_names = save_completed_tasks(task_dict)
     if completed_task_names:
         logging.info(f'Saved done tasks: {completed_task_names}')
-        for name in completed_task_names:
-            del task_dict[name]
+        delete_tasks(task_dict, completed_task_names)
 
     # Process failed tasks
     failed_task_names = save_failed_tasks(task_dict)
     if failed_task_names:
         logging.warning(f'Saved failed tasks: {failed_task_names}')
-        for name in failed_task_names:
-            del task_dict[name]
+        delete_tasks(task_dict, failed_task_names)
 
     # Get/start next task
     current_task = get_task(task_dict)
@@ -165,10 +176,18 @@ def human_node(state: GraphState) -> GraphState:
     Uses langgraph interrupt mechanism to pause execution and get user input.
     Supports mock inputs for testing.
     """
+
+    def validate_human_node(state: GraphState) -> Task:
+        """Validate fields in state dictionary."""
+        state_dict = state['keys']
+        current_task = get_task(state_dict['task_dict'])
+        if not current_task:
+            raise ValueError('No in-progress task found')
+        return current_task
+
+    current_task = validate_human_node(state)
     state_dict = state['keys']
     mock_inputs = state_dict['mock_inputs']
-    current_task = get_task(state_dict['task_dict'])
-    assert current_task is not None, 'No in-progress task found'
 
     # Handle mock inputs for testing, otherwise get real user input
     if mock_inputs:
@@ -196,6 +215,8 @@ def human_node(state: GraphState) -> GraphState:
 
 
 # TODO: Refactor this for best extensibility
+# NOTE: May change user_inputs type to dict instead of str from the human node.
+# This could include multiple updates from the Interrupt in the human node.
 def processor_node(state: GraphState) -> GraphState:
     """
     Process user input and update task state.
@@ -205,30 +226,33 @@ def processor_node(state: GraphState) -> GraphState:
     - Task-specific message processing
     - Action creation based on task type
     """
+
+    def validate_processor_node(state: GraphState) -> tuple[Task, str]:
+        """Validate fields in state dictionary."""
+        state_dict = state['keys']
+        current_task = get_task(state_dict['task_dict'])
+        user_input = state_dict['user_input']
+
+        if not current_task:
+            raise ValueError('No in-progress task found')
+        if not user_input:
+            raise ValueError('No user input found')
+
+        return current_task, user_input
+
+    current_task, user_input = validate_processor_node(state)
+
     state_dict = state['keys']
-    task_dict = state_dict['task_dict']
-    current_task = get_task(task_dict)
-    user_input = state_dict['user_input']
-
-    assert current_task is not None, 'No in-progress task found'
-    assert user_input is not None, 'No user input found'
-
     config = state_dict['config']
 
     if is_human_action_next(current_task['actions']):
         current_task['actions'].pop(0)
 
     # Catch command input
-    # NOTE: The logic for detecting command may change in the future
-    if user_input.startswith('/'):
+    if user_input_is_command(user_input):
         logging.info('Command detected!')
-        return {
-            'keys': state_dict,
-            'mutation_count': state['mutation_count'] + 1,
-            'is_done': False,
-        }
-
-    handle_user_message(user_input, current_task, config)
+    else:
+        handle_user_message(user_input, current_task, config)
 
     return {
         'keys': state_dict,
@@ -238,46 +262,59 @@ def processor_node(state: GraphState) -> GraphState:
 
 
 async def action_node(state: GraphState) -> GraphState:
-    """Execute and manage task actions."""
+    """
+    Execute and manage task actions.
+
+    Handles action lifecycle:
+    - Validates task state
+    - Executes next action
+    - Processes results and updates state
+    """
+
+    def validate_action_node(state: GraphState) -> Task:
+        """Validate task has queued non-stash actions."""
+        state_dict = state['keys']
+        current_task = get_task(state_dict['task_dict'])
+        if not current_task:
+            raise ValueError('No in-progress task found')
+        if not current_task['actions']:
+            raise ValueError('No actions found for in-progress task.')
+
+        action = current_task['actions'][0]
+        if action['type'] == ActionType.STASH:
+            raise ValueError('Stash action should be handled in task manager')
+
+        return current_task
+
+    current_task = validate_action_node(state)
+
+    # Get and validate state
     state_dict = state['keys']
-    task_dict = state_dict['task_dict']
-
-    current_task = get_task(task_dict)
-    if not current_task:
-        raise ValueError('No in-progress task found')
-    if not current_task['actions']:
-        raise ValueError('No actions found for in-progress task.')
-
     action = current_task['actions'][0]
-    assert action['type'] != ActionType.STASH, 'Stash action should be handled in task manager'
 
-    # Initialize action if needed
+    # Execute action
     if action['status'] == Status.NOT_STARTED:
         action = start_action(action, current_task)
     assert action['status'] == Status.IN_PROGRESS
 
-    # Execute action and process result
-    # NOTE: This should not include the dump from the active chain
     logging.info(f"Executing action: {action['type']}")
     result = await execute_action(action)
     logging.info(result)
 
-    # Update state based on result
+    # Update state
     current_task = handle_action_result(current_task, result)
     if result['success']:
         state_dict['action_count'] += 1
 
-    # Handle action completion
     if action['status'] in [Status.DONE, Status.FAILED]:
         completed_action = current_task['actions'].pop(0)
         save_action_data(completed_action)
 
-        # Mark task as failed if action failed
         if action['status'] == Status.FAILED:
-            logging.error('Action failed, marking task as failed')
             current_task['status'] = Status.FAILED
+            logging.error('Action failed, marking task as failed')
     else:
-        logging.warning('Action is still in progress!')
+        logging.warning('Action still in progress - may not be DB-serializable')
 
     return {
         'keys': state_dict,
@@ -296,38 +333,36 @@ async def execute_command_node(state: GraphState) -> GraphState:
     - Mode switching and settings
     """
 
-    try:
+    def validate_command_node(state: GraphState) -> tuple[Task, Command]:
+        """Validate fields in state dictionary."""
         state_dict = state['keys']
+        current_task = get_task(state_dict['task_dict'])
+        user_input = state_dict['user_input']
 
-        # Validate input exists
-        user_input = state_dict.get('user_input')
+        if not current_task:
+            raise ValueError('No in-progress task found')
         if not user_input:
-            raise ValueError('No user command to execute!')
+            raise ValueError('No user input found')
 
-        # Parse and validate command
         command = Command(user_input)
         if not command.is_valid:
             raise ValueError(f'Invalid command: {command.command}')
 
-        state_dict['user_input'] = None
-        current_task = get_task(state_dict['task_dict'])
-        if not current_task:
-            raise ValueError('No in-progress task found')
+        return current_task, command
 
-        # Execute command
+    current_task, command = validate_command_node(state)
+    state_dict = state['keys']
+    state_dict['user_input'] = None
+    logging.info(f'Executing command: {command.command}')
+
+    try:
         await execute_command(command, current_task, state_dict)
-
     except Exception as e:
-        logging.error(f'Command execution failed: {str(e)}')
+        logging.error(f'Command execution failed: {e}')
         logging.critical('This should never happen!')
+        # NOTE: Can set is_done to True here if we want to fail the graph
 
-    finally:
-        # Always return updated state
-        return {
-            'keys': state['keys'],
-            'mutation_count': state['mutation_count'] + 1,
-            'is_done': False,
-        }
+    return {'keys': state['keys'], 'mutation_count': state['mutation_count'] + 1, 'is_done': False}
 
 
 def decide_from_agent(
@@ -359,4 +394,6 @@ def decide_from_processor(
     """Route from processor based on input type (command vs message)."""
     state_dict = state['keys']
     user_input = state_dict['user_input']
-    return 'execute_command' if user_input.startswith('/') else 'agent_node'
+    if user_input is None:
+        raise ValueError('No user input found')
+    return 'execute_command' if user_input_is_command(user_input) else 'agent_node'
