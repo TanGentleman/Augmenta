@@ -5,7 +5,7 @@ from pathlib import Path
 ROOT_DIR = Path(__file__).resolve().parent
 FLASH_DIR = ROOT_DIR / "flash"
 AUGMENTA_DIR = ROOT_DIR / "augmenta"
-AGENTS_DIR = ROOT_DIR / "tangents"
+TANGENTS_DIR = ROOT_DIR / "tangents"
 
 
 # Augmenta module paths
@@ -19,6 +19,9 @@ DATA_DIR = ROOT_DIR / "data"
 
 FLASHCARD_DATA_DIR = DATA_DIR / "json-flashcards"
 FLASHCARD_FILEPATH = FLASHCARD_DATA_DIR / "flashcards.json"
+
+TANGENTS_DATA_DIR = DATA_DIR / "tangents-data"
+TASKS_DATA_DIR = TANGENTS_DATA_DIR / "tasks"
 
 LLM_OUTPUTS_PATH = DATA_DIR / "llm-outputs"
 LLM_RESPONSE_PATH = LLM_OUTPUTS_PATH / "markdown"
@@ -56,11 +59,12 @@ def ensure_valid_framework():
         TEXT_FILE_DIR,
         CHROMA_FOLDER_PATH,
         FAISS_FOLDER_PATH,
-        AGENTS_DIR,
+        TANGENTS_DIR,
         FLASH_DIR,
         AUGMENTA_DIR,
         CONFIG_DIR,
-        FLASHCARD_DATA_DIR
+        FLASHCARD_DATA_DIR,
+        TASKS_DATA_DIR
     ]
     
     for directory in directories:

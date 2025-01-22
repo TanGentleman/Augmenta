@@ -1,8 +1,8 @@
-from paths import AGENTS_DIR
+from paths import TANGENTS_DIR
 
 VERSION = 'v4'
 
-MERMAID_DIR = AGENTS_DIR / 'graph_mermaids'
+MERMAID_DIR = TANGENTS_DIR / 'graph_mermaids'
 # Create the directory if it doesn't exist
 MERMAID_DIR.mkdir(parents=True, exist_ok=True)
 
