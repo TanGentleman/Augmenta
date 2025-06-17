@@ -1,0 +1,6 @@
+langchain_core
+langgraph
+aiohttp
+langchain_openai
+aiofiles
+python-dotenv
