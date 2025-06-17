@@ -11,6 +11,11 @@ from tangents.classes.tasks import Task, TaskType
 from tangents.utils.action_utils import add_human_action
 from tangents.utils.experimental import run_healthcheck
 
+# Experimental
+from tangents.experimental.utils import parse_convex_result
+from tangents.experimental.youtwo_mcp import create_entities
+
+
 
 def start_action(action: Action, task: Task) -> Action:
     """Initialize an action with required state before execution."""
@@ -47,6 +52,12 @@ def start_action(action: Action, task: Task) -> Action:
         case PlanActionType.REVISE_PLAN:
             if action_args.get('proposed_plan') is None:
                 action_args['proposed_plan'] = task_state['proposed_plan']
+        
+        case ActionType.TOOL_CALL:
+            if action_args.get('tool_name') is None:
+                action_args['tool_name'] = task_state['tool_name']
+            if action_args.get('tool_args') is None:
+                action_args['tool_args'] = task_state['tool_args']
 
     return action
 
@@ -116,7 +127,15 @@ async def execute_action(action: Action) -> ActionResult:
                 return {'success': True, 'data': 'Data saved', 'error': None}
 
             case ActionType.TOOL_CALL:
-                return {'success': True, 'data': 'Tool called', 'error': None}
+                print("FYI: Tool output will be stringified.")
+                tool_name = action_args['tool_name']
+                tool_args = action_args['tool_args']
+                response_string = f"Tool called: {tool_name}"
+                if tool_name == 'create_entities':
+                    res = await create_entities(tool_args['entities'])
+                    res = parse_convex_result(res)
+                    response_string = str(res)
+                return {'success': True, 'data': response_string, 'error': None}
 
             case ActionType.HEALTHCHECK:
                 endpoint = action_args['endpoint']
@@ -198,6 +217,12 @@ def handle_action_result(task: Task, action_result: ActionResult) -> Task:
             case (TaskType.PLANNING, PlanActionType.REVISE_PLAN):
                 task_state['plan'] = action_result['data']
                 task['status'] = Status.DONE
+
+            case (TaskType.EXPERIMENTAL, ActionType.TOOL_CALL):
+                task_state['tool_call_result'] = action_result['data']
+                task_state['tool_call'] = None
+                task_state['tool_call_args'] = None
+                print(f"Updated state! Experimental MCP tool call was a success.")
 
             case _:
                 raise ValueError(

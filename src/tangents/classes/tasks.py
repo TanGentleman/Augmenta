@@ -19,6 +19,8 @@ class TaskType(Enum):
     RAG = 'rag'
     PLANNING = 'planning'
 
+    EXPERIMENTAL = 'experimental'
+
 
 # NOTE: Not sure if states.py is the right place for this
 class TaskState(TypedDict):

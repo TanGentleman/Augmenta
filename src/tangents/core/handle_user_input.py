@@ -68,6 +68,16 @@ def handle_user_message(user_input: str, current_task: Task, config: Config) -> 
                 print('Using your revision!')
                 # The next human action is added in handle_action.handle_action_result
                 # That logic can alternatively be added here
+
+        case TaskType.EXPERIMENTAL:
+            print("Experimental task. User input here can modify task state.")
+            if user_input == 'entity':
+                print("Magic word found! Adding tool call action to create entities.")
+                current_task['actions'].append(create_action(
+                    ActionType.TOOL_CALL,
+                    args={'tool_name': 'create_entities', 'tool_args': {'entities': [{'name': 'table', 'entityType': 'furniture'}]}}
+                ))
+
         case _:
             raise ValueError('Invalid task type')
 

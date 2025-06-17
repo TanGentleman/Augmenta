@@ -123,6 +123,12 @@ def initialize_task_state(task: Task, config: Config) -> dict:
                 'revision_count': 0,
             }
 
+        case TaskType.EXPERIMENTAL:
+            task_state = {
+                'tool_call': None,
+                'tool_call_result': None,
+            }
+
         case _:
             raise ValueError('Invalid task type!')
 
