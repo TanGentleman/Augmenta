@@ -73,7 +73,7 @@ if DEV_MODE:
     print('Dev mode enabled. Using planning state dict.')
 
 
-def create_workflow() -> CompiledStateGraph:
+def create_workflow(checkpointer: bool = True) -> CompiledStateGraph:
     """
     Create and compile the workflow directed graph.
 
@@ -124,8 +124,9 @@ def create_workflow() -> CompiledStateGraph:
     workflow.add_edge('execute_command', 'agent_node')
     workflow.add_edge('action_node', 'agent_node')
     workflow.add_edge('task_manager', 'agent_node')
-
-    return workflow.compile(checkpointer=MemorySaver())
+    if checkpointer:
+        return workflow.compile(checkpointer=MemorySaver())
+    return workflow.compile()
 
 
 async def process_interrupt(interrupt_value: dict) -> str:
