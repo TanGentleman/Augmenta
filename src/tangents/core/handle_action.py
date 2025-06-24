@@ -16,6 +16,8 @@ from tangents.experimental.utils import parse_convex_result
 from tangents.experimental.youtwo_mcp import create_entities
 
 
+async def default_stream_callback(text: str):
+    print(text, end='', flush=True)
 
 def start_action(action: Action, task: Task) -> Action:
     """Initialize an action with required state before execution."""
@@ -35,6 +37,9 @@ def start_action(action: Action, task: Task) -> Action:
                         action_args['messages'] = task_state['messages']
                     if action_args.get('stream') is None:
                         action_args['stream'] = task_state['stream']
+                    # Add streaming callback from task state
+                    if action_args.get('stream_callback') is None:
+                        action_args['stream_callback'] = default_stream_callback
                 case _:
                     raise ValueError('Missing support in start_action for ActionType.GENERATE!')
 
@@ -94,9 +99,24 @@ async def execute_action(action: Action) -> ActionResult:
                 stream = action_args['stream']
                 chain = action_args['active_chain']
                 messages = action_args['messages']
-
+                stream_callback = action_args['stream_callback']
+                # NOTE: We may have to clean up the stream callback after the action is done
+                print(f"Stream callback: {stream_callback}")
                 try:
-                    if stream:
+                    if stream and stream_callback:
+                        response_string = ''
+                        async for chunk in chain.astream(messages):
+                            chunk_content = chunk.content
+                            if chunk_content:
+                                response_string += chunk_content
+                                # Yield chunk through callback instead of printing
+                                await stream_callback(chunk_content)
+                        
+                        if not response_string:
+                            raise ValueError('No response generated')
+                    # This should not be reached
+                    elif stream:
+                        # Fallback to printing if no callback provided
                         response_string = ''
                         async for chunk in chain.astream(messages):
                             print(chunk.content, end='', flush=True)
