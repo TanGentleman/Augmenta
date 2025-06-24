@@ -9,7 +9,7 @@ See tan_graph.py for workflow architecture details.
 """
 
 import logging
-from typing import Literal
+from typing import Literal, Optional
 
 from langgraph.types import interrupt
 
@@ -38,9 +38,7 @@ from tangents.utils.task_utils import (
     start_task,
 )
 
-# Constants
-MAX_MUTATIONS = 50  # Maximum state mutations before failing
-MAX_ACTIONS = 5  # Maximum actions per task before failing
+
 
 
 def start_node(state: GraphState) -> GraphState:
@@ -80,14 +78,15 @@ def agent_node(state: GraphState) -> GraphState:
     """
     # NOTE: Can add validation function here
     state_dict = state['keys']
+    config = state_dict['config']
     current_task = get_task(state_dict['task_dict'])
     if current_task:
         if state['is_done']:
             logging.warning('Early exit: task is still in progress!')
-        elif state_dict['action_count'] > MAX_ACTIONS:
+        elif state_dict['action_count'] > config.workflow_settings.max_actions:
             logging.error('Action count exceeded max actions, marking task as failed')
             current_task['status'] = Status.FAILED
-        elif state['mutation_count'] > MAX_MUTATIONS:
+        elif state['mutation_count'] > config.workflow_settings.max_mutations:
             logging.error('Mutation count exceeded, marking task as failed')
             current_task['status'] = Status.FAILED
 
@@ -261,7 +260,7 @@ def processor_node(state: GraphState) -> GraphState:
     }
 
 
-async def action_node(state: GraphState) -> GraphState:
+async def action_node(state: GraphState, config: Optional[dict] = None) -> GraphState:
     """
     Execute and manage task actions.
 
@@ -296,7 +295,13 @@ async def action_node(state: GraphState) -> GraphState:
     if action['status'] == Status.NOT_STARTED:
         action = start_action(action, current_task)
     assert action['status'] == Status.IN_PROGRESS
-
+    
+    # Set up runtime stream config
+    if config is not None and action['type'] == ActionType.GENERATE:
+        stream_callback = config.get('configurable', {}).get('stream_callback')
+        print(f"stream_callback: {stream_callback}")
+        action['args']['stream_callback'] = stream_callback
+        # exit()
     logging.info(f"Executing action: {action['type']}")
     result = await execute_action(action)
     logging.info(result)
