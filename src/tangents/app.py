@@ -225,11 +225,25 @@ class AugmentaChatInterface:
             Updates for chat history, session data, and UI elements.
         """
         if not chat_history or chat_history[-1]["role"] != "user":
-            logger.error("Expected user message at end of history.")
+            logger.critical("Expected user message at end of history.")
+            yield (
+                chat_history,
+                session_data,
+                gr.update(interactive=True),
+                gr.update(interactive=True)
+            )
             return
-
         user_message = chat_history[-1]["content"]
-
+        if user_message.strip() == "":
+            logger.warning("User input is empty.")
+            yield (
+                chat_history,
+                session_data,
+                gr.update(interactive=True),
+                gr.update(interactive=True)
+            )
+            return
+        
         if not session_data.get("session_id"):
             session_data["session_id"] = str(uuid4())
             session_data["message_count"] = 0
