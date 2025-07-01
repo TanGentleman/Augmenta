@@ -27,7 +27,6 @@ from langgraph.types import Command as ResumeCommand
 
 from tangents.experimental.utils import get_gradio_state_dict
 from tangents.tan_graph import create_workflow
-from tangents.output_handlers import OutputProcessor
 
 # Configuration
 MODEL_NAME = 'nebius/meta-llama/Llama-3.3-70B-Instruct'
@@ -151,7 +150,7 @@ class GraphExecutor:
         history: list,
         streaming_handler: StreamingHandler,
         session_id: str,
-        is_first_message: bool = False
+        is_new_session: bool = False
     ) -> str:
         """
         Execute graph workflow with streaming support.
@@ -161,7 +160,7 @@ class GraphExecutor:
             history: Chat history (used only for context, not for state creation)
             streaming_handler: Streaming handler for UI updates
             session_id: Unique ID for session continuity
-            is_first_message: Whether this is the first message in the session
+            is_new_session: Whether this is the first message in the session
         
         Returns:
             Final response content
@@ -179,7 +178,7 @@ class GraphExecutor:
             # Start streaming response
             streaming_handler.start_response()
             
-            if is_first_message:
+            if is_new_session:
                 # First message: create initial state with mock_inputs
                 logger.info(f"Starting new session {session_id} with initial state")
                 
@@ -194,10 +193,6 @@ class GraphExecutor:
                     model_name=MODEL_NAME,
                     system_message=SYSTEM_MESSAGE,
                 )
-                
-                # Ensure required state keys
-                state_dict.setdefault('task_dict', {})
-                state_dict.setdefault('config', {})
                 
                 graph_state = {
                     'keys': state_dict,
@@ -269,9 +264,6 @@ class GraphExecutor:
             
         except Exception as e:
             logger.error(f"Error processing {node} updates: {str(e)}")
-    
-
-
 
 class GradioInterface:
     """Manages the Gradio chat interface."""
@@ -288,6 +280,7 @@ class GradioInterface:
     def generate_response(self, history: list, session_state: dict) -> Generator[tuple[list, dict], None, None]:
         """Generate bot response with streaming using proper session state."""
         if not history or history[-1]["role"] != "user":
+            logger.error("No user message found in history")
             return
         
         user_message = history[-1]["content"]
@@ -312,7 +305,7 @@ class GradioInterface:
                 return await self.executor.execute_with_streaming(
                     user_message, history, streaming_handler,
                     session_id=session_id,
-                    is_first_message=(session_state["message_count"] == 1)
+                    is_new_session=(session_state["message_count"] == 1)
                 )
             
             # Execute with periodic yielding for UI updates
