@@ -136,6 +136,7 @@ class GraphExecutor:
                 logger.info(f"Continuing existing session {session_id} with ResumeCommand")
                 await self._execute_resume(user_message, config, streaming_handler)
             
+            streaming_handler.finish_response()
             return streaming_handler.current_content
             
         except Exception as e:
@@ -147,7 +148,7 @@ class GraphExecutor:
     async def _execute_normal(self, graph_state: dict, config: dict, streaming_handler: StreamingHandler):
         """Execute normal graph workflow."""
         async for output in self.graph.astream(graph_state, config, stream_mode='updates'):
-            await self._process_output(output, streaming_handler)
+            await self._process_output(output)
     
     async def _execute_resume(self, resume_command: str, config: dict, streaming_handler: StreamingHandler):
         """Execute graph resume from interrupt."""
@@ -156,26 +157,21 @@ class GraphExecutor:
             config, 
             stream_mode='updates'
         ):
-            await self._process_output(output, streaming_handler)
+            await self._process_output(output)
     
-    async def _process_output(self, output: Dict[str, Any], streaming_handler: StreamingHandler):
+    async def _process_output(self, output: Dict[str, Any]):
         """Process graph output and handle interrupts."""
         for node, updates in output.items():
             if node == '__interrupt__':
+                logger.info("Interrupt found!")
                 return  # Pause execution on interrupt
-            else:
-                await self._extract_content_from_updates(node, updates, streaming_handler)
-    
-    async def _extract_content_from_updates(self, node: str, updates: Any, streaming_handler: StreamingHandler):
-        """Extract meaningful content from node updates."""
-        try:
-            if isinstance(updates, dict) and updates.get('is_done') is True:
-                streaming_handler.finish_response()
-                logger.info("Finished response")
-                return
-            logger.debug(f"Node {node} processed: {type(updates)}")
-        except Exception as e:
-            logger.error(f"Error processing {node} updates: {str(e)}")
+            try:
+                if isinstance(updates, dict) and updates.get('is_done') is True:
+                    logger.info("Graph is done")
+                    return
+                logger.debug(f"Node {node} processed: {type(updates)}")
+            except Exception as e:
+                logger.error(f"Error processing {node} updates: {str(e)}")
 
 class GradioInterface:
     """Manages the Gradio chat interface."""
@@ -226,7 +222,15 @@ class GradioInterface:
                 yield history, session_state
             
             # Get final result
-            loop.run_until_complete(task)
+            res = loop.run_until_complete(task)
+            if res == "":
+                # NOTE: This condition will delete any exchange that fails
+                # NOTE: For instance, after /stash, all exchanges will fail (on that thread)
+                # TODO: We fix this by changing to a new thread after stashing
+                logger.warning("No result from task")
+                if history and history[-1]["role"] == "assistant" and history[-1]["content"] == "":
+                    logger.warning("Popping non-response from history")
+                    history = history[:-2]
             yield history, session_state
             
         except Exception as e:

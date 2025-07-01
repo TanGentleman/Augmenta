@@ -8,6 +8,8 @@ from tangents.classes.actions import Status
 from tangents.template import get_default_config
 from tangents.utils.chains import fast_get_llm
 
+from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
+
 class BriefEntity(TypedDict):
     name: str
     entityType: str
@@ -52,15 +54,22 @@ def get_gradio_state_dict(user_message: str, history: list, model_name: str, sys
     messages = []
     if history == [] or history[0]['role'] != 'system':
         if chat_config.disable_system_message is False:
-            messages.insert(0, {'role': 'system', 'content': chat_config.system_message})
+            messages.append(SystemMessage(content=chat_config.system_message))
     # Add all messages from history except the last one if it's a user message
     for i, m in enumerate(history):
         # Skip the last message if it's from the user (we'll handle it separately)
-        if i == len(history) - 1 and m['role'] == 'user':
-            continue
-        # Can add custom logic here to modify the messages
-        messages.append(m)
-        print(f'{m["role"]}: {m["content"]}')
+        if i == len(history) - 1:
+            if m['role'] == 'user':
+                continue
+            if m['role'] == 'assistant' and m['content'] == '':
+                continue
+        if m['role'] == 'assistant':
+            messages.append(AIMessage(content=m['content']))
+        elif m['role'] == 'user':
+            messages.append(HumanMessage(content=m['content']))
+        elif m['role'] == 'system':
+            print("WARNING: System message passed in history")
+            messages.append(SystemMessage(content=m['content']))
     
     task_state = {
         'messages': messages,
