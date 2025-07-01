@@ -21,6 +21,7 @@ from tangents.tan_graph import create_workflow
 # Application Configuration
 MODEL_NAME = 'nebius/meta-llama/Llama-3.3-70B-Instruct'
 SYSTEM_MESSAGE = 'You are a helpful assistant who responds playfully.'
+POLLING_INTERVAL = 0.05
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -206,6 +207,7 @@ class AugmentaChatInterface:
     def add_user_message(self, user_input: str, chat_history: list) -> tuple[str, list]:
         """Add user's message to chat history."""
         if not user_input.strip():
+            print(f"User input is empty! Assistant will not respond.")
             return "", chat_history
         return "", chat_history + [{"role": "user", "content": user_input}]
 
@@ -225,17 +227,7 @@ class AugmentaChatInterface:
             Updates for chat history, session data, and UI elements.
         """
         if not chat_history or chat_history[-1]["role"] != "user":
-            logger.critical("Expected user message at end of history.")
-            yield (
-                chat_history,
-                session_data,
-                gr.update(interactive=True),
-                gr.update(interactive=True)
-            )
-            return
-        user_message = chat_history[-1]["content"]
-        if user_message.strip() == "":
-            logger.warning("User input is empty.")
+            logger.warning("Assistant found invalid user message.")
             yield (
                 chat_history,
                 session_data,
@@ -255,6 +247,7 @@ class AugmentaChatInterface:
         response_streamer = ResponseStreamer(chat_history)
 
         try:
+            user_message = chat_history[-1]["content"]
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
 
@@ -268,7 +261,7 @@ class AugmentaChatInterface:
             task = loop.create_task(process_message())
 
             while not task.done():
-                loop.run_until_complete(asyncio.sleep(0.1))
+                loop.run_until_complete(asyncio.sleep(POLLING_INTERVAL))
                 yield (
                     chat_history,
                     session_data,
