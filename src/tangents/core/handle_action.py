@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 from langchain_core.messages import HumanMessage, AIMessage
 from tangents.classes.actions import (
     Action,
@@ -19,7 +20,7 @@ from tangents.experimental.youtwo_mcp import create_entities
 async def default_stream_callback(text: str):
     print(text, end='', flush=True)
 
-def start_action(action: Action, task: Task) -> Action:
+def start_action(action: Action, task: Task, config: Optional[dict] = None) -> Action:
     """Initialize an action with required state before execution."""
     action['status'] = Status.IN_PROGRESS
 
@@ -37,9 +38,12 @@ def start_action(action: Action, task: Task) -> Action:
                         action_args['messages'] = task_state['messages']
                     if action_args.get('stream') is None:
                         action_args['stream'] = task_state['stream']
-                    # Add streaming callback from task state
+                    # Add streaming callback from config
                     if action_args.get('stream_callback') is None:
-                        action_args['stream_callback'] = default_stream_callback
+                        if config is None:
+                            action_args['stream_callback'] = default_stream_callback
+                        else:
+                            action_args['stream_callback'] = config.get('configurable', {}).get('stream_callback', default_stream_callback)
                 case _:
                     raise ValueError('Missing support in start_action for ActionType.GENERATE!')
 

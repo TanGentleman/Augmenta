@@ -293,14 +293,8 @@ async def action_node(state: GraphState, config: Optional[dict] = None) -> Graph
 
     # Execute action
     if action['status'] == Status.NOT_STARTED:
-        action = start_action(action, current_task)
+        action = start_action(action, current_task, config)
     assert action['status'] == Status.IN_PROGRESS
-    
-    # Set up runtime stream config
-    if config is not None and action['type'] == ActionType.GENERATE:
-        stream_callback = config.get('configurable', {}).get('stream_callback')
-        print(f"stream_callback: {bool(stream_callback)}")
-        action['args']['stream_callback'] = stream_callback
         # exit()
     logging.info(f"Executing action: {action['type']}")
     result = await execute_action(action)
