@@ -70,6 +70,7 @@ class WorkflowEngine:
 
     def __init__(self):
         self.workflow = create_workflow(checkpointer=True)
+        self.is_workflow_completed = False
 
     async def process_conversation(
         self,
@@ -78,7 +79,7 @@ class WorkflowEngine:
         response_streamer: ResponseStreamer,
         session_id: str,
         is_new_session: bool = False
-    ) -> str:
+    ) -> tuple[str, bool]:
         """
         Process a single conversation turn.
 
@@ -90,9 +91,12 @@ class WorkflowEngine:
             is_new_session: True if starting a new session.
 
         Returns:
-            Final assistant response.
+            Tuple of (final assistant response, workflow_completed).
         """
         try:
+            # Reset completion status at start of processing
+            self.is_workflow_completed = False
+            
             config = {
                 'recursion_limit': 20,
                 'configurable': {
@@ -108,13 +112,16 @@ class WorkflowEngine:
                 logger.info(f"Continuing session: {session_id}")
                 await self._continue_workflow(user_message, response_streamer, config)
 
-            return response_streamer.current_response
+            return response_streamer.current_response, self.is_workflow_completed
 
         except Exception as e:
+            # NOTE: We may not want to return display the error message as a valid assistant response!
+            # TODO: Add a Toast or update the UI in this case
             error_message = f"Workflow error: {str(e)}"
             logger.error(error_message)
             response_streamer.complete_response(error_message)
-            return error_message
+            print(f"is_workflow_completed: {self.is_workflow_completed}")
+            return error_message, self.is_workflow_completed
 
     async def _start_new_workflow(
         self,
@@ -126,7 +133,7 @@ class WorkflowEngine:
         """Start a new workflow session."""
         state_dict = get_gradio_state_dict(
             user_message=user_message,
-            history=chat_history.copy(),
+            history=chat_history,
             model_name=MODEL_NAME,
             system_message=SYSTEM_MESSAGE,
         )
@@ -159,6 +166,7 @@ class WorkflowEngine:
 
     async def _resume_from_checkpoint(self, resume_input: str, config: dict) -> None:
         """Resume workflow from a checkpoint."""
+        # from tangents.examples.traces import EXAMPLE_FULL_OUTPUTS
         async for output in self.workflow.astream(
             ResumeCommand(resume=resume_input),
             config,
@@ -171,12 +179,17 @@ class WorkflowEngine:
         for node_name, node_updates in output.items():
             if node_name == '__interrupt__':
                 logger.info("Workflow paused, awaiting user input.")
+                # from tangents.examples.traces import EXAMPLE_INTERRUPT_OUTPUT
                 return
 
             try:
-                if isinstance(node_updates, dict) and node_updates.get('is_done') is True:
-                    logger.info("Workflow completed.")
-                    return
+                if isinstance(node_updates, dict):
+                    if node_updates.get('is_done') is True:
+                        logger.info("Workflow completed.")
+                        self.is_workflow_completed = True
+                        return
+                else:
+                    logger.warning(f"Node updates are not a dict: {type(node_updates)}")
                 logger.debug(f"Processed node '{node_name}': {type(node_updates)}")
             except Exception as e:
                 logger.error(f"Error processing node '{node_name}': {str(e)}")
@@ -249,14 +262,19 @@ class AugmentaChatInterface:
                     gr.update(interactive=False)
                 )
 
-            final_response = loop.run_until_complete(task)
+            final_response, workflow_completed = loop.run_until_complete(task)
 
             if not final_response.strip():
                 logger.warning("Empty response received.")
                 if chat_history[-1]["role"] == "assistant" and not chat_history[-1]["content"].strip():
                     chat_history = chat_history[:-2]
                     logger.info("Removed incomplete exchange.")
-
+                    # TODO: Add a Toast or update the UI in this case
+            # If graph is run to completion, remove the session from the gradio state
+            if workflow_completed:
+                logger.info(f"Workflow completed. Clearing session: {session_id}")
+                session_data["session_id"] = None
+                session_data["message_count"] = 0
             yield (
                 chat_history,
                 session_data,
