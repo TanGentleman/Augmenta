@@ -1,11 +1,10 @@
 """
-LangGraph Chat Interface
+Augmenta Chat Interface
 
-A simple chat app that showcases LangGraph's powerful workflow capabilities:
-- Real-time streaming responses
-- Session continuity across conversations  
-- Workflow interrupts and resumption
-- Robust state management
+A Gradio frontend supporting:
+- Real-time streaming
+- Persistent chat sessions
+- Human-In-The-Loop within complex workflows
 """
 
 import asyncio
@@ -19,7 +18,7 @@ from langgraph.types import Command as ResumeCommand
 from tangents.experimental.utils import get_gradio_state_dict
 from tangents.tan_graph import create_workflow
 
-# Configuration
+# Application Configuration
 MODEL_NAME = 'nebius/meta-llama/Llama-3.3-70B-Instruct'
 SYSTEM_MESSAGE = 'You are a helpful assistant who responds playfully.'
 
@@ -27,272 +26,305 @@ SYSTEM_MESSAGE = 'You are a helpful assistant who responds playfully.'
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-class StreamingHandler:
-    """Manages real-time chat updates for a single response."""
-    
+
+class ResponseStreamer:
+    """
+    Handles real-time streaming of assistant responses.
+    """
+
     def __init__(self, chat_history: list):
         self.chat_history = chat_history
         self.current_response = ""
         self.is_active = False
-        
-    def start_new_response(self):
-        """Begin streaming a new assistant response."""
+
+    def start_new_response(self) -> None:
+        """Start streaming a new response."""
         self.current_response = ""
         self.is_active = True
         self.chat_history.append({"role": "assistant", "content": ""})
-    
-    async def add_content(self, new_text: str):
+
+    async def add_content(self, new_text: str) -> None:
         """Add text to the current streaming response."""
         if not self.is_active:
-            logger.error("Not streaming, skipping content update")
+            logger.warning("Tried adding content without active streaming.")
             return
-            
+
         self.current_response += new_text
         if self.chat_history and self.chat_history[-1]["role"] == "assistant":
             self.chat_history[-1]["content"] = self.current_response
-    
-    def complete_response(self, final_content: Optional[str] = None):
-        """Finish the current response."""
+
+    def complete_response(self, final_content: Optional[str] = None) -> None:
+        """Finish the current response stream."""
         if final_content:
             self.current_response = final_content
             if self.chat_history and self.chat_history[-1]["role"] == "assistant":
                 self.chat_history[-1]["content"] = self.current_response
-        
+
         self.is_active = False
 
-class LangGraphExecutor:
-    """Handles LangGraph workflow execution with streaming."""
-    
+
+class WorkflowEngine:
+    """
+    Processes chat conversations using workflow graphs.
+    """
+
     def __init__(self):
         self.workflow = create_workflow(checkpointer=True)
-        self.active_sessions = {}
-    
-    async def run_with_streaming(
+
+    async def process_conversation(
         self,
         user_message: str,
         chat_history: list,
-        stream_handler: StreamingHandler,
+        response_streamer: ResponseStreamer,
         session_id: str,
-        is_first_message: bool = False
+        is_new_session: bool = False
     ) -> str:
         """
-        Execute LangGraph workflow with real-time streaming.
-        
-        This showcases LangGraph's key features:
-        - Persistent state across conversations
-        - Workflow interrupts and resumption
-        - Real-time streaming updates
+        Process a single conversation turn.
+
+        Args:
+            user_message: User's input message.
+            chat_history: Conversation history.
+            response_streamer: Handles streaming responses.
+            session_id: Unique session identifier.
+            is_new_session: True if starting a new session.
+
+        Returns:
+            Final assistant response.
         """
         try:
             config = {
                 'recursion_limit': 20,
                 'configurable': {
                     'thread_id': session_id,
-                    'stream_callback': stream_handler.add_content
+                    'stream_callback': response_streamer.add_content
                 }
             }
-            
-            if is_first_message:
-                logger.info(f"Starting new LangGraph session {session_id}")
-                # Create initial state for new conversation
-                state_dict = get_gradio_state_dict(
-                    user_message=user_message,
-                    history=chat_history.copy(),
-                    model_name=MODEL_NAME,
-                    system_message=SYSTEM_MESSAGE,
-                )
-                
-                initial_state = {
-                    'keys': state_dict,
-                    'mutation_count': 0,
-                    'is_done': False,
-                }
-                stream_handler.start_new_response()
-                await self._run_workflow(initial_state, config)
-                stream_handler.complete_response()
+
+            if is_new_session:
+                logger.info(f"Starting new session: {session_id}")
+                await self._start_new_workflow(user_message, chat_history, response_streamer, config)
             else:
-                logger.info(f"Resuming LangGraph session {session_id}")
-                # Resume existing workflow with new input
-                stream_handler.start_new_response()
-                await self._resume_workflow(user_message, config)
-                stream_handler.complete_response()
-                
-            return stream_handler.current_response
-            
+                logger.info(f"Continuing session: {session_id}")
+                await self._continue_workflow(user_message, response_streamer, config)
+
+            return response_streamer.current_response
+
         except Exception as e:
-            error_message = f"LangGraph execution error: {str(e)}"
+            error_message = f"Workflow error: {str(e)}"
             logger.error(error_message)
-            stream_handler.complete_response(error_message)
+            response_streamer.complete_response(error_message)
             return error_message
-    
-    async def _run_workflow(self, workflow_state: dict, config: dict):
-        """Execute the LangGraph workflow from initial state."""
+
+    async def _start_new_workflow(
+        self,
+        user_message: str,
+        chat_history: list,
+        response_streamer: ResponseStreamer,
+        config: dict
+    ) -> None:
+        """Start a new workflow session."""
+        state_dict = get_gradio_state_dict(
+            user_message=user_message,
+            history=chat_history.copy(),
+            model_name=MODEL_NAME,
+            system_message=SYSTEM_MESSAGE,
+        )
+
+        initial_state = {
+            'keys': state_dict,
+            'mutation_count': 0,
+            'is_done': False,
+        }
+
+        response_streamer.start_new_response()
+        await self._execute_workflow(initial_state, config)
+        response_streamer.complete_response()
+
+    async def _continue_workflow(
+        self,
+        user_input: str,
+        response_streamer: ResponseStreamer,
+        config: dict
+    ) -> None:
+        """Continue an existing workflow session."""
+        response_streamer.start_new_response()
+        await self._resume_from_checkpoint(user_input, config)
+        response_streamer.complete_response()
+
+    async def _execute_workflow(self, workflow_state: dict, config: dict) -> None:
+        """Execute workflow from initial state."""
         async for output in self.workflow.astream(workflow_state, config, stream_mode='updates'):
-            await self._handle_workflow_output(output)
-    
-    async def _resume_workflow(self, resume_input: str, config: dict):
-        """Resume LangGraph workflow from interrupt point."""
+            await self._process_workflow_output(output)
+
+    async def _resume_from_checkpoint(self, resume_input: str, config: dict) -> None:
+        """Resume workflow from a checkpoint."""
         async for output in self.workflow.astream(
-            ResumeCommand(resume=resume_input), 
-            config, 
+            ResumeCommand(resume=resume_input),
+            config,
             stream_mode='updates'
         ):
-            await self._handle_workflow_output(output)
-    
-    async def _handle_workflow_output(self, output: Dict[str, Any]):
-        """Process LangGraph workflow outputs and handle interrupts."""
+            await self._process_workflow_output(output)
+
+    async def _process_workflow_output(self, output: Dict[str, Any]) -> None:
+        """Handle workflow outputs and state transitions."""
         for node_name, node_updates in output.items():
             if node_name == '__interrupt__':
-                logger.info("LangGraph workflow interrupted - waiting for user input")
-                return  # Pause execution for user interaction
+                logger.info("Workflow paused, awaiting user input.")
+                return
+
             try:
                 if isinstance(node_updates, dict) and node_updates.get('is_done') is True:
-                    logger.info("LangGraph workflow completed")
+                    logger.info("Workflow completed.")
                     return
-                logger.debug(f"Node {node_name} processed: {type(node_updates)}")
+                logger.debug(f"Processed node '{node_name}': {type(node_updates)}")
             except Exception as e:
-                logger.error(f"Error processing {node_name} updates: {str(e)}")
+                logger.error(f"Error processing node '{node_name}': {str(e)}")
 
-class ChatInterface:
-    """Simple chat interface showcasing LangGraph capabilities."""
-    
+
+class AugmentaChatInterface:
+    """
+    User interface for Augmenta Chat.
+    """
+
     def __init__(self):
-        self.graph_executor = LangGraphExecutor()
-    
+        self.workflow_engine = WorkflowEngine()
+
     def add_user_message(self, user_input: str, chat_history: list) -> tuple[str, list]:
-        """Add user message to chat history."""
+        """Add user's message to chat history."""
         if not user_input.strip():
             return "", chat_history
         return "", chat_history + [{"role": "user", "content": user_input}]
-    
-    def generate_bot_response(self, chat_history: list, session_data: dict) -> Generator[tuple[list, dict, gr.update, gr.update], None, None]:
+
+    def generate_assistant_response(
+        self,
+        chat_history: list,
+        session_data: dict
+    ) -> Generator[tuple[list, dict, gr.update, gr.update], None, None]:
         """
-        Generate streaming bot response using LangGraph.
-        
-        Returns: (chat_history, session_data, textbox_update, send_button_update)
+        Generate assistant's response with streaming updates.
+
+        Args:
+            chat_history: Current chat history.
+            session_data: Session metadata.
+
+        Yields:
+            Updates for chat history, session data, and UI elements.
         """
         if not chat_history or chat_history[-1]["role"] != "user":
-            logger.error("Invalid chat state: Expected user message")
+            logger.error("Expected user message at end of history.")
             return
-        
+
         user_message = chat_history[-1]["content"]
-        
-        # Initialize session if needed
+
         if not session_data.get("session_id"):
             session_data["session_id"] = str(uuid4())
             session_data["message_count"] = 0
-        
+
         session_data["message_count"] += 1
         session_id = session_data["session_id"]
-        is_first_message = (session_data["message_count"] == 1)
-        
-        stream_handler = StreamingHandler(chat_history)
-        
+        is_new_session = (session_data["message_count"] == 1)
+
+        response_streamer = ResponseStreamer(chat_history)
+
         try:
-            # Set up async execution
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
-            
-            async def execute_langgraph():
-                return await self.graph_executor.run_with_streaming(
-                    user_message, chat_history, stream_handler,
+
+            async def process_message():
+                return await self.workflow_engine.process_conversation(
+                    user_message, chat_history, response_streamer,
                     session_id=session_id,
-                    is_first_message=is_first_message
+                    is_new_session=is_new_session
                 )
-            
-            task = loop.create_task(execute_langgraph())
-            
-            # Stream updates while processing (disable user input)
+
+            task = loop.create_task(process_message())
+
             while not task.done():
                 loop.run_until_complete(asyncio.sleep(0.1))
                 yield (
-                    chat_history, 
-                    session_data, 
-                    gr.update(interactive=False),  # Disable textbox
-                    gr.update(interactive=False)   # Disable send button
+                    chat_history,
+                    session_data,
+                    gr.update(interactive=False),
+                    gr.update(interactive=False)
                 )
-            
-            # Get final result and re-enable input
+
             final_response = loop.run_until_complete(task)
-            
-            if final_response == "":
-                logger.warning("Empty response from LangGraph")
-                # Clean up failed exchanges
-                if chat_history and chat_history[-1]["role"] == "assistant" and chat_history[-1]["content"] == "":
-                    logger.warning("Removing empty response from history")
+
+            if not final_response.strip():
+                logger.warning("Empty response received.")
+                if chat_history[-1]["role"] == "assistant" and not chat_history[-1]["content"].strip():
                     chat_history = chat_history[:-2]
-                    
+                    logger.info("Removed incomplete exchange.")
+
             yield (
-                chat_history, 
-                session_data, 
-                gr.update(interactive=True),   # Re-enable textbox
-                gr.update(interactive=True)    # Re-enable send button
+                chat_history,
+                session_data,
+                gr.update(interactive=True),
+                gr.update(interactive=True)
             )
-            
+
         except Exception as e:
             error_message = f"Chat error: {str(e)}"
             logger.error(error_message)
-            
-            # Add error message to chat
-            if not chat_history or chat_history[-1]["role"] != "assistant":
-                chat_history.append({"role": "assistant", "content": error_message})
-            else:
-                chat_history[-1]["content"] = error_message
-                
-            # Re-enable input after error
+            chat_history.append({"role": "assistant", "content": error_message})
             yield (
-                chat_history, 
-                session_data, 
-                gr.update(interactive=True),   # Re-enable textbox
-                gr.update(interactive=True)    # Re-enable send button
+                chat_history,
+                session_data,
+                gr.update(interactive=True),
+                gr.update(interactive=True)
             )
         finally:
             loop.close()
     
     def create_interface(self) -> gr.Blocks:
-        """Create the Gradio chat interface."""
+        """
+        Create and configure the Gradio chat interface.
+        
+        Returns:
+            Configured Gradio Blocks interface ready for launch
+        """
         with gr.Blocks(
-            title="LangGraph Chat Demo",
+            title="Augmenta Chat",
             analytics_enabled=False
         ) as demo:
-            gr.Markdown("# 🕸️ LangGraph Chat Demo")
+            gr.Markdown("# 🤖 Augmenta Chat")
             gr.Markdown(
-                "See LangGraph in action! This chat interface demonstrates:\n\n"
-                "✨ **Real-time streaming** - Watch responses appear as they're generated\n"
-                "🧵 **Session continuity** - Conversations persist with state management\n"
-                "⚡ **Workflow interrupts** - Interactive workflows that can pause and resume\n"
-                "🛡️ **Robust error handling** - Graceful handling of edge cases"
+                "**Augmenta Chat Demo**\n\n"
+                "A simple chat interface powered by LangGraph, supporting streaming responses, "
+                "resumable chat sessions, and interactive workflows with Human-In-The-Loop capabilities."
             )
             
-            # Session state
+            # Session state management
             session_data = gr.State({})
             
-            # Chat interface
+            # Main chat interface
             chatbot = gr.Chatbot(
-                label="LangGraph Assistant",
+                label="Chat with Augmenta",
                 height=500,
                 type="messages",
                 show_copy_button=True
             )
             
+            # Input controls
             with gr.Row():
                 message_input = gr.Textbox(
-                    placeholder="Type your message and see LangGraph in action...",
-                    label="Message",
+                    placeholder="Start a conversation with Augmenta...",
+                    label="Your message",
                     lines=2,
                     scale=4,
                     show_label=False,
                 )
                 send_button = gr.Button("Send", variant="primary", scale=1)
             
-            # Event handlers with input locking
+            # Event handling with proper input management
             send_button.click(
                 fn=self.add_user_message,
                 inputs=[message_input, chatbot],
                 outputs=[message_input, chatbot],
                 queue=False
             ).then(
-                fn=self.generate_bot_response,
+                fn=self.generate_assistant_response,
                 inputs=[chatbot, session_data],
                 outputs=[chatbot, session_data, message_input, send_button]
             )
@@ -303,7 +335,7 @@ class ChatInterface:
                 outputs=[message_input, chatbot],
                 queue=False
             ).then(
-                fn=self.generate_bot_response,
+                fn=self.generate_assistant_response,
                 inputs=[chatbot, session_data],
                 outputs=[chatbot, session_data, message_input, send_button]
             )
@@ -312,22 +344,28 @@ class ChatInterface:
 
 
 def main():
-    """Launch the LangGraph chat demo."""
+    """Launch the Augmenta Chat application."""
     try:
-        # Setup logging
-        logger.setLevel(logging.INFO)
+        # Configure logging
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        logger.info("Starting Augmenta Chat application")
         
         # Load environment variables
         from dotenv import load_dotenv
         load_dotenv()
         
-        # Create and launch the chat interface
-        interface = ChatInterface()
-        demo = interface.create_interface()
+        # Initialize and launch chat interface
+        chat_app = AugmentaChatInterface()
+        demo = chat_app.create_interface()
+        
+        logger.info("Launching Augmenta Chat interface")
         demo.launch(share=False, debug=False)
         
     except Exception as e:
-        logger.error(f"Failed to start LangGraph demo: {str(e)}")
+        logger.error(f"Failed to start Augmenta Chat: {str(e)}")
         raise
 
 
