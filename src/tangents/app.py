@@ -35,10 +35,6 @@ SYSTEM_MESSAGE = 'You are a helpful assistant who responds playfully.'
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
-class FormattingError(Exception):
-    """Exception raised when formatting is not possible."""
-    pass
-
 class StreamingHandler:
     """
     Handles real-time streaming updates for Gradio chat interface.
@@ -56,8 +52,6 @@ class StreamingHandler:
         """Start a new assistant response."""
         self.current_content = ""
         self.is_streaming = True
-        
-        # Add new assistant message to history
         self.history.append({"role": "assistant", "content": ""})
     
     async def update_content(self, text: str):
@@ -67,8 +61,6 @@ class StreamingHandler:
             return
             
         self.current_content += text
-        
-        # Update the last assistant message
         if self.history and self.history[-1]["role"] == "assistant":
             self.history[-1]["content"] = self.current_content
     
@@ -107,10 +99,9 @@ class GraphExecutor:
             is_new_session: Whether this is the first message in the session
         
         Returns:
-            Final response content or "INTERRUPT_PENDING" if interrupt is pending
+            Final response content
         """
         try:
-            # Configure execution
             config = {
                 'recursion_limit': 20,
                 'configurable': {
@@ -119,14 +110,10 @@ class GraphExecutor:
                 }
             }
             
-            # Start streaming response
             streaming_handler.start_response()
             
             if is_new_session:
-                # First message: create initial state with mock_inputs
                 logger.info(f"Starting new session {session_id} with initial state")
-                
-                # Create clean history without empty last assistant message
                 clean_history = history.copy()
                 if clean_history and clean_history[-1].get("role") == "assistant" and clean_history[-1].get("content", "") == "":
                     clean_history.pop()
@@ -146,14 +133,9 @@ class GraphExecutor:
                 
                 await self._execute_normal(graph_state, config, streaming_handler)
             else:
-                # Continuation: use ResumeCommand
                 logger.info(f"Continuing existing session {session_id} with ResumeCommand")
                 await self._execute_resume(user_message, config, streaming_handler)
             
-            # Check if we need to continue after interrupt
-            if streaming_handler.is_streaming:
-                return "INTERRUPT_PENDING"
-                
             return streaming_handler.current_content
             
         except Exception as e:
@@ -165,9 +147,7 @@ class GraphExecutor:
     async def _execute_normal(self, graph_state: dict, config: dict, streaming_handler: StreamingHandler):
         """Execute normal graph workflow."""
         async for output in self.graph.astream(graph_state, config, stream_mode='updates'):
-            interrupt_status = await self._process_output(output, streaming_handler)
-            if interrupt_status == "INTERRUPT_PENDING":
-                return  # Pause execution on interrupt
+            await self._process_output(output, streaming_handler)
     
     async def _execute_resume(self, resume_command: str, config: dict, streaming_handler: StreamingHandler):
         """Execute graph resume from interrupt."""
@@ -176,37 +156,24 @@ class GraphExecutor:
             config, 
             stream_mode='updates'
         ):
-            interrupt_status = await self._process_output(output, streaming_handler)
-            if interrupt_status == "INTERRUPT_PENDING":
-                return  # Pause execution on interrupt
+            await self._process_output(output, streaming_handler)
     
     async def _process_output(self, output: Dict[str, Any], streaming_handler: StreamingHandler):
         """Process graph output and handle interrupts."""
         for node, updates in output.items():
             if node == '__interrupt__':
-                # Return the interrupt to pause execution
-                return "INTERRUPT_PENDING"
+                return  # Pause execution on interrupt
             else:
-                # Process regular node updates
                 await self._extract_content_from_updates(node, updates, streaming_handler)
-        
-        return "CONTINUE"
     
     async def _extract_content_from_updates(self, node: str, updates: Any, streaming_handler: StreamingHandler):
         """Extract meaningful content from node updates."""
         try:
-            # Check for completion
-            if isinstance(updates, dict):
-                # Handle completion signal
-                if updates.get('is_done') is True:
-                    streaming_handler.finish_response()
-                    return
-            else:
-                logger.error(f"Unexpected type of updates: {type(updates)}")
-            
-            # Log debug info without cluttering UI
+            if isinstance(updates, dict) and updates.get('is_done') is True:
+                streaming_handler.finish_response()
+                logger.info("Finished response")
+                return
             logger.debug(f"Node {node} processed: {type(updates)}")
-            
         except Exception as e:
             logger.error(f"Error processing {node} updates: {str(e)}")
 
@@ -230,7 +197,6 @@ class GradioInterface:
         
         user_message = history[-1]["content"]
         
-        # Initialize session state if needed
         if not session_state.get("session_id"):
             session_state["session_id"] = str(uuid4())
             session_state["message_count"] = 0
@@ -238,10 +204,8 @@ class GradioInterface:
         session_state["message_count"] += 1
         session_id = session_state["session_id"]
         
-        # Create streaming handler
         streaming_handler = StreamingHandler(history)
         
-        # Execute with proper async handling
         try:
             loop = asyncio.new_event_loop()
             asyncio.set_event_loop(loop)
@@ -344,7 +308,7 @@ def main():
     """Main entry point for the application."""
     try:
         # Setup
-        logging.basicConfig(level=logging.INFO)
+        logger.setLevel(logging.INFO)
         
         # Load environment
         from dotenv import load_dotenv
