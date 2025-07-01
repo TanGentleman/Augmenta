@@ -110,17 +110,13 @@ class GraphExecutor:
                 }
             }
             
-            streaming_handler.start_response()
-            
             if is_new_session:
                 logger.info(f"Starting new session {session_id} with initial state")
-                clean_history = history.copy()
-                if clean_history and clean_history[-1].get("role") == "assistant" and clean_history[-1].get("content", "") == "":
-                    clean_history.pop()
+                agent_history = history.copy()
                 
                 state_dict = get_gradio_state_dict(
                     user_message=user_message,
-                    history=clean_history,
+                    history=agent_history,
                     model_name=MODEL_NAME,
                     system_message=SYSTEM_MESSAGE,
                 )
@@ -130,13 +126,14 @@ class GraphExecutor:
                     'mutation_count': 0,
                     'is_done': False,
                 }
-                
+                streaming_handler.start_response()
                 await self._execute_normal(graph_state, config, streaming_handler)
+                streaming_handler.finish_response()
             else:
                 logger.info(f"Continuing existing session {session_id} with ResumeCommand")
+                streaming_handler.start_response()
                 await self._execute_resume(user_message, config, streaming_handler)
-            
-            streaming_handler.finish_response()
+                streaming_handler.finish_response()
             return streaming_handler.current_content
             
         except Exception as e:

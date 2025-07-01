@@ -60,8 +60,9 @@ def get_gradio_state_dict(user_message: str, history: list, model_name: str, sys
         # Skip the last message if it's from the user (we'll handle it separately)
         if i == len(history) - 1:
             if m['role'] == 'user':
-                continue
-            if m['role'] == 'assistant' and m['content'] == '':
+                # Added as a mock input
+                if user_message != m['content']:
+                    print(f"WARNING: User message mismatch: {user_message} != {m['content']}")
                 continue
         if m['role'] == 'assistant':
             messages.append(AIMessage(content=m['content']))
