@@ -7,7 +7,6 @@ providing real-time streaming responses with robust error handling and interrupt
 Key Components:
 - StreamingHandler: Manages real-time chat updates with proper content isolation
 - GraphExecutor: Handles graph execution and state management
-- InterruptManager: Processes workflow interrupts through chat interface
 - GradioInterface: UI setup and event coordination
 
 Production Features:
@@ -33,9 +32,12 @@ MODEL_NAME = 'nebius/meta-llama/Llama-3.3-70B-Instruct'
 SYSTEM_MESSAGE = 'You are a helpful assistant who responds playfully.'
 
 # Setup logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
+class FormattingError(Exception):
+    """Exception raised when formatting is not possible."""
+    pass
 
 class StreamingHandler:
     """
@@ -61,10 +63,7 @@ class StreamingHandler:
     async def update_content(self, text: str):
         """Update the current response content."""
         if not self.is_streaming:
-            return
-            
-        # Filter out technical state data that shouldn't be shown
-        if self._should_filter_content(text):
+            logger.error("Not streaming, skipping update")
             return
             
         self.current_content += text
@@ -81,61 +80,6 @@ class StreamingHandler:
                 self.history[-1]["content"] = self.current_content
         
         self.is_streaming = False
-    
-    def add_system_message(self, message: str):
-        """Add a system message (like interrupts) to chat."""
-        self.history.append({
-            "role": "assistant",
-            "content": f"🔄 **System**: {message}"
-        })
-    
-    def _should_filter_content(self, text: str) -> bool:
-        """Filter out technical state data that shouldn't be displayed."""
-        if not text:
-            return True
-        
-        # Don't filter whitespace-only content (legitimate spaces)
-        if text.isspace():
-            return False
-            
-        # Filter technical state indicators
-        technical_terms = [
-            'keysmutation_count', 'mutation_count', 'is_done',
-            '{"keys"', '"mutation_count"', '"is_done"',
-            'action_count', 'task_dict'
-        ]
-        
-        text_lower = text.lower().strip()
-        return any(term in text_lower for term in technical_terms)
-
-
-class InterruptManager:
-    """Manages workflow interrupts in the Gradio context."""
-    
-    @staticmethod
-    async def handle_interrupt(interrupt_data: dict, streaming_handler: StreamingHandler) -> str:
-        """
-        Process workflow interrupt.
-        
-        Args:
-            interrupt_data: Interrupt information from the graph
-            streaming_handler: Handler for UI updates
-            
-        Returns:
-            Placeholder indicating interrupt is pending
-        """
-        prompt = interrupt_data.get('prompt', 'Please provide input to continue:')
-        
-        # Skip generic/false interrupts
-        if prompt in ['Enter your message (or /help for commands):', 'User input:']:
-            logger.debug(f"Skipping generic interrupt: {prompt}")
-            return "SKIP_INTERRUPT"
-        
-        logger.info(f"Processing interrupt: {prompt}")
-        streaming_handler.add_system_message(f"Interrupt: {prompt}")
-        
-        return "INTERRUPT_PENDING"
-
 
 class GraphExecutor:
     """Handles graph execution and streaming coordination."""
@@ -163,7 +107,7 @@ class GraphExecutor:
             is_new_session: Whether this is the first message in the session
         
         Returns:
-            Final response content
+            Final response content or "INTERRUPT_PENDING" if interrupt is pending
         """
         try:
             # Configure execution
@@ -221,7 +165,7 @@ class GraphExecutor:
     async def _execute_normal(self, graph_state: dict, config: dict, streaming_handler: StreamingHandler):
         """Execute normal graph workflow."""
         async for output in self.graph.astream(graph_state, config, stream_mode='updates'):
-            interrupt_status = await self._process_output(output, config, streaming_handler)
+            interrupt_status = await self._process_output(output, streaming_handler)
             if interrupt_status == "INTERRUPT_PENDING":
                 return  # Pause execution on interrupt
     
@@ -232,11 +176,11 @@ class GraphExecutor:
             config, 
             stream_mode='updates'
         ):
-            interrupt_status = await self._process_output(output, config, streaming_handler)
+            interrupt_status = await self._process_output(output, streaming_handler)
             if interrupt_status == "INTERRUPT_PENDING":
                 return  # Pause execution on interrupt
     
-    async def _process_output(self, output: Dict[str, Any], config: dict, streaming_handler: StreamingHandler):
+    async def _process_output(self, output: Dict[str, Any], streaming_handler: StreamingHandler):
         """Process graph output and handle interrupts."""
         for node, updates in output.items():
             if node == '__interrupt__':
@@ -254,10 +198,11 @@ class GraphExecutor:
             # Check for completion
             if isinstance(updates, dict):
                 # Handle completion signal
-                keys = updates.get('keys', {})
-                if keys.get('is_done', False) or updates.get('is_done', False):
-                    streaming_handler.finish_response("✅ Task completed successfully.")
+                if updates.get('is_done') is True:
+                    streaming_handler.finish_response()
                     return
+            else:
+                logger.error(f"Unexpected type of updates: {type(updates)}")
             
             # Log debug info without cluttering UI
             logger.debug(f"Node {node} processed: {type(updates)}")
@@ -280,7 +225,7 @@ class GradioInterface:
     def generate_response(self, history: list, session_state: dict) -> Generator[tuple[list, dict], None, None]:
         """Generate bot response with streaming using proper session state."""
         if not history or history[-1]["role"] != "user":
-            logger.error("No user message found in history")
+            logger.error("Formatting error: User message must be the last message in the history.")
             return
         
         user_message = history[-1]["content"]
