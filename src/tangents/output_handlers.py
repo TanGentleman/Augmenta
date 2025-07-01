@@ -11,6 +11,23 @@ class OutputProcessor:
     """Processes and displays workflow output."""
 
     @staticmethod
+    def format_task_status(task_dict) -> str:
+        """Format task status information for display."""
+        if not task_dict:
+            return 'Task: None'
+        
+        status_lines = []
+        for task_name, task in task_dict.items():
+            if hasattr(task, 'get') and task.get('status'):
+                status_lines.append(f"{task_name}: {task['status'].value}")
+            elif hasattr(task, '__getitem__') and 'status' in task:
+                status_lines.append(f"{task_name}: {task['status'].value}")
+            else:
+                status_lines.append(f"{task_name}: Unknown status")
+        
+        return '\n'.join(status_lines) if status_lines else 'Task: None'
+
+    @staticmethod
     def print_values(graph_state: GraphState) -> None:
         """Process and display full graph state output."""
         task_dict = graph_state['keys'].get('task_dict')

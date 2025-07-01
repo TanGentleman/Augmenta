@@ -101,7 +101,7 @@ async def execute_action(action: Action) -> ActionResult:
                 messages = action_args['messages']
                 stream_callback = action_args['stream_callback']
                 # NOTE: We may have to clean up the stream callback after the action is done
-                print(f"Stream callback: {stream_callback}")
+                print(f"Stream callback: {bool(stream_callback)}")
                 try:
                     if stream and stream_callback:
                         response_string = ''
