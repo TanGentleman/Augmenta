@@ -21,24 +21,21 @@ from tangents.experimental.youtwo_mcp import create_entities
 async def default_stream_callback(text: str):
     print(text, end='', flush=True)
 
-def start_action(action: Action, task: Task, action_config: RunnableConfig) -> Action:
+def start_action(action: Action, task: Task, runtime_config: Optional[dict] = None) -> Action:
     """Initialize an action with required state before execution."""
     action['status'] = Status.IN_PROGRESS
     task_state = task['state']
     action_args = action['args']
     
     def get_arg_value(arg_name, default=None, required=False):
-        """Get argument value with priority: action_args > config > task_state."""
+        """Get argument value with priority: action_args > runtime_config > task_state."""
         # 1. Check if argument exists in action_args
         if arg_name in action_args and action_args[arg_name] is not None:
             return action_args[arg_name]
         
-        # 2. Check if argument exists in config
-        if (action_config is not None and 
-            'configurable' in action_config and 
-            arg_name in action_config['configurable'] and 
-            action_config['configurable'][arg_name] is not None):
-            return action_config['configurable'][arg_name]
+        # 2. Check if argument exists directly in runtime_config
+        if runtime_config is not None and arg_name in runtime_config and runtime_config[arg_name] is not None:
+            return runtime_config[arg_name]
         
         # 3. Check if argument exists in task_state
         if arg_name in task_state and task_state[arg_name] is not None:

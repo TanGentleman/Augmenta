@@ -17,6 +17,7 @@ from langgraph.types import Command as ResumeCommand
 
 from tangents.experimental.utils import get_gradio_state_dict
 from tangents.tan_graph import create_workflow
+from tangents.utils.chains import fast_get_llm
 
 # Application Configuration
 MODEL_NAME = 'nebius/meta-llama/Llama-3.3-70B-Instruct'
@@ -72,6 +73,8 @@ class WorkflowEngine:
     def __init__(self):
         self.workflow = create_workflow(checkpointer=True)
         self.is_workflow_completed = False
+        # Create the active chain using the MODEL_NAME
+        self.active_chain = fast_get_llm(MODEL_NAME)
 
     async def process_conversation(
         self,
@@ -102,7 +105,10 @@ class WorkflowEngine:
                 'recursion_limit': 20,
                 'configurable': {
                     'thread_id': session_id,
-                    'stream_callback': response_streamer.add_content
+                    'action_config': {
+                        'stream_callback': response_streamer.add_content,
+                        'active_chain': self.active_chain
+                    }
                 }
             }
 

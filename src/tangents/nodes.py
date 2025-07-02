@@ -11,6 +11,7 @@ See tan_graph.py for workflow architecture details.
 import logging
 from typing import Literal, Optional
 
+from langchain_core.runnables import RunnableConfig
 from langgraph.types import interrupt
 
 from tangents.classes.actions import ActionType, Status
@@ -260,7 +261,7 @@ def processor_node(state: GraphState) -> GraphState:
     }
 
 
-async def action_node(state: GraphState, config: Optional[dict] = None) -> GraphState:
+async def action_node(state: GraphState, config: RunnableConfig) -> GraphState:
     """
     Execute and manage task actions.
 
@@ -293,7 +294,8 @@ async def action_node(state: GraphState, config: Optional[dict] = None) -> Graph
 
     # Execute action
     if action['status'] == Status.NOT_STARTED:
-        action = start_action(action, current_task, config)
+        runtime_config = config.get('configurable', {}).get("action_config", None)
+        action = start_action(action, current_task, runtime_config)
     assert action['status'] == Status.IN_PROGRESS
         # exit()
     logging.info(f"Executing action: {action['type']}")
