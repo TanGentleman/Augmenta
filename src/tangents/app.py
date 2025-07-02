@@ -308,6 +308,11 @@ class AugmentaChatInterface:
         finally:
             loop.close()
     
+    def clear_session(self) -> tuple[list, dict]:
+        """Clear chat history and session data."""
+        logger.info("Clearing chat history and session data.")
+        return [], {"session_id": None, "message_count": 0}
+    
     def create_interface(self) -> gr.Blocks:
         """
         Create and configure the Gradio chat interface.
@@ -347,7 +352,8 @@ class AugmentaChatInterface:
                     show_label=False,
                 )
                 send_button = gr.Button("Send", variant="primary", scale=1)
-            
+                clear_button = gr.Button("Clear", variant="secondary", scale=1)
+
             # Event handling with proper input management
             send_button.click(
                 fn=self.add_user_message,
@@ -370,7 +376,14 @@ class AugmentaChatInterface:
                 inputs=[chatbot, session_data],
                 outputs=[chatbot, session_data, message_input, send_button]
             )
-        
+
+            clear_button.click(
+                fn=self.clear_session,
+                inputs=[],
+                outputs=[chatbot, session_data],
+                queue=False
+            )
+
         return demo
 
 
