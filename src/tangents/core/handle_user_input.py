@@ -23,11 +23,12 @@ def handle_user_message(user_input: str, current_task: Task, config: Config) -> 
         case TaskType.CHAT:
             task_state['messages'].append(HumanMessage(content=user_input))
             if task_state['active_chain'] is None:
-                logging.warning('No active chain found, initializing new chain!')
-                llm = fast_get_llm(config.chat_settings.primary_model)
-                if llm is None:
-                    raise ValueError('Chain not initialized!')
-                task_state['active_chain'] = llm
+                logging.warning('No active chain found, it must be passed to Action at runtime!')
+                # logging.warning('No active chain found, initializing new chain!')
+                # llm = fast_get_llm(config.chat_settings.primary_model)
+                # if llm is None:
+                #     raise ValueError('Chain not initialized!')
+                # task_state['active_chain'] = llm
 
             generate_action = create_action(
                 ActionType.GENERATE,

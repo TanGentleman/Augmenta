@@ -1,6 +1,7 @@
 import logging
 from typing import Optional
 from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.runnables import RunnableConfig
 from tangents.classes.actions import (
     Action,
     ActionType,
@@ -10,7 +11,7 @@ from tangents.classes.actions import (
 )
 from tangents.classes.tasks import Task, TaskType
 from tangents.utils.action_utils import add_human_action
-from tangents.utils.experimental import run_healthcheck
+from tangents.utils.experimental import run_healthcheck, HEALTHCHECK_ENDPOINT
 
 # Experimental
 from tangents.experimental.utils import parse_convex_result
@@ -20,53 +21,70 @@ from tangents.experimental.youtwo_mcp import create_entities
 async def default_stream_callback(text: str):
     print(text, end='', flush=True)
 
-def start_action(action: Action, task: Task, config: Optional[dict] = None) -> Action:
+def start_action(action: Action, task: Task, action_config: RunnableConfig) -> Action:
     """Initialize an action with required state before execution."""
     action['status'] = Status.IN_PROGRESS
-
-    # Initialize action args from task state if needed
     task_state = task['state']
     action_args = action['args']
+    
+    def get_arg_value(arg_name, default=None, required=False):
+        """Get argument value with priority: action_args > config > task_state."""
+        # 1. Check if argument exists in action_args
+        if arg_name in action_args and action_args[arg_name] is not None:
+            return action_args[arg_name]
+        
+        # 2. Check if argument exists in config
+        if (action_config is not None and 
+            'configurable' in action_config and 
+            arg_name in action_config['configurable'] and 
+            action_config['configurable'][arg_name] is not None):
+            return action_config['configurable'][arg_name]
+        
+        # 3. Check if argument exists in task_state
+        if arg_name in task_state and task_state[arg_name] is not None:
+            return task_state[arg_name]
+        
+        if default is None and required is True:
+            raise ValueError(f'Missing required argument: {arg_name}')
+        
+        return default
 
     match action['type']:
         case ActionType.GENERATE:
             match task['type']:
                 case TaskType.CHAT:
-                    if action_args.get('active_chain') is None:
-                        action_args['active_chain'] = task_state['active_chain']
-                    if action_args.get('messages') is None:
-                        action_args['messages'] = task_state['messages']
-                    if action_args.get('stream') is None:
-                        action_args['stream'] = task_state['stream']
-                    # Add streaming callback from config
-                    if action_args.get('stream_callback') is None:
-                        if config is None:
-                            action_args['stream_callback'] = default_stream_callback
-                        else:
-                            action_args['stream_callback'] = config.get('configurable', {}).get('stream_callback', default_stream_callback)
+                    # Apply consistent priority pattern for all arguments
+                    action_args['active_chain'] = get_arg_value('active_chain', required=True)
+                    action_args['messages'] = get_arg_value('messages', required=True)
+                    action_args['stream'] = get_arg_value('stream', required=True)
+                    
+                    # Special handling for stream_callback with default
+                    action_args['stream_callback'] = get_arg_value(
+                        'stream_callback', 
+                        default=default_stream_callback,
+                        required=True
+                    )
+                    
+                    # Validate required arguments
+                    if action_args['active_chain'] is None:
+                        raise ValueError('No active chain found!')
                 case _:
                     raise ValueError('Missing support in start_action for ActionType.GENERATE!')
 
         case ActionType.HEALTHCHECK:
-            if action_args.get('endpoint') is None:
-                # NOTE: Assuming LiteLLM is running locally
-                logging.warning('Healthcheck endpoint is fixed to port 4000 proxy!')
-                base_url = 'http://localhost:4000'
-                action_args['endpoint'] = f'{base_url}/health/liveness'
+            action_args['endpoint'] = get_arg_value('endpoint',
+                                                    default=HEALTHCHECK_ENDPOINT,
+                                                    required=True)
 
         case PlanActionType.PROPOSE_PLAN:
-            if action_args.get('plan_context') is None:
-                action_args['plan_context'] = task_state['context']
+            action_args['plan_context'] = get_arg_value('plan_context', required=True)
 
         case PlanActionType.REVISE_PLAN:
-            if action_args.get('proposed_plan') is None:
-                action_args['proposed_plan'] = task_state['proposed_plan']
+            action_args['proposed_plan'] = get_arg_value('proposed_plan', required=True)
         
         case ActionType.TOOL_CALL:
-            if action_args.get('tool_name') is None:
-                action_args['tool_name'] = task_state['tool_name']
-            if action_args.get('tool_args') is None:
-                action_args['tool_args'] = task_state['tool_args']
+            action_args['tool_name'] = get_arg_value('tool_name', required=True)
+            action_args['tool_args'] = get_arg_value('tool_args', required=True)
 
     return action
 
