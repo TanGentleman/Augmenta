@@ -1,11 +1,12 @@
 import json
-from typing import TypedDict
+from typing import Any, TypedDict
 from mcp.types import CallToolResult
 from tangents.classes.settings import ChatSettings, Config
 from tangents.classes.states import AgentState
 from tangents.classes.tasks import Task, TaskType
-from tangents.classes.actions import Status
+from tangents.classes.actions import ActionType, Status
 from tangents.template import get_default_config
+from tangents.utils.action_utils import create_action
 from tangents.utils.chains import fast_get_llm
 
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage
@@ -44,7 +45,7 @@ def get_experimental_task() -> Task:
         state=None,
     )
 
-def get_gradio_state_dict(user_message: str, history: list, model_name: str, system_message: str) -> AgentState:
+def get_gradio_state_dict(user_message: str, history: list, model_name: str, system_message: str, active_chain: Any | None = None) -> AgentState:
     chat_config = ChatSettings(
         primary_model=model_name,
         stream=True,
@@ -74,7 +75,7 @@ def get_gradio_state_dict(user_message: str, history: list, model_name: str, sys
     
     task_state = {
         'messages': messages,
-        'active_chain': fast_get_llm(model_name),
+        'active_chain': active_chain,
         'stream': True,
     }
     state_dict = {
@@ -87,7 +88,7 @@ def get_gradio_state_dict(user_message: str, history: list, model_name: str, sys
             'chat_task': Task(
                 type=TaskType.CHAT,
                 status=Status.IN_PROGRESS,
-                actions=[],
+                actions=[create_action(ActionType.HEALTHCHECK)],
                 state=task_state
             )
         },

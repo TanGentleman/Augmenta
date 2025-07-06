@@ -24,6 +24,8 @@ MODEL_NAME = 'nebius/meta-llama/Llama-3.3-70B-Instruct'
 SYSTEM_MESSAGE = 'You are a helpful assistant who responds playfully.'
 POLLING_INTERVAL = 0.05
 
+DEFINE_CHAIN_IN_STATE = False
+
 # Setup logging
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -74,7 +76,7 @@ class WorkflowEngine:
         self.workflow = create_workflow(checkpointer=True)
         self.is_workflow_completed = False
         # Create the active chain using the MODEL_NAME
-        self.active_chain = fast_get_llm(MODEL_NAME)
+        self.active_chain = None if DEFINE_CHAIN_IN_STATE else fast_get_llm(MODEL_NAME)
 
     async def process_conversation(
         self,
@@ -143,6 +145,7 @@ class WorkflowEngine:
             history=chat_history,
             model_name=MODEL_NAME,
             system_message=SYSTEM_MESSAGE,
+            active_chain=fast_get_llm(MODEL_NAME) if DEFINE_CHAIN_IN_STATE else None
         )
 
         initial_state = {
