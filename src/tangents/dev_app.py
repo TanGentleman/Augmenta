@@ -1,0 +1,499 @@
+"""
+Augmenta Chat Interface - Unified Version
+
+A Gradio frontend supporting multiple graph workflows:
+- Real-time streaming
+- Persistent chat sessions
+- Human-In-The-Loop within complex workflows
+- Support for both default and planning graphs
+"""
+
+import asyncio
+import logging
+from uuid import uuid4
+from typing import Optional, Dict, Any, Generator, Literal
+from dataclasses import dataclass
+
+import gradio as gr
+from langgraph.types import Command as ResumeCommand
+
+from tangents.tan_graph import create_workflow, get_planning_state_dict, get_default_state_dict
+from tangents.experimental.utils import get_gradio_state_dict
+from tangents.utils.chains import fast_get_llm
+
+# Application Configuration
+MODEL_NAME = 'nebius/meta-llama/Llama-3.3-70B-Instruct'
+SYSTEM_MESSAGE = 'You are a helpful assistant who responds playfully.'
+POLLING_INTERVAL = 0.05
+RECURSION_LIMIT = 50
+
+# Graph type selection
+GraphType = Literal['default', 'planning']
+GRAPH_TYPE: GraphType = 'planning'  # Change this to switch graph types
+
+DEFINE_CHAIN_IN_STATE = False
+
+# Setup logging
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+
+
+@dataclass
+class GraphConfig:
+    """Configuration for different graph types."""
+    graph_type: GraphType
+    state_dict_func: callable
+    title: str
+    description: str
+    placeholder: str
+    emoji: str
+    
+    def get_action_config(self, active_chain, response_streamer) -> Dict[str, Any]:
+        """Get action config for this graph type."""
+        base_config = {
+            'stream_callback': response_streamer.add_content,
+        }
+        
+        if self.graph_type == 'planning':
+            base_config.update({
+                'proposal_system_prompt': 'List 3 function identifiers in the MCP spec.',
+                'revision_system_prompt': 'Use the user input to revise the plan.',
+                'proposal_chain': active_chain,
+                'revision_chain': active_chain,
+            })
+        else:
+            base_config['chain'] = active_chain
+            
+        return base_config
+
+
+# Graph configurations
+GRAPH_CONFIGS = {
+    'default': GraphConfig(
+        graph_type='default',
+        state_dict_func=get_default_state_dict,
+        title="🤖 Augmenta Chat",
+        description="A chat interface powered by LangGraph workflows, supporting streaming responses, "
+                   "resumable chat sessions, and interactive workflows with Human-In-The-Loop capabilities.",
+        placeholder="Start a conversation with Augmenta...",
+        emoji="🤖"
+    ),
+    'planning': GraphConfig(
+        graph_type='planning',
+        state_dict_func=get_planning_state_dict,
+        title="📋 Planning Augmenta Chat",
+        description="A planning-focused chat interface powered by LangGraph workflows with advanced planning capabilities.",
+        placeholder="Start a planning conversation with Augmenta...",
+        emoji="📋",
+    )
+}
+
+# Get current graph config
+CURRENT_CONFIG = GRAPH_CONFIGS[GRAPH_TYPE]
+
+
+class ResponseStreamer:
+    """
+    Handles real-time streaming of assistant responses.
+    """
+
+    def __init__(self, chat_history: list):
+        self.chat_history = chat_history
+        self.current_response = ""
+        self.is_active = False
+
+    def start_new_response(self) -> None:
+        """Start streaming a new response."""
+        self.current_response = ""
+        self.is_active = True
+        self.chat_history.append({"role": "assistant", "content": ""})
+
+    async def add_content(self, new_text: str) -> None:
+        """Add text to the current streaming response."""
+        if not self.is_active:
+            logger.warning("Tried adding content without active streaming.")
+            return
+
+        self.current_response += new_text
+        if self.chat_history and self.chat_history[-1]["role"] == "assistant":
+            self.chat_history[-1]["content"] = self.current_response
+
+    def complete_response(self, final_content: Optional[str] = None) -> None:
+        """Finish the current response stream."""
+        if final_content:
+            self.current_response = final_content
+            if self.chat_history and self.chat_history[-1]["role"] == "assistant":
+                self.chat_history[-1]["content"] = self.current_response
+
+        self.is_active = False
+
+
+class UnifiedWorkflowEngine:
+    """
+    Processes chat conversations using configurable workflow graphs.
+    """
+
+    def __init__(self, graph_config: GraphConfig):
+        self.graph_config = graph_config
+        self.workflow = create_workflow(checkpointer=True)
+        self.is_workflow_completed = False
+        # Create the active chain using the MODEL_NAME
+        self.active_chain = None if DEFINE_CHAIN_IN_STATE else fast_get_llm(MODEL_NAME)
+
+    async def process_conversation(
+        self,
+        user_message: str,
+        chat_history: list,
+        response_streamer: ResponseStreamer,
+        session_id: str,
+        is_new_session: bool = False
+    ) -> tuple[str, bool]:
+        """
+        Process a single conversation turn using the configured graph.
+
+        Args:
+            user_message: User's input message.
+            chat_history: Conversation history.
+            response_streamer: Handles streaming responses.
+            session_id: Unique session identifier.
+            is_new_session: True if starting a new session.
+
+        Returns:
+            Tuple of (final assistant response, workflow_completed).
+        """
+        try:
+            # Reset completion status at start of processing
+            self.is_workflow_completed = False
+            
+            # Get active chain for configuration
+            active_chain = fast_get_llm(MODEL_NAME)
+            if active_chain is None:
+                raise ValueError('No active chain found!')
+                
+            # Build configuration based on graph type
+            config = {
+                'recursion_limit': RECURSION_LIMIT,
+                'configurable': {
+                    'thread_id': session_id,
+                    'action_config': self.graph_config.get_action_config(active_chain, response_streamer)
+                }
+            }
+
+            if is_new_session:
+                logger.info(f"Starting new {self.graph_config.graph_type} session: {session_id}")
+                await self._start_new_workflow(user_message, chat_history, response_streamer, config)
+            else:
+                logger.info(f"Continuing {self.graph_config.graph_type} session: {session_id}")
+                await self._continue_workflow(user_message, response_streamer, config)
+
+            return response_streamer.current_response, self.is_workflow_completed
+
+        except Exception as e:
+            error_message = f"{self.graph_config.graph_type.title()} workflow error: {str(e)}"
+            logger.error(error_message)
+            response_streamer.complete_response(error_message)
+            return error_message, self.is_workflow_completed
+
+    async def _start_new_workflow(
+        self,
+        user_message: str,
+        chat_history: list,
+        response_streamer: ResponseStreamer,
+        config: dict
+    ) -> None:
+        """Start a new workflow session."""
+        # Use the configured state dict function
+        if self.graph_config.graph_type == 'default':
+            # For default graph, use the gradio state dict
+            state_dict = get_gradio_state_dict(
+                user_message=user_message,
+                history=chat_history,
+                model_name=MODEL_NAME,
+                system_message=SYSTEM_MESSAGE,
+                active_chain=fast_get_llm(MODEL_NAME) if DEFINE_CHAIN_IN_STATE else None
+            )
+        else:
+            # For planning graphs, use planning state dict
+            state_dict = self.graph_config.state_dict_func()
+            # TODO: Add user message and chat history to the state dict if needed
+            # This is where you'd customize state initialization per graph type
+
+        initial_state = {
+            'keys': state_dict,
+            'mutation_count': 0,
+            'is_done': False,
+        }
+
+        response_streamer.start_new_response()
+        await self._execute_workflow(initial_state, config)
+        response_streamer.complete_response()
+
+    async def _continue_workflow(
+        self,
+        user_input: str,
+        response_streamer: ResponseStreamer,
+        config: dict
+    ) -> None:
+        """Continue an existing workflow session."""
+        response_streamer.start_new_response()
+        await self._resume_from_checkpoint(user_input, config)
+        response_streamer.complete_response()
+
+    async def _execute_workflow(self, workflow_state: dict, config: dict) -> None:
+        """Execute workflow from initial state."""
+        async for output in self.workflow.astream(workflow_state, config, stream_mode='updates'):
+            await self._process_workflow_output(output)
+
+    async def _resume_from_checkpoint(self, resume_input: str, config: dict) -> None:
+        """Resume workflow from a checkpoint."""
+        async for output in self.workflow.astream(
+            ResumeCommand(resume=resume_input),
+            config,
+            stream_mode='updates'
+        ):
+            await self._process_workflow_output(output)
+
+    async def _process_workflow_output(self, output: Dict[str, Any]) -> None:
+        """Handle workflow outputs and state transitions."""
+        for node_name, node_updates in output.items():
+            if node_name == '__interrupt__':
+                logger.info(f"{self.graph_config.graph_type.title()} workflow paused, awaiting user input.")
+                return
+
+            try:
+                if isinstance(node_updates, dict):
+                    if node_updates.get('is_done') is True:
+                        logger.info(f"{self.graph_config.graph_type.title()} workflow completed.")
+                        self.is_workflow_completed = True
+                        return
+                else:
+                    logger.warning(f"Node updates are not a dict: {type(node_updates)}")
+                logger.debug(f"Processed {self.graph_config.graph_type} node '{node_name}': {type(node_updates)}")
+            except Exception as e:
+                logger.error(f"Error processing {self.graph_config.graph_type} node '{node_name}': {str(e)}")
+
+
+class UnifiedChatInterface:
+    """
+    User interface for Unified Augmenta Chat.
+    """
+
+    def __init__(self, graph_config: GraphConfig):
+        self.graph_config = graph_config
+        self.workflow_engine = UnifiedWorkflowEngine(graph_config)
+
+    def add_user_message(self, user_input: str, chat_history: list) -> tuple[str, list]:
+        """Add user's message to chat history."""
+        if not user_input.strip():
+            print(f"User input is empty! Assistant will not respond.")
+            return "", chat_history
+        return "", chat_history + [{"role": "user", "content": user_input}]
+
+    def generate_assistant_response(
+        self,
+        chat_history: list,
+        session_data: dict
+    ) -> Generator[tuple[list, dict, gr.update, gr.update], None, None]:
+        """
+        Generate assistant's response with streaming updates.
+
+        Args:
+            chat_history: Current chat history.
+            session_data: Session metadata.
+
+        Yields:
+            Updates for chat history, session data, and UI elements.
+        """
+        if not chat_history or chat_history[-1]["role"] != "user":
+            logger.warning("Assistant found invalid user message.")
+            yield (
+                chat_history,
+                session_data,
+                gr.update(interactive=True),
+                gr.update(interactive=True)
+            )
+            return
+        
+        if not session_data.get("session_id"):
+            session_data["session_id"] = str(uuid4())
+            session_data["message_count"] = 0
+
+        session_data["message_count"] += 1
+        session_id = session_data["session_id"]
+        is_new_session = (session_data["message_count"] == 1)
+
+        response_streamer = ResponseStreamer(chat_history)
+
+        try:
+            user_message = chat_history[-1]["content"]
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+            async def process_message():
+                return await self.workflow_engine.process_conversation(
+                    user_message, chat_history, response_streamer,
+                    session_id=session_id,
+                    is_new_session=is_new_session
+                )
+
+            task = loop.create_task(process_message())
+
+            while not task.done():
+                loop.run_until_complete(asyncio.sleep(POLLING_INTERVAL))
+                yield (
+                    chat_history,
+                    session_data,
+                    gr.update(interactive=False),
+                    gr.update(interactive=False)
+                )
+
+            final_response, workflow_completed = loop.run_until_complete(task)
+
+            if not final_response.strip():
+                logger.warning(f"Empty response received from {self.graph_config.graph_type} workflow.")
+                if chat_history[-1]["role"] == "assistant" and not chat_history[-1]["content"].strip():
+                    chat_history = chat_history[:-2]
+                    logger.info("Removed incomplete exchange.")
+                    
+            # If graph is run to completion, remove the session from the gradio state
+            if workflow_completed:
+                logger.info(f"{self.graph_config.graph_type.title()} workflow completed. Clearing session: {session_id}")
+                session_data["session_id"] = None
+                session_data["message_count"] = 0
+                # Update final messages state
+                
+            yield (
+                chat_history,
+                session_data,
+                gr.update(interactive=True),
+                gr.update(interactive=True)
+            )
+
+        except Exception as e:
+            error_message = f"{self.graph_config.graph_type.title()} chat error: {str(e)}"
+            logger.error(error_message)
+            chat_history.append({"role": "assistant", "content": error_message})
+            yield (
+                chat_history,
+                session_data,
+                gr.update(interactive=True),
+                gr.update(interactive=True)
+            )
+        finally:
+            loop.close()
+    
+    def clear_session(self) -> tuple[list, dict]:
+        """Clear chat history and session data."""
+        logger.info(f"Clearing {self.graph_config.graph_type} chat history and session data.")
+        return [], {"session_id": None, "message_count": 0}
+    
+    def create_interface(self) -> gr.Blocks:
+        """
+        Create and configure the Gradio chat interface.
+        
+        Returns:
+            Configured Gradio Blocks interface ready for launch
+        """
+        with gr.Blocks(
+            title=self.graph_config.title,
+            analytics_enabled=False
+        ) as demo:
+            gr.Markdown(f"# {self.graph_config.title}")
+            gr.Markdown(
+                f"**{self.graph_config.title} Demo**\n\n"
+                f"{self.graph_config.description}"
+            )
+            
+            # Session state management
+            session_data = gr.State({})
+            
+            with gr.Tabs():
+                with gr.Tab("Chat"):
+                    # Main chat interface
+                    chatbot = gr.Chatbot(
+                        label=f"Chat with {self.graph_config.graph_type.title()} Augmenta",
+                        height=500,
+                        type="messages",
+                        show_copy_button=True
+                    )
+                    
+                    # Input controls
+                    with gr.Row():
+                        message_input = gr.Textbox(
+                            placeholder=self.graph_config.placeholder,
+                            label="Your message",
+                            lines=2,
+                            scale=4,
+                            show_label=False,
+                        )
+                        send_button = gr.Button("Send", variant="primary", scale=1)
+                        clear_button = gr.Button("Clear", variant="secondary", scale=1)
+                
+                with gr.Tab("Session"):
+                    session_id_display = gr.Textbox(
+                        label="Session ID",
+                        value=session_data.value.get("session_id", "No active session"),
+                        interactive=True
+                    )
+
+            # Event handling with proper input management
+            send_button.click(
+                fn=self.add_user_message,
+                inputs=[message_input, chatbot],
+                outputs=[message_input, chatbot],
+                queue=False
+            ).then(
+                fn=self.generate_assistant_response,
+                inputs=[chatbot, session_data],
+                outputs=[chatbot, session_data, message_input, send_button]
+            )
+            
+            message_input.submit(
+                fn=self.add_user_message,
+                inputs=[message_input, chatbot],
+                outputs=[message_input, chatbot],
+                queue=False
+            ).then(
+                fn=self.generate_assistant_response,
+                inputs=[chatbot, session_data],
+                outputs=[chatbot, session_data, message_input, send_button]
+            )
+
+            clear_button.click(
+                fn=self.clear_session,
+                inputs=[],
+                outputs=[chatbot, session_data],
+                queue=False
+            )
+
+        return demo
+
+
+def main():
+    """Launch the Unified Augmenta Chat application."""
+    try:
+        # Configure logging
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        logger.info(f"Starting {CURRENT_CONFIG.title} application with {CURRENT_CONFIG.graph_type} graph")
+        
+        # Load environment variables
+        from dotenv import load_dotenv
+        load_dotenv()
+        
+        # Initialize and launch chat interface
+        chat_app = UnifiedChatInterface(CURRENT_CONFIG)
+        demo = chat_app.create_interface()
+        
+        logger.info(f"Launching {CURRENT_CONFIG.title} interface")
+        demo.launch(share=False, debug=False)
+        
+    except Exception as e:
+        logger.error(f"Failed to start {CURRENT_CONFIG.title}: {str(e)}")
+        raise
+
+
+if __name__ == "__main__":
+    main() 
