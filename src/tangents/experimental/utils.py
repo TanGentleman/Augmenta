@@ -1,4 +1,5 @@
 import json
+import logging
 from typing import Any, TypedDict
 from mcp.types import CallToolResult
 from tangents.classes.settings import ChatSettings, Config
@@ -75,7 +76,7 @@ def get_gradio_state_dict(user_message: str, history: list, model_name: str, sys
     
     task_state = {
         'messages': messages,
-        'active_chain': active_chain,
+        'chain': active_chain,
         'stream': True,
     }
     state_dict = {
@@ -95,3 +96,19 @@ def get_gradio_state_dict(user_message: str, history: list, model_name: str, sys
         'mock_inputs': [user_message],
     }
     return state_dict
+
+def get_proposed_plan(context: str, system_prompt: str) -> str | None:
+    """
+    Get a proposed plan from the LLM.
+    """
+    try:
+        llm = fast_get_llm('nebius/meta-llama/Llama-3.3-70B-Instruct')
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=context),
+        ]
+        response = llm.invoke(messages)
+        return response.content
+    except Exception as e:
+        logging.error(f"Error getting proposed plan: {e}")
+        return None

@@ -22,19 +22,14 @@ def handle_user_message(user_input: str, current_task: Task, config: Config) -> 
     match current_task['type']:
         case TaskType.CHAT:
             task_state['messages'].append(HumanMessage(content=user_input))
-            if task_state['active_chain'] is None:
+            if task_state['chain'] is None:
                 logging.warning('No active chain found, it must be passed to Action at runtime!')
-                # logging.warning('No active chain found, initializing new chain!')
-                # llm = fast_get_llm(config.chat_settings.primary_model)
-                # if llm is None:
-                #     raise ValueError('Chain not initialized!')
-                # task_state['active_chain'] = llm
 
             generate_action = create_action(
                 ActionType.GENERATE,
                 args={
                     'messages': task_state['messages'],
-                    'chain': task_state['active_chain'],
+                    'chain': task_state['chain'],
                     'stream': task_state['stream'],
                 },
             )
@@ -53,22 +48,28 @@ def handle_user_message(user_input: str, current_task: Task, config: Config) -> 
         case TaskType.PLANNING:
             # assert that there is an in-progress revise action queued next
             action_list = current_task['actions']
-            if len(action_list) == 0:
+            if len(action_list) == 0 or action_list[0]['type'] != PlanActionType.REVISE_PLAN:
                 raise ValueError('No revise action found!')
-
-            if (
-                action_list[0]['type'] != PlanActionType.REVISE_PLAN
-                or action_list[0]['status'] != Status.IN_PROGRESS
-            ):
-                raise ValueError('Next action must be an in-progress revise action!')
-
             if user_input == 'y':
                 print('Plan is confirmed!')
-                current_task['actions'][0]['args']['is_done'] = True
+                if action_list[0]['status'] == Status.NOT_STARTED:
+                    # NOTE: Early exit!
+                    task_state['plan'] = task_state['proposed_plan']
+                    current_task['status'] = Status.DONE
+                    # Clear the revision action
+                    current_task['actions'].pop(0)
+                    assert len(current_task['actions']) == 0, 'No actions should be left after the revise action is cleared!'
+                else:
+                    current_task['actions'][0]['args']['is_done'] = True
             else:
                 print('Using your revision!')
-                # The next human action is added in handle_action.handle_action_result
-                # That logic can alternatively be added here
+                task_state['human_feedback'] = user_input
+                current_task['actions'][0]['args']['revision_context'] = user_input
+                # Generation for revision
+                # NOTE: Is this insertion sound?
+                generate_action = create_action(ActionType.GENERATE)
+                current_task['actions'].insert(0, generate_action)
+                logging.info(f'Using your input as context for the next revision!')
 
         case TaskType.EXPERIMENTAL:
             print("Experimental task. User input here can modify task state.")

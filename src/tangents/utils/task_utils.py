@@ -73,7 +73,21 @@ def delete_tasks(task_dict: dict[str, Task], task_names: list[str]) -> None:
 
 
 def stash_task(task: Task) -> bool:
-    """Stash a task for later processing. (placeholder)"""
+    """Stash a task for later processing. (creates file if not exists)"""
+    import json
+    from pathlib import Path
+    filepath = Path(__file__).parent.parent / 'stashed_tasks.json'
+    # Ensure the file exists (create if not)
+    if not filepath.exists():
+        filepath.touch()
+    task_json = {
+        'name': "Unknown",
+        'status': task['status'].value,
+        'type': task['type'].value,
+    }
+    with open(filepath, 'a') as f:
+        json.dump(task_json, f)
+
     logging.info('Stashed task')
     return True
 
@@ -97,7 +111,7 @@ def initialize_task_state(task: Task, config: Config) -> dict:
         case TaskType.CHAT:
             task_state = {
                 'messages': [],
-                'active_chain': None,
+                'chain': None,
                 'stream': config.chat_settings.stream,
             }
             if not config.chat_settings.disable_system_message:
@@ -108,7 +122,7 @@ def initialize_task_state(task: Task, config: Config) -> dict:
             llm = fast_get_llm(model_name)
             if llm is None:
                 raise ValueError('Chain not initialized!')
-            task_state['active_chain'] = llm
+            task_state['chain'] = llm
 
         case TaskType.RAG:
             if not config.rag_settings.enabled:
@@ -117,7 +131,7 @@ def initialize_task_state(task: Task, config: Config) -> dict:
 
         case TaskType.PLANNING:
             task_state = {
-                'context': None,
+                'plan_context': None,
                 'proposed_plan': None,
                 'plan': None,
                 'revision_count': 0,

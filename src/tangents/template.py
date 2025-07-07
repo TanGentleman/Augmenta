@@ -3,7 +3,7 @@ from tangents.classes.settings import ChatSettings, Config, RAGSettings
 from tangents.classes.states import AgentState
 from tangents.classes.tasks import Task, TaskType
 from tangents.utils.action_utils import create_action
-
+from tangents.experimental.constants import CONVEX_MCP_SPEC_PATH
 
 class MockInputs:
     SUMMARY = ['/mode summary', '/read', '/quit']
@@ -41,7 +41,7 @@ def get_default_config() -> Config:
             system_message='Speak with lots of emojis',
             disable_system_message=False,
         ),
-        rag_settings=RAGSettings(enabled=True),
+        rag_settings=RAGSettings(),
     )
 
 
@@ -79,6 +79,26 @@ def get_planning_state_dict() -> AgentState:
         'config': get_default_config(),
         'action_count': 0,
         'user_input': None,
-        'task_dict': {'plan_from_email_task': get_example_planning_task()},
+        # 'task_dict': {'plan_from_email_task': get_example_planning_task()},
+        'task_dict': {'convex_mcp_spec_task': get_convex_mcp_spec_task()},
         'mock_inputs': MockInputs.EMPTY,
     }
+
+def get_convex_mcp_spec_task() -> Task:
+    return Task(
+        type=TaskType.PLANNING,
+        status=Status.NOT_STARTED,
+        # status=Status.IN_PROGRESS,
+        actions=[
+            create_action(PlanActionType.FETCH, args={'source': CONVEX_MCP_SPEC_PATH, 'method': 'convex_mcp_spec'}),
+            create_action(PlanActionType.PROPOSE_PLAN),
+            create_action(PlanActionType.REVISE_PLAN),
+        ],
+        state=None,
+        # state={
+        #     'plan_context': None,
+        #     'proposed_plan': None,
+        #     'plan': None,
+        #     'revision_count': 0,
+        # },
+    )
